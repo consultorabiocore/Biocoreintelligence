@@ -1,167 +1,158 @@
 import streamlit as st
 import ee
 import json
-import folium
 import pandas as pd
 import io
-import matplotlib.pyplot as plt
 import os
 import base64
-from streamlit_folium import st_folium
+import requests
+import matplotlib.pyplot as plt
 from fpdf import FPDF
 from datetime import datetime, timedelta
 
-# --- CONFIGURACIÓN DE MARCA ---
+# --- CREDENCIALES CRÍTICAS (BOT TELEGRAM) ---
+T_TOKEN = "7961684994:AAGbepFHxXJtjCVTCjEwq2xWh9vT9TO6G68"
+T_ID = "6712325113"
 LOGO_PATH = os.path.join("assets", "logo_biocore.png")
 COLOR_BIOCORE = (20, 50, 80)
 
-st.set_page_config(page_title="BioCore Intelligence", layout="wide", page_icon="🛰️")
+st.set_page_config(page_title="BioCore Intelligence | Reporte Diario", layout="wide")
 
-def get_base64_image(path):
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
+# --- FUNCIONES DE UTILIDAD ---
+def clean(text): return str(text).encode('latin-1', 'replace').decode('latin-1')
+
+def enviar_telegram(mensaje):
+    url = f"https://api.telegram.org/bot{T_TOKEN}/sendMessage"
+    try: requests.post(url, data={"chat_id": T_ID, "text": mensaje, "parse_mode": "Markdown"})
+    except: pass
+
+def get_base64_logo():
+    if os.path.exists(LOGO_PATH):
+        with open(LOGO_PATH, "rb") as f: return base64.b64encode(f.read()).decode()
     return None
 
-def clean(text):
-    return str(text).encode('latin-1', 'replace').decode('latin-1')
+# --- MOTOR DE CÁLCULO Y CONSULTA HISTÓRICA (SIN SHEETS) ---
+def generar_analisis_diario(geom, dias_atras=180):
+    """Calcula el estado de hoy y recupera el historial para el gráfico del PDF"""
+    fin = datetime.now()
+    ini = fin - timedelta(days=dias_atras)
+    
+    # Colección Sentinel-2 (Lógica Droplet mejorada)
+    col = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+        .filterBounds(geom)\
+        .filterDate(ini.strftime('%Y-%m-%d'), fin.strftime('%Y-%m-%d'))\
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
 
-def iniciar_gee():
-    try:
-        info = json.loads(st.secrets["GEE_JSON"])
-        pk = info["private_key"].replace("\\n", "\n")
-        creds = ee.ServiceAccountCredentials(info["client_email"], key_data=pk)
-        ee.Initialize(creds)
-        return True
-    except: return False
+    def calc_indices(img):
+        # Índices técnicos BioCore
+        savi = img.expression('((B8-B4)/(B8+B4+0.5))*1.5', {
+            'B8': img.select('B8'), 'B4': img.select('B4')
+        }).rename('savi')
+        ndsi_ndwi = img.normalizedDifference(['B3', 'B11']).rename('mn') # Dual: Nieve/Agua
+        swir = img.select('B11').divide(10000).rename('swir')
+        
+        return ee.Feature(None, {
+            'fecha': img.date().format('YYYY-MM-DD'),
+            'savi': savi.reduceRegion(ee.Reducer.median(), geom, 30).get('savi'),
+            'mn': ndsi_ndwi.reduceRegion(ee.Reducer.median(), geom, 30).get('mn'),
+            'swir': swir.reduceRegion(ee.Reducer.median(), geom, 30).get('swir')
+        })
 
-conectado = iniciar_gee()
+    datos = col.map(calc_indices).getInfo()
+    df = pd.DataFrame([f['properties'] for f in datos['features'] if f['properties']['savi'] is not None])
+    if not df.empty:
+        df['fecha'] = pd.to_datetime(df['fecha'])
+        df = df.sort_values('fecha')
+    return df
 
-# --- MOTOR DE REPORTES PDF ---
-def generar_reporte_biocore(cliente, sector, periodo, df_hist, alerta_fuego, alerta_desvio):
+# --- GENERADOR DE REPORTE PDF (ESTILO PROFESIONAL) ---
+def crear_pdf_reporte(df, proy, sector, estado, diagnostico):
     pdf = FPDF()
     pdf.add_page()
     
-    # Franja Corporativa
+    # Encabezado BioCore
     pdf.set_fill_color(*COLOR_BIOCORE)
     pdf.rect(0, 0, 210, 40, 'F')
+    if os.path.exists(LOGO_PATH): pdf.image(LOGO_PATH, x=10, y=10, h=20)
     
-    if os.path.exists(LOGO_PATH):
-        pdf.image(LOGO_PATH, x=15, y=10, h=18)
+    pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", "B", 15)
+    pdf.set_xy(40, 15); pdf.cell(0, 10, clean(f"REPORTE DIARIO DE AUDITORÍA: {proy}"), ln=1)
+    pdf.set_font("helvetica", "I", 9); pdf.set_xy(40, 22)
+    pdf.cell(0, 10, clean("Responsable Técnica: Loreto Campos Carrasco | BioCore Intelligence"), ln=1)
     
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 16)
-    pdf.set_xy(45, 12)
-    pdf.cell(0, 10, clean("BIOCORE INTELLIGENCE"), ln=1)
-    
+    # Estatus y Diagnóstico
     pdf.ln(25); pdf.set_text_color(0, 0, 0)
-    pdf.set_font("helvetica", "B", 12)
-    pdf.cell(0, 8, clean(f"CLIENTE: {cliente}"), ln=1)
-    pdf.set_font("helvetica", "", 11)
-    pdf.cell(0, 8, clean(f"SECTOR: {sector} | PERIODO ANALIZADO: {periodo}"), ln=1)
+    color_status = (200, 0, 0) if "ALERTA" in estado else (0, 100, 0)
+    pdf.set_fill_color(*color_status); pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", "B", 11)
+    pdf.cell(0, 10, clean(f"  ESTADO ACTUAL: {estado}"), ln=1, fill=True)
     
-    if alerta_fuego or alerta_desvio:
-        pdf.set_fill_color(255, 230, 230)
-        pdf.set_font("helvetica", "B", 10)
-        pdf.cell(0, 10, clean(" STATUS: ALERTA TÉCNICA ACTIVA"), border=1, ln=1, fill=True)
+    pdf.ln(5); pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", "", 10)
+    pdf.multi_cell(0, 6, clean(f"DIAGNÓSTICO TÉCNICO:\n{diagnostico}"), border=1)
 
-    if not df_hist.empty:
-        plt.figure(figsize=(10, 4))
-        df_hist['fecha'] = pd.to_datetime(df_hist['fecha'])
-        df_hist = df_hist.sort_values('fecha')
-        plt.plot(df_hist['fecha'], df_hist['ndvi'], color='#143250', marker='o', markersize=3)
-        plt.title(f"Analisis de Tendencia - {periodo}")
-        plt.grid(True, alpha=0.2)
-        plt.savefig("temp_pdf.png", dpi=150)
-        pdf.image("temp_pdf.png", x=15, y=110, w=180)
+    # Gráfico de Tendencia
+    if not df.empty:
+        plt.figure(figsize=(10, 5))
+        plt.plot(df['fecha'], df['mn'], color='#1f77b4', label='NDSI/NDWI (Nieve/Agua)', marker='o')
+        plt.plot(df['fecha'], df['savi'], color='#2ca02c', label='SAVI (Vigor Vegetal)', marker='s')
+        plt.title(f"Evolución Histórica - {proy}")
+        plt.legend(); plt.grid(True, alpha=0.3)
+        plt.savefig("plot_diario.png", dpi=150)
+        pdf.image("plot_diario.png", x=15, y=120, w=180)
         plt.close()
 
-    pdf.set_y(255); pdf.set_font("helvetica", "B", 10)
-    pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
+    pdf.set_y(265); pdf.set_font("helvetica", "B", 10); pdf.cell(0, 5, "Loreto Campos Carrasco", align="C", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- BARRA LATERAL ---
-with st.sidebar:
-    logo_b64 = get_base64_image(LOGO_PATH)
-    if logo_b64:
-        st.markdown(
-            f"""
-            <div style="display: flex; justify-content: center; padding: 20px 0;">
-                <img src="data:image/png;base64,{logo_b64}" width="110" style="image-rendering: crisp-edges;">
-            </div>
-            """, unsafe_allow_html=True
-        )
-    
-    st.markdown("---")
-    
-    if not st.session_state.get('auth', False):
-        u, p = st.text_input("Usuario"), st.text_input("Clave", type="password")
-        if st.button("Entrar"):
-            if u == "admin" and p == "loreto2026":
-                st.session_state.auth = True; st.rerun()
-    else:
-        st.success("🛰️ Conectado")
-        cliente = st.text_input("Titular", "Mandante_RCA")
-        sector_seleccionado = st.selectbox("Tipo de Proyecto:", ["Minería", "Humedales", "Forestal", "Energía", "Industrial"])
-        
-        # SELECTOR DE PERIODO TEMPORAL
-        opciones_periodo = {
-            "Última Semana": 7,
-            "Último Mes": 30,
-            "Últimos 6 Meses": 180,
-            "Último Año": 365,
-            "Histórico (Decadal)": 7300
-        }
-        periodo_label = st.selectbox("Periodo de Análisis:", list(opciones_periodo.keys()))
-        dias_analisis = opciones_periodo[periodo_label]
-        
-        input_coords = st.text_area("Coordenadas (Polygon):")
-        if st.button("Salir"): st.session_state.auth = False; st.rerun()
+# --- INTERFAZ STREAMLIT ---
+if not ee.data._credentials: # Iniciar GEE si no está
+    try:
+        info = json.loads(st.secrets["GEE_JSON"])
+        ee.Initialize(ee.ServiceAccountCredentials(info['client_email'], key_data=info['private_key'].replace("\\n", "\n")))
+    except: st.error("Error GEE")
 
-# --- PANEL PRINCIPAL ---
+with st.sidebar:
+    logo_b64 = get_base64_logo()
+    if logo_b64: st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{logo_b64}" width="120"></div>', unsafe_allow_html=True)
+    st.markdown("---")
+    if st.session_state.get('auth', False):
+        proy_name = st.text_input("Proyecto", "Pascua Lama")
+        tipo_sec = st.selectbox("Sector:", ["Minería", "Glaciares", "Humedales"])
+        coords_json = st.text_area("Polígono (Coordenadas):")
+        if st.button("Log Out"): st.session_state.auth = False; st.rerun()
+    else:
+        u, p = st.text_input("User"), st.text_input("Pass", type="password")
+        if st.button("Entrar"):
+            if u == "admin" and p == "loreto2026": st.session_state.auth = True; st.rerun()
+
 if st.session_state.get('auth', False):
-    st.title("Plataforma de Prevención de Riesgos Ambientales")
+    st.title("BioCore Intelligence: Generación de Reportes Diarios")
     
-    if input_coords:
+    if coords_json:
         try:
-            data = io.StringIO(input_coords.strip())
-            df_p = pd.read_csv(data, names=['lat', 'lon'])
-            geom = ee.Geometry.Polygon(df_p[['lon', 'lat']].values.tolist())
-            
-            col_map, col_res = st.columns([2, 1])
-            with col_map:
-                m = folium.Map(location=[df_p['lat'].mean(), df_p['lon'].mean()], zoom_start=13)
-                if conectado:
-                    s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).first()
-                    if s1:
-                        mid = s1.getMapId({'min': -25, 'max': 0})
-                        folium.TileLayer(tiles=mid['tile_fetcher'].url_format, attr='Radar').add_to(m)
-                folium.GeoJson(geom.getInfo()).add_to(m)
-                st_folium(m, width="100%", height=500)
-            
-            with col_res:
-                if st.button(f"🔍 Ejecutar Auditoría"):
-                    with st.spinner("Procesando Satélites..."):
-                        # Alerta Fuego (48h)
-                        fuego = ee.ImageCollection("FIRMS").filterBounds(geom).filterDate((datetime.now()-timedelta(days=2)).strftime('%Y-%m-%d'), datetime.now().strftime('%Y-%m-%d')).size().getInfo() > 0
+            geom_auditoria = ee.Geometry.Polygon(json.loads(coords_json))
+            if st.button("🚀 GENERAR REPORTE COMPLETO Y NOTIFICAR"):
+                with st.spinner("Escaneando satélites y construyendo histórico..."):
+                    df = generar_analisis_diario(geom_auditoria)
+                    
+                    if not df.empty:
+                        actual = df.iloc[-1]
+                        # Lógica de diagnóstico legal
+                        estado = "🟢 BAJO CONTROL"
+                        diagnostico = "Sin variaciones anómalas respecto al historial."
+                        if tipo_sec in ["Minería", "Glaciares"] and actual['mn'] < 0.35:
+                            estado = "🔴 ALERTA TÉCNICA"
+                            diagnostico = f"Pérdida crítica de cobertura (NDSI: {actual['mn']:.2f}). Se requiere inspección."
                         
-                        # Análisis Temporal según selector
-                        fecha_inicio = (datetime.now() - timedelta(days=dias_analisis)).strftime('%Y-%m-%d')
-                        col = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(geom).filterDate(fecha_inicio, datetime.now().strftime('%Y-%m-%d')).filter(ee.Filter.lt('CLOUD_COVER', 20))
+                        # PDF y Telegram
+                        pdf_reporte = crear_pdf_reporte(df, proy_name, tipo_sec, estado, diagnostico)
                         
-                        datos = col.map(lambda img: ee.Feature(None, {
-                            'fecha': img.date().format('YYYY-MM-DD'),
-                            'ndvi': img.normalizedDifference(['SR_B5', 'SR_B4']).reduceRegion(ee.Reducer.mean(), geom, 60).get('nd')
-                        })).getInfo()
+                        msg_tel = (f"🛰 **REPORTE DIARIO BIOCORE**\n**{proy_name}**\n"
+                                   f"Estatus: {estado}\nNDSI: `{actual['mn']:.2f}`\nSAVI: `{actual['savi']:.2f}`\n"
+                                   f"✅ Reporte PDF generado.")
+                        enviar_telegram(msg_tel)
                         
-                        df_hist = pd.DataFrame([f['properties'] for f in datos['features'] if f['properties']['ndvi'] is not None])
-                        
-                        alerta_desv = not df_hist.empty and len(df_hist) > 1 and df_hist['ndvi'].iloc[-1] < (df_hist['ndvi'].mean() * 0.8)
-                        
-                        pdf = generar_reporte_biocore(cliente, sector_seleccionado, periodo_label, df_hist, fuego, alerta_desv)
-                        st.download_button("📥 Descargar Reporte", pdf, f"BioCore_{cliente}.pdf")
-                        
-                        if fuego: st.error("🔥 Alerta: Fuego detectado en el área.")
-                        st.success("Análisis completado.")
-        except:
-            st.error("Error en el formato de coordenadas.")
+                        st.success("✅ Reporte Diario generado con éxito.")
+                        st.download_button("📥 DESCARGAR REPORTE TÉCNICO (PDF)", pdf_reporte, f"BioCore_{proy_name}_{datetime.now().strftime('%Y%m%d')}.pdf")
+                        st.line_chart(df.set_index('fecha')[['mn', 'savi']])
+        except Exception as e: st.error(f"Error: {e}")

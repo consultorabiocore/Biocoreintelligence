@@ -11,15 +11,12 @@ st.set_page_config(page_title="BioCore SaaS", layout="wide")
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON
             info = json.loads(st.secrets["GEE_JSON"])
-            
-            # 2. LIMPIEZA EXTREMA (Solución al InvalidPadding)
             pk = info['private_key']
-            # Reemplazamos saltos de línea literales, quitamos comillas y limpiamos espacios
-            pk = pk.replace("\\n", "\n").replace('\\n', '\n').strip()
             
-            # 3. Inicialización
+            # LIMPIEZA TOTAL: Eliminamos el caracter '|' y corregimos saltos de línea
+            pk = pk.replace('|', '').replace("\\n", "\n").replace('\\n', '\n').strip()
+            
             creds = ee.ServiceAccountCredentials(info['client_email'], key_data=pk)
             ee.Initialize(creds)
         except Exception as e:
@@ -34,9 +31,7 @@ if 'auth' not in st.session_state:
     st.session_state.auth = False
 
 with st.sidebar:
-    # Mostramos el nombre si no hay logo
     st.markdown("### 🛰️ **BioCore Intelligence**")
-
     if not st.session_state.auth:
         u = st.text_input("Usuario")
         p = st.text_input("Password", type="password")
@@ -52,7 +47,6 @@ with st.sidebar:
             st.session_state.auth = False
             st.rerun()
 
-# --- MAPA ---
 if st.session_state.auth:
     st.header("👨‍💻 Dashboard de Monitoreo")
     m = folium.Map(location=[-37.28, -72.70], zoom_start=12)

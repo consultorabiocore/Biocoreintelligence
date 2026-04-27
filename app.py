@@ -11,12 +11,16 @@ st.set_page_config(page_title="BioCore SaaS", layout="wide")
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # Cargamos y limpiamos la llave
+            # 1. Cargamos el JSON
             info = json.loads(st.secrets["GEE_JSON"])
-            # Esta línea es la que arregla el error de Padding
-            llave = info['private_key'].replace('\\n', '\n').strip()
             
-            creds = ee.ServiceAccountCredentials(info['client_email'], key_data=llave)
+            # 2. LIMPIEZA BLINDADA (Solución definitiva a InvalidPadding)
+            pk = info['private_key']
+            # Quitamos comillas extras, corregimos saltos de línea y eliminamos espacios laterales
+            pk = pk.replace("\\n", "\n").replace('"', '').strip()
+            
+            # 3. Inicialización
+            creds = ee.ServiceAccountCredentials(info['client_email'], key_data=pk)
             ee.Initialize(creds)
         except Exception as e:
             st.error(f"❌ Error de conexión: {e}")
@@ -30,7 +34,6 @@ if 'auth' not in st.session_state:
     st.session_state.auth = False
 
 with st.sidebar:
-    # Intento de cargar logo
     try:
         st.image("assets/logo.png", use_container_width=True)
     except:
@@ -49,20 +52,10 @@ with st.sidebar:
             st.session_state.auth = False
             st.rerun()
 
-# --- PANEL PRINCIPAL ---
 if st.session_state.auth:
     st.header("👨‍💻 Dashboard de Monitoreo")
-    
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        # Mapa centrado en Chile
-        m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
-        Draw(export=True).add_to(m)
-        st_folium(m, width="100%", height=500)
-    
-    with col2:
-        st.write("### Controles")
-        st.info("Dibuja un polígono en el mapa para analizar los índices ambientales.")
+    m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
+    Draw(export=True).add_to(m)
+    st_folium(m, width="100%", height=500)
 else:
-    st.info("Inicie sesión para acceder a las herramientas de BioCore.")
+    st.info("Inicie sesión para acceder.")

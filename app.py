@@ -18,10 +18,9 @@ def iniciar_gee():
             
             # 2. LIMPIEZA QUIRÚRGICA (Solución definitiva a InvalidPadding)
             if isinstance(pk, str):
-                # Convertimos saltos de línea de texto a reales
+                # Reemplazamos saltos de línea de texto por reales
                 pk = pk.replace("\\n", "\n")
-                # Removemos cualquier cosa que no sea parte de una llave PEM válida
-                # Esto quita espacios, puntos o barras que se cuelan al pegar
+                # Eliminamos cualquier carácter extraño al inicio (puntos, espacios, etc.)
                 pk = re.sub(r'^[^{A-Za-z0-9\-]*', '', pk).strip()
             
             # 3. Autenticación
@@ -50,7 +49,7 @@ with st.sidebar:
             else:
                 st.error("Credenciales incorrectas")
     else:
-        st.success("Sesión Iniciada")
+        st.success("Conexión Establecida")
         if st.button("Cerrar Sesión"):
             st.session_state.auth = False
             st.rerun()
@@ -58,6 +57,7 @@ with st.sidebar:
 # --- PANEL PRINCIPAL ---
 if st.session_state.auth:
     st.header("👨‍💻 Dashboard de Monitoreo")
+    # Mapa centrado en la zona de Laja/Biobío
     m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
     Draw(export=True).add_to(m)
     st_folium(m, width="100%", height=500)

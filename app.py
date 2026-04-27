@@ -12,16 +12,14 @@ st.set_page_config(page_title="BioCore Intelligence SaaS", layout="wide")
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON
+            # 1. Cargamos el JSON desde los Secrets
             creds_info = json.loads(st.secrets["GEE_JSON"])
             
-            # 2. LIMPIEZA PROFUNDA DE LA CLAVE (Solución al error InvalidPadding)
-            # Esto quita espacios raros y asegura que los saltos de línea sean correctos
-            private_key = creds_info['private_key']
-            if isinstance(private_key, str):
-                private_key = private_key.replace("\\n", "\n")
+            # 2. LIMPIEZA DE CLAVE (Solución al error InvalidPadding)
+            # Reemplazamos saltos de línea y quitamos espacios accidentales
+            private_key = creds_info['private_key'].replace('\\n', '\n').strip()
             
-            # 3. Inicialización
+            # 3. Inicialización con Service Account
             credentials = ee.ServiceAccountCredentials(
                 creds_info['client_email'],
                 key_data=private_key
@@ -33,7 +31,7 @@ def iniciar_gee():
             except:
                 st.error(f"❌ Error de conexión con GEE: {e}")
     else:
-        st.error("⚠️ GEE_JSON no encontrado en Secrets.")
+        st.error("⚠️ Configuración incompleta: GEE_JSON no encontrado.")
 
 iniciar_gee()
 
@@ -42,13 +40,14 @@ if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 with st.sidebar:
+    # Ruta flexible para el logo
     try:
         st.image("assets/logo.png", use_container_width=True)
     except:
         try:
             st.image("logo.png", use_container_width=True)
         except:
-            st.markdown("### 🛰️ **BioCore Intelligence**")
+            st.subheader("🛰️ BioCore Intelligence")
 
     st.title("🛡️ Panel de Acceso")
     
@@ -71,10 +70,12 @@ with st.sidebar:
 if st.session_state.autenticado:
     st.header("👨‍💻 Análisis Satelital BioCore")
     
-    # Lógica del mapa y procesamiento
-    m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
-    Draw(export=True).add_to(m)
-    st_folium(m, width=700, height=450)
-    st.info("Dibuja un área y presiona analizar (lógica simplificada para probar conexión)")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
+        Draw(export=True).add_to(m)
+        st_folium(m, width=700, height=450)
+    with col2:
+        st.info("Dibuja un polígono para comenzar el análisis.")
 else:
     st.info("Inicie sesión para acceder al sistema.")

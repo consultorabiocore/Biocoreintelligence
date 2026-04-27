@@ -1,5 +1,6 @@
 import streamlit as st
 import ee
+import json
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw
@@ -8,14 +9,9 @@ st.set_page_config(page_title="BioCore SaaS", layout="wide")
 
 def iniciar_gee():
     try:
-        info = dict(st.secrets["gee"])
-        # Normalizar \n de la private_key (TOML a veces los escapa)
-        info["private_key"] = info["private_key"].replace("\\n", "\n")
-        
-        creds = ee.ServiceAccountCredentials(
-            info["client_email"],
-            key_data=info["private_key"]
-        )
+        info = json.loads(st.secrets["GEE_JSON"])
+        pk = info["private_key"].replace("\\n", "\n")
+        creds = ee.ServiceAccountCredentials(info["client_email"], key_data=pk)
         ee.Initialize(creds)
         return True
     except Exception as e:
@@ -24,7 +20,6 @@ def iniciar_gee():
 
 conectado = iniciar_gee()
 
-# --- SIDEBAR ---
 with st.sidebar:
     st.subheader("🛰️ BioCore Intelligence")
     if conectado:
@@ -46,7 +41,6 @@ with st.sidebar:
             st.session_state.auth = False
             st.rerun()
 
-# --- PANEL PRINCIPAL ---
 if st.session_state.auth:
     st.header("👨‍💻 Dashboard de Monitoreo")
     m = folium.Map(location=[-37.28, -72.70], zoom_start=12)

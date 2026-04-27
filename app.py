@@ -5,70 +5,64 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="BioCore Intelligence SaaS", layout="wide")
+# --- CONFIGURACIÓN INICIAL ---
+st.set_page_config(page_title="BioCore SaaS", layout="wide")
 
-# --- INICIALIZACIÓN DE GOOGLE EARTH ENGINE ---
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON desde los Secrets
-            creds_info = json.loads(st.secrets["GEE_JSON"])
+            # Cargamos y limpiamos la llave
+            info = json.loads(st.secrets["GEE_JSON"])
+            # Esta línea es la que arregla el error de Padding
+            llave = info['private_key'].replace('\\n', '\n').strip()
             
-            # 2. REPARACIÓN AUTOMÁTICA DE LA LLAVE
-            # Esto limpia los saltos de línea y espacios que causan "InvalidPadding"
-            pk = creds_info['private_key']
-            if isinstance(pk, str):
-                pk = pk.replace("\\n", "\n").strip()
-            
-            # 3. Inicialización con Service Account
-            credentials = ee.ServiceAccountCredentials(
-                creds_info['client_email'],
-                key_data=pk
-            )
-            ee.Initialize(credentials)
+            creds = ee.ServiceAccountCredentials(info['client_email'], key_data=llave)
+            ee.Initialize(creds)
         except Exception as e:
-            st.error(f"❌ Error de conexión con GEE: {e}")
+            st.error(f"❌ Error de conexión: {e}")
     else:
-        st.error("⚠️ No se encontró la configuración GEE_JSON en Secrets.")
+        st.warning("⚠️ Esperando configuración de GEE_JSON...")
 
 iniciar_gee()
 
 # --- INTERFAZ ---
-if 'autenticado' not in st.session_state:
-    st.session_state.autenticado = False
+if 'auth' not in st.session_state:
+    st.session_state.auth = False
 
 with st.sidebar:
-    # Ruta flexible para el logo
+    # Intento de cargar logo
     try:
         st.image("assets/logo.png", use_container_width=True)
     except:
-        st.markdown("### 🛰️ **BioCore Intelligence**")
+        st.subheader("🛰️ BioCore Intelligence")
 
-    st.title("🛡️ Panel de Acceso")
-    
-    if not st.session_state.autenticado:
-        user = st.text_input("Usuario")
-        passw = st.text_input("Password", type="password")
-        if st.button("Ingresar"):
-            if user == "admin" and passw == "loreto2026":
-                st.session_state.autenticado = True
+    if not st.session_state.auth:
+        u = st.text_input("Usuario")
+        p = st.text_input("Password", type="password")
+        if st.button("Entrar"):
+            if u == "admin" and p == "loreto2026":
+                st.session_state.auth = True
                 st.rerun()
-            else:
-                st.error("Credenciales incorrectas")
     else:
-        st.success("Sesión Iniciada")
+        st.success("Conexión Exitosa")
         if st.button("Cerrar Sesión"):
-            st.session_state.autenticado = False
+            st.session_state.auth = False
             st.rerun()
 
 # --- PANEL PRINCIPAL ---
-if st.session_state.autenticado:
-    st.header("👨‍💻 Análisis Satelital BioCore")
+if st.session_state.auth:
+    st.header("👨‍💻 Dashboard de Monitoreo")
     
-    m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
-    Draw(export=True).add_to(m)
-    st_folium(m, width=700, height=450)
-    st.info("Dibuja un polígono para comenzar el análisis.")
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        # Mapa centrado en Chile
+        m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
+        Draw(export=True).add_to(m)
+        st_folium(m, width="100%", height=500)
+    
+    with col2:
+        st.write("### Controles")
+        st.info("Dibuja un polígono en el mapa para analizar los índices ambientales.")
 else:
-    st.info("Por favor, inicie sesión para acceder al sistema.")
+    st.info("Inicie sesión para acceder a las herramientas de BioCore.")

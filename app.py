@@ -8,19 +8,27 @@ from datetime import datetime
 
 # --- INICIALIZACIÓN PROFESIONAL ---
 def iniciar_gee():
-    if not ee.data._credentials:
+    try:
+        # Streamlit Cloud usa st.secrets para manejar las llaves
+        if "GEE_JSON" in st.secrets:
+            # Cargamos los secretos
+            creds_info = json.loads(st.secrets["GEE_JSON"])
+            credentials = ee.ServiceAccountCredentials(creds_info['client_email'], key_data=st.secrets["GEE_JSON"])
+            
+            # Inicialización moderna
+            ee.Initialize(credentials)
+        else:
+            st.error("⚠️ No se encontró la variable GEE_JSON en los Secrets de Streamlit.")
+    except Exception as e:
+        # Si ya estaba inicializado, evitamos el error
         try:
-            # En App Platform de DigitalOcean, esto leerá la variable de entorno GEE_JSON
-            if "GEE_JSON" in st.secrets:
-                creds_dict = json.loads(st.secrets["GEE_JSON"])
-                creds = ee.ServiceAccountCredentials(creds_dict['client_email'], key_data=st.secrets["GEE_JSON"])
-                ee.Initialize(creds)
-            else:
-                st.error("⚠️ Configura la variable GEE_JSON en DigitalOcean.")
-        except Exception as e:
-            st.error(f"❌ Error GEE: {e}")
+            ee.Initialize()
+        except:
+            st.error(f"❌ Error crítico de GEE: {e}")
 
+# Llamamos a la función
 iniciar_gee()
+
 
 # --- LÓGICA DE PROCESAMIENTO (TU CÓDIGO INTEGRADO) ---
 def procesar_biocore(coords, tipo, glaciar):

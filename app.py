@@ -12,14 +12,15 @@ st.set_page_config(page_title="BioCore Intelligence SaaS", layout="wide")
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON desde los Secrets
+            # 1. Cargamos el JSON
             creds_info = json.loads(st.secrets["GEE_JSON"])
             
-            # 2. LIMPIEZA DE CLAVE (Solución al error InvalidPadding)
-            # Reemplazamos saltos de línea y quitamos espacios accidentales
+            # 2. LIMPIEZA AGRESIVA DE LA CLAVE
+            # El error InvalidPadding ocurre por saltos de línea mal interpretados
+            # Esta línea asegura que la clave sea un PEM válido para Python
             private_key = creds_info['private_key'].replace('\\n', '\n').strip()
             
-            # 3. Inicialización con Service Account
+            # 3. Autenticación con Service Account
             credentials = ee.ServiceAccountCredentials(
                 creds_info['client_email'],
                 key_data=private_key
@@ -27,55 +28,44 @@ def iniciar_gee():
             ee.Initialize(credentials)
         except Exception as e:
             try:
-                ee.Initialize()
+                ee.Initialize() # Intento de respaldo
             except:
                 st.error(f"❌ Error de conexión con GEE: {e}")
     else:
-        st.error("⚠️ Configuración incompleta: GEE_JSON no encontrado.")
+        st.error("⚠️ No se encontró GEE_JSON en Secrets.")
 
 iniciar_gee()
 
-# --- INTERFAZ DE USUARIO (SIDEBAR) ---
+# --- INTERFAZ ---
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 with st.sidebar:
-    # Ruta flexible para el logo
     try:
         st.image("assets/logo.png", use_container_width=True)
     except:
-        try:
-            st.image("logo.png", use_container_width=True)
-        except:
-            st.subheader("🛰️ BioCore Intelligence")
+        st.subheader("🛰️ BioCore Intelligence")
 
-    st.title("🛡️ Panel de Acceso")
-    
+    st.title("🛡️ Acceso")
     if not st.session_state.autenticado:
-        user = st.text_input("Usuario")
-        passw = st.text_input("Password", type="password")
+        u = st.text_input("Usuario")
+        p = st.text_input("Password", type="password")
         if st.button("Ingresar"):
-            if user == "admin" and passw == "loreto2026":
+            if u == "admin" and p == "loreto2026":
                 st.session_state.autenticado = True
                 st.rerun()
-            else:
-                st.error("Credenciales incorrectas")
     else:
-        st.success("Sesión Iniciada")
-        if st.button("Cerrar Sesión"):
+        st.success("Conectado")
+        if st.button("Salir"):
             st.session_state.autenticado = False
             st.rerun()
 
 # --- PANEL PRINCIPAL ---
 if st.session_state.autenticado:
-    st.header("👨‍💻 Análisis Satelital BioCore")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
-        Draw(export=True).add_to(m)
-        st_folium(m, width=700, height=450)
-    with col2:
-        st.info("Dibuja un polígono para comenzar el análisis.")
+    st.header("👨‍💻 Dashboard BioCore")
+    m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
+    Draw(export=True).add_to(m)
+    st_folium(m, width=700, height=450)
 else:
-    st.info("Inicie sesión para acceder al sistema.")
+    st.info("Inicie sesión para continuar.")
+

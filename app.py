@@ -4,29 +4,13 @@ import json
 import folium
 import os
 import base64
-import requests
 from streamlit_folium import st_folium
 
-# --- CONFIGURACIÓN ESTILO "SATELLITES ON FIRE" ---
+# --- CONFIGURACIÓN ESTRATÉGICA ---
+st.set_page_config(page_title="BioCore Intelligence", layout="wide")
+
+# Ruta del logo - Ajusta esto según tu carpeta en GitHub
 LOGO_PATH = os.path.join("assets", "logo_biocore.png")
-
-st.set_page_config(page_title="BioCore Intelligence", layout="wide", initial_sidebar_state="collapsed")
-
-# CSS para ocultar menús de Streamlit y que parezca una App nativa
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stApp {background-color: #0e1117;}
-    /* Botones flotantes estilo Satellites on Fire */
-    .stButton>button {
-        border-radius: 20px;
-        border: 1px solid #4CAF50;
-        background-color: #1e2329;
-        color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 def inicializar_gee():
     try:
@@ -38,64 +22,81 @@ def inicializar_gee():
         return True
     except: return False
 
-# --- LÓGICA DE SESIÓN ---
+# --- FUNCIÓN PARA MOSTRAR LOGO ---
+def mostrar_logo():
+    if os.path.exists(LOGO_PATH):
+        with open(LOGO_PATH, "rb") as f:
+            data = base64.b64encode(f.read()).decode()
+            st.sidebar.markdown(
+                f'<div style="text-align:center"><img src="data:image/png;base64,{data}" width="150"></div>', 
+                unsafe_allow_html=True
+            )
+    else:
+        st.sidebar.title("🌿 BioCore")
+
+# --- LÓGICA DE NAVEGACIÓN ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 
-# --- BARRA SUPERIOR (NAVBAR) ---
-header_col1, header_col2 = st.columns([4, 1])
-with header_col1:
-    st.title("🛰 BioCore | Visualización")
-with header_col2:
-    if st.session_state.auth:
-        if st.button("Cerrar"): st.session_state.auth = False; st.rerun()
+mostrar_logo() # El logo siempre visible en la pestaña del lado
 
-# --- INTERFAZ TIPO APP ---
-if not st.session_state.auth:
-    st.info("Inicie sesión para acceder al monitoreo satelital")
-    u, p = st.text_input("Usuario"), st.text_input("Clave", type="password")
-    if st.button("Entrar"):
-        if u == "admin" and p == "loreto2026": st.session_state.auth = True; st.rerun()
-
-elif inicializar_gee():
-    # Menú lateral para parámetros (como el de la foto 2 que subiste)
-    with st.sidebar:
-        st.header("Configuración")
-        proy = st.text_input("Proyecto", "Pascua Lama")
-        sector = st.selectbox("Capa", ["Minería", "Glaciares", "Humedales"])
-        st.markdown("---")
-        raw_coords = st.text_area("Área de interés (JSON):", height=200)
-
-    # --- MAPA A PANTALLA COMPLETA ---
-    geom = None
-    if raw_coords:
-        try:
-            puntos = json.loads(raw_coords)
-            geom = ee.Geometry.Polygon(puntos)
-        except: st.warning("Esperando coordenadas válidas...")
-
-    # Configuración del Mapa tipo Google Satellite
-    if geom:
-        centro = geom.centroid().coordinates().getInfo()[::-1]
-        m = folium.Map(location=centro, zoom_start=14, tiles=None)
+with st.sidebar:
+    st.markdown("---")
+    if not st.session_state.auth:
+        st.subheader("Acceso Restringido")
+        u = st.text_input("Usuario")
+        p = st.text_input("Clave", type="password")
+        if st.button("Entrar"):
+            if u == "admin" and p == "loreto2026":
+                st.session_state.auth = True
+                st.rerun()
     else:
-        m = folium.Map(location=[-33.45, -70.66], zoom_start=5, tiles=None)
+        st.success("Sesión: Loreto Campos")
+        proy_name = st.text_input("Proyecto Actual:", "Pascua Lama")
+        tipo_auditoria = st.selectbox("Capa de Análisis:", ["Minería", "Glaciares", "Humedales"])
+        if st.button("Cerrar Sesión"):
+            st.session_state.auth = False
+            st.rerun()
 
-    # Añadimos la capa satelital limpia
-    folium.TileLayer(
-        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        attr='Google',
-        name='Google Satellite',
-        overlay=False
-    ).add_to(m)
+# --- CUERPO PRINCIPAL (MAPA Y DATOS) ---
+if st.session_state.auth and inicializar_gee():
+    st.title(f"Visualización Satelital: {proy_name}")
+    
+    col_mapa, col_datos = st.columns([2, 1])
 
-    if geom:
-        folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#00ff00', 'weight': 2, 'fillOpacity': 0.1}).add_to(m)
+    with col_datos:
+        st.markdown("**1. Configuración Geográfica**")
+        raw_coords = st.text_area("Pegue coordenadas JSON aquí:", height=200, placeholder="[[-70.03, -29.31], ...]")
+        
+        geom = None
+        if raw_coords:
+            try:
+                puntos = json.loads(raw_coords)
+                geom = ee.Geometry.Polygon(puntos)
+                st.success("Polígono detectado")
+            except:
+                st.error("Error en formato de coordenadas")
 
-    # El mapa ocupa el ancho total
-    st_folium(m, width=1200, height=500)
+    with col_mapa:
+        if geom:
+            centro = geom.centroid().coordinates().getInfo()[::-1]
+            m = folium.Map(location=centro, zoom_start=14)
+        else:
+            m = folium.Map(location=[-33.45, -70.66], zoom_start=4)
+        
+        # Capa Satelital tipo Google (Limpia como Satellites on Fire)
+        folium.TileLayer(
+            tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            attr='Google Satellite',
+            name='Google Satellite'
+        ).add_to(m)
 
-    # Botón flotante de acción (Reporte Diario)
+        if geom:
+            folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#00ff00', 'weight': 2}).add_to(m)
+
+        # Ajuste de tamaño para que se vea bien en celular
+        st_folium(m, width="100%", height=400)
+
     if geom:
         st.markdown("---")
-        if st.button("🚀 GENERAR AUDITORÍA Y AVISAR AL CELULAR"):
-            st.success("Analizando datos... El reporte será enviado a su Telegram.")
+        if st.button("🚀 EJECUTAR REPORTE DIARIO"):
+            st.info("Calculando índices ambientales...")

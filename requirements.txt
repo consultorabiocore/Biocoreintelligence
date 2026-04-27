@@ -1,4 +1,9 @@
-streamlit
 earthengine-api
-folium
+streamlit
 streamlit-folium
+folium
+pandas
+matplotlib
+fpdf
+google-auth
+

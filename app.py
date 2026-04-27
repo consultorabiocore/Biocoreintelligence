@@ -11,17 +11,16 @@ st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON de los Secrets
+            # 1. Cargamos el JSON desde los Secrets
             creds_info = json.loads(st.secrets["GEE_JSON"])
             
-            # 2. LIMPIEZA PROFUNDA DE LA LLAVE (Solución definitiva)
+            # 2. LIMPIEZA PROFUNDA (Solución al InvalidPadding)
+            # Extraemos la llave y nos aseguramos de que los saltos de línea sean reales
             pk = creds_info['private_key']
-            
-            # Eliminamos caracteres de escape y saltos de línea mal formados
             if isinstance(pk, str):
                 pk = pk.replace("\\n", "\n").strip()
             
-            # 3. Autenticación
+            # 3. Autenticación con Service Account
             credentials = ee.ServiceAccountCredentials(
                 creds_info['client_email'],
                 key_data=pk
@@ -34,7 +33,7 @@ def iniciar_gee():
 
 iniciar_gee()
 
-# --- LÓGICA DE ACCESO ---
+# --- LÓGICA DE ACCESO (BIOCORE) ---
 if 'auth' not in st.session_state:
     st.session_state.auth = False
 
@@ -44,20 +43,24 @@ with st.sidebar:
         u = st.text_input("Usuario")
         p = st.text_input("Password", type="password")
         if st.button("Ingresar"):
+            # Credenciales de acceso para Loreto
             if u == "admin" and p == "loreto2026":
                 st.session_state.auth = True
                 st.rerun()
+            else:
+                st.error("Credenciales incorrectas")
     else:
-        st.success("Conectado")
+        st.success("Conexión Establecida")
         if st.button("Cerrar Sesión"):
             st.session_state.auth = False
             st.rerun()
 
 # --- PANEL PRINCIPAL ---
 if st.session_state.auth:
-    st.header("👨‍💻 Dashboard BioCore")
+    st.header("👨‍💻 Dashboard de Análisis")
+    # Mapa base centrado en la zona de interés (Biobío)
     m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
     Draw(export=True).add_to(m)
     st_folium(m, width="100%", height=500)
 else:
-    st.info("Inicie sesión para acceder al sistema.")
+    st.info("Inicie sesión para acceder a las herramientas de BioCore.")

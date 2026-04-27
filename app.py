@@ -12,26 +12,25 @@ st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON desde los Secrets
+            # 1. Cargamos el JSON
             info = json.loads(st.secrets["GEE_JSON"])
             pk = info['private_key']
             
-            # 2. LIMPIEZA QUIRÚRGICA (Solución definitiva a InvalidPadding/InvalidByte)
+            # 2. LIMPIEZA QUIRÚRGICA (Solución definitiva a InvalidPadding)
             if isinstance(pk, str):
-                # Reemplaza saltos de línea literales
+                # Convertimos saltos de línea de texto a reales
                 pk = pk.replace("\\n", "\n")
-                # Elimina cualquier carácter que no sea parte de una llave PEM limpia
-                # (como puntos, barras o espacios que se cuelan al inicio o final)
-                pk = re.sub(r'^[^{A-Za-z0-9\-]*', '', pk) 
-                pk = pk.strip()
+                # Removemos cualquier cosa que no sea parte de una llave PEM válida
+                # Esto quita espacios, puntos o barras que se cuelan al pegar
+                pk = re.sub(r'^[^{A-Za-z0-9\-]*', '', pk).strip()
             
-            # 3. Autenticación con Service Account
+            # 3. Autenticación
             creds = ee.ServiceAccountCredentials(info['client_email'], key_data=pk)
             ee.Initialize(creds)
         except Exception as e:
             st.error(f"❌ Error de conexión con GEE: {e}")
     else:
-        st.warning("⚠️ GEE_JSON no detectado en Secrets.")
+        st.warning("⚠️ Esperando configuración de GEE_JSON en Secrets...")
 
 iniciar_gee()
 
@@ -51,15 +50,14 @@ with st.sidebar:
             else:
                 st.error("Credenciales incorrectas")
     else:
-        st.success("Conexión Establecida")
+        st.success("Sesión Iniciada")
         if st.button("Cerrar Sesión"):
             st.session_state.auth = False
             st.rerun()
 
 # --- PANEL PRINCIPAL ---
 if st.session_state.auth:
-    st.header("👨‍💻 Dashboard de Análisis BioCore")
-    # Mapa centrado en la región del Biobío
+    st.header("👨‍💻 Dashboard de Monitoreo")
     m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
     Draw(export=True).add_to(m)
     st_folium(m, width="100%", height=500)

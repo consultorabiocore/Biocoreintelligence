@@ -17,12 +17,10 @@ COLOR_BIOCORE = (20, 50, 80)
 
 st.set_page_config(page_title="BioCore Intelligence", layout="wide", page_icon="🛰️")
 
-# Función para convertir imagen local a Base64 (evita que se vea borrosa)
 def get_base64_image(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
+            return base64.b64encode(f.read()).decode()
     return None
 
 def clean(text):
@@ -40,7 +38,7 @@ def iniciar_gee():
 conectado = iniciar_gee()
 
 # --- MOTOR DE REPORTES PDF ---
-def generar_reporte_biocore(cliente, proyecto, df_hist, alerta_fuego, alerta_desvio):
+def generar_reporte_biocore(cliente, sector, periodo, df_hist, alerta_fuego, alerta_desvio):
     pdf = FPDF()
     pdf.add_page()
     
@@ -57,60 +55,72 @@ def generar_reporte_biocore(cliente, proyecto, df_hist, alerta_fuego, alerta_des
     pdf.cell(0, 10, clean("BIOCORE INTELLIGENCE"), ln=1)
     
     pdf.ln(25); pdf.set_text_color(0, 0, 0)
-    pdf.set_font("helvetica", "B", 12); pdf.cell(0, 10, clean(f"INFORME PREVENTIVO: {cliente}"), ln=1)
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 8, clean(f"CLIENTE: {cliente}"), ln=1)
+    pdf.set_font("helvetica", "", 11)
+    pdf.cell(0, 8, clean(f"SECTOR: {sector} | PERIODO ANALIZADO: {periodo}"), ln=1)
     
     if alerta_fuego or alerta_desvio:
         pdf.set_fill_color(255, 230, 230)
+        pdf.set_font("helvetica", "B", 10)
         pdf.cell(0, 10, clean(" STATUS: ALERTA TÉCNICA ACTIVA"), border=1, ln=1, fill=True)
 
     if not df_hist.empty:
         plt.figure(figsize=(10, 4))
         df_hist['fecha'] = pd.to_datetime(df_hist['fecha'])
-        plt.plot(df_hist['fecha'], df_hist['ndvi'], color='#143250')
-        plt.title("Analisis Historico de Linea de Base")
-        plt.savefig("temp_pdf_chart.png", dpi=150)
-        pdf.image("temp_pdf_chart.png", x=15, y=100, w=180)
+        df_hist = df_hist.sort_values('fecha')
+        plt.plot(df_hist['fecha'], df_hist['ndvi'], color='#143250', marker='o', markersize=3)
+        plt.title(f"Analisis de Tendencia - {periodo}")
+        plt.grid(True, alpha=0.2)
+        plt.savefig("temp_pdf.png", dpi=150)
+        pdf.image("temp_pdf.png", x=15, y=110, w=180)
         plt.close()
 
-    pdf.set_y(250); pdf.set_font("helvetica", "B", 10)
+    pdf.set_y(255); pdf.set_font("helvetica", "B", 10)
     pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- BARRA LATERAL (LOGO NITIDO Y CENTRADO) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     logo_b64 = get_base64_image(LOGO_PATH)
     if logo_b64:
-        # HTML/CSS para centrar y mantener nitidez
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: center; align-items: center; padding: 10px 0;">
-                <img src="data:image/png;base64,{logo_b64}" width="100" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
+            <div style="display: flex; justify-content: center; padding: 20px 0;">
+                <img src="data:image/png;base64,{logo_b64}" width="110" style="image-rendering: crisp-edges;">
             </div>
-            """,
-            unsafe_allow_html=True
+            """, unsafe_allow_html=True
         )
-    else:
-        st.warning("Logo no encontrado en /assets")
     
-    st.markdown("<h3 style='text-align: center;'>BioCore Intelligence</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
     if not st.session_state.get('auth', False):
-        u = st.text_input("Usuario")
-        p = st.text_input("Clave", type="password")
+        u, p = st.text_input("Usuario"), st.text_input("Clave", type="password")
         if st.button("Entrar"):
             if u == "admin" and p == "loreto2026":
                 st.session_state.auth = True; st.rerun()
     else:
-        st.success("🛰️ Sistema Activo")
-        cliente = st.text_input("Titular", "Mandante_Proyecto")
-        anios = st.slider("Historial (Años)", 5, 40, 20)
-        input_coords = st.text_area("Coordenadas:")
+        st.success("🛰️ Conectado")
+        cliente = st.text_input("Titular", "Mandante_RCA")
+        sector_seleccionado = st.selectbox("Tipo de Proyecto:", ["Minería", "Humedales", "Forestal", "Energía", "Industrial"])
+        
+        # SELECTOR DE PERIODO TEMPORAL
+        opciones_periodo = {
+            "Última Semana": 7,
+            "Último Mes": 30,
+            "Últimos 6 Meses": 180,
+            "Último Año": 365,
+            "Histórico (Decadal)": 7300
+        }
+        periodo_label = st.selectbox("Periodo de Análisis:", list(opciones_periodo.keys()))
+        dias_analisis = opciones_periodo[periodo_label]
+        
+        input_coords = st.text_area("Coordenadas (Polygon):")
         if st.button("Salir"): st.session_state.auth = False; st.rerun()
 
 # --- PANEL PRINCIPAL ---
 if st.session_state.get('auth', False):
-    st.title("Plataforma de Prevención de Multas")
+    st.title("Plataforma de Prevención de Riesgos Ambientales")
     
     if input_coords:
         try:
@@ -125,30 +135,33 @@ if st.session_state.get('auth', False):
                     s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).first()
                     if s1:
                         mid = s1.getMapId({'min': -25, 'max': 0})
-                        folium.TileLayer(tiles=mid['tile_fetcher'].url_format, attr='ESA').add_to(m)
+                        folium.TileLayer(tiles=mid['tile_fetcher'].url_format, attr='Radar').add_to(m)
                 folium.GeoJson(geom.getInfo()).add_to(m)
                 st_folium(m, width="100%", height=500)
             
             with col_res:
-                if st.button(f"🔍 Escaneo {anios} Años"):
-                    with st.spinner("Analizando NASA y ESA..."):
-                        # Fuego NASA FIRMS
+                if st.button(f"🔍 Ejecutar Auditoría"):
+                    with st.spinner("Procesando Satélites..."):
+                        # Alerta Fuego (48h)
                         fuego = ee.ImageCollection("FIRMS").filterBounds(geom).filterDate((datetime.now()-timedelta(days=2)).strftime('%Y-%m-%d'), datetime.now().strftime('%Y-%m-%d')).size().getInfo() > 0
                         
-                        # Histórico Landsat
-                        col = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(geom).filter(ee.Filter.lt('CLOUD_COVER', 10)).limit(anios*2)
+                        # Análisis Temporal según selector
+                        fecha_inicio = (datetime.now() - timedelta(days=dias_analisis)).strftime('%Y-%m-%d')
+                        col = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(geom).filterDate(fecha_inicio, datetime.now().strftime('%Y-%m-%d')).filter(ee.Filter.lt('CLOUD_COVER', 20))
+                        
                         datos = col.map(lambda img: ee.Feature(None, {
-                            'fecha': img.date().format('YYYY-MM'),
+                            'fecha': img.date().format('YYYY-MM-DD'),
                             'ndvi': img.normalizedDifference(['SR_B5', 'SR_B4']).reduceRegion(ee.Reducer.mean(), geom, 60).get('nd')
                         })).getInfo()
                         
                         df_hist = pd.DataFrame([f['properties'] for f in datos['features'] if f['properties']['ndvi'] is not None])
-                        alerta_desv = not df_hist.empty and df_hist['ndvi'].iloc[-1] < (df_hist['ndvi'].mean() * 0.75)
                         
-                        pdf = generar_reporte_biocore(cliente, "General", df_hist, fuego, alerta_desv)
-                        st.download_button("📥 Descargar Reporte de Blindaje", pdf, f"BioCore_{cliente}.pdf")
+                        alerta_desv = not df_hist.empty and len(df_hist) > 1 and df_hist['ndvi'].iloc[-1] < (df_hist['ndvi'].mean() * 0.8)
                         
-                        if fuego: st.error("🔥 ALERTA: Fuego detectado por satélites de la NASA.")
-                        if alerta_desv: st.warning("⚠️ RIESGO: Desviación detectada en la línea de base.")
+                        pdf = generar_reporte_biocore(cliente, sector_seleccionado, periodo_label, df_hist, fuego, alerta_desv)
+                        st.download_button("📥 Descargar Reporte", pdf, f"BioCore_{cliente}.pdf")
+                        
+                        if fuego: st.error("🔥 Alerta: Fuego detectado en el área.")
+                        st.success("Análisis completado.")
         except:
             st.error("Error en el formato de coordenadas.")

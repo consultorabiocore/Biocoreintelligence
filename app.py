@@ -6,10 +6,9 @@ import os
 import base64
 from streamlit_folium import st_folium
 
-# --- CONFIGURACIÓN ESTRATÉGICA ---
+# --- CONFIGURACIÓN DE PANTALLA ---
 st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
-# Ruta del logo - Ajusta esto según tu carpeta en GitHub
 LOGO_PATH = os.path.join("assets", "logo_biocore.png")
 
 def inicializar_gee():
@@ -22,81 +21,83 @@ def inicializar_gee():
         return True
     except: return False
 
-# --- FUNCIÓN PARA MOSTRAR LOGO ---
-def mostrar_logo():
+# --- LÓGICA DE ACCESO ---
+if 'auth' not in st.session_state: st.session_state.auth = False
+
+# --- PESTAÑA LATERAL (SIDEBAR) ---
+with st.sidebar:
+    # Carga del Logo
     if os.path.exists(LOGO_PATH):
         with open(LOGO_PATH, "rb") as f:
             data = base64.b64encode(f.read()).decode()
-            st.sidebar.markdown(
-                f'<div style="text-align:center"><img src="data:image/png;base64,{data}" width="150"></div>', 
-                unsafe_allow_html=True
-            )
+            st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{data}" width="160"></div>', unsafe_allow_html=True)
     else:
-        st.sidebar.title("🌿 BioCore")
-
-# --- LÓGICA DE NAVEGACIÓN ---
-if 'auth' not in st.session_state: st.session_state.auth = False
-
-mostrar_logo() # El logo siempre visible en la pestaña del lado
-
-with st.sidebar:
+        st.title("BioCore")
+    
     st.markdown("---")
+    
     if not st.session_state.auth:
-        st.subheader("Acceso Restringido")
         u = st.text_input("Usuario")
         p = st.text_input("Clave", type="password")
-        if st.button("Entrar"):
+        if st.button("Ingresar"):
             if u == "admin" and p == "loreto2026":
                 st.session_state.auth = True
                 st.rerun()
     else:
-        st.success("Sesión: Loreto Campos")
-        proy_name = st.text_input("Proyecto Actual:", "Pascua Lama")
-        tipo_auditoria = st.selectbox("Capa de Análisis:", ["Minería", "Glaciares", "Humedales"])
+        # Aquí los campos aparecen vacíos para que tú los llenes
+        st.subheader("Datos del Cliente")
+        nombre_cliente = st.text_input("Nombre del Proyecto/Cliente:", value="")
+        tipo_sector = st.selectbox("Tipo de Análisis:", ["Seleccione...", "Minería", "Glaciares", "Humedales", "Agrícola", "Forestal"])
+        
         if st.button("Cerrar Sesión"):
             st.session_state.auth = False
             st.rerun()
 
-# --- CUERPO PRINCIPAL (MAPA Y DATOS) ---
+# --- PANEL CENTRAL ---
 if st.session_state.auth and inicializar_gee():
-    st.title(f"Visualización Satelital: {proy_name}")
-    
-    col_mapa, col_datos = st.columns([2, 1])
+    # Título dinámico
+    if nombre_cliente:
+        st.title(f"Monitoreo: {nombre_cliente}")
+    else:
+        st.title("Consola de Vigilancia Satelital")
 
-    with col_datos:
-        st.markdown("**1. Configuración Geográfica**")
-        raw_coords = st.text_area("Pegue coordenadas JSON aquí:", height=200, placeholder="[[-70.03, -29.31], ...]")
+    col_map, col_ctrl = st.columns([2, 1])
+
+    with col_ctrl:
+        st.markdown("### 📍 Área de Estudio")
+        # Cuadro de coordenadas sin texto de ejemplo que moleste
+        raw_input = st.text_area("Ingrese las coordenadas del polígono:", height=250)
         
         geom = None
-        if raw_coords:
+        if raw_input:
             try:
-                puntos = json.loads(raw_coords)
+                puntos = json.loads(raw_input)
                 geom = ee.Geometry.Polygon(puntos)
-                st.success("Polígono detectado")
+                st.success("Geometría cargada")
             except:
-                st.error("Error en formato de coordenadas")
+                st.error("Error en los datos. Revise el formato.")
 
-    with col_mapa:
+    with col_map:
         if geom:
             centro = geom.centroid().coordinates().getInfo()[::-1]
             m = folium.Map(location=centro, zoom_start=14)
         else:
-            m = folium.Map(location=[-33.45, -70.66], zoom_start=4)
+            # Vista general de Chile si no hay datos
+            m = folium.Map(location=[-37.0, -72.0], zoom_start=5)
         
-        # Capa Satelital tipo Google (Limpia como Satellites on Fire)
+        # Capa Satelital limpia (Estilo Satellites on Fire)
         folium.TileLayer(
             tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            attr='Google Satellite',
-            name='Google Satellite'
+            attr='Google',
+            name='Satélite'
         ).add_to(m)
 
         if geom:
-            folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#00ff00', 'weight': 2}).add_to(m)
+            folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#39FF14', 'weight': 2, 'fillOpacity': 0.1}).add_to(m)
 
-        # Ajuste de tamaño para que se vea bien en celular
-        st_folium(m, width="100%", height=400)
+        st_folium(m, width="100%", height=450)
 
-    if geom:
-        st.markdown("---")
-        if st.button("🚀 EJECUTAR REPORTE DIARIO"):
-            st.info("Calculando índices ambientales...")
+    # Botón de acción al final
+    if geom and nombre_cliente:
+        if st.button(f"🚀 GENERAR REPORTE PARA {nombre_cliente.upper()}"):
+            st.info("Procesando índices... El reporte se enviará a su Telegram.")

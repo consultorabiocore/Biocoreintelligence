@@ -21,7 +21,7 @@ if 'suscripciones' not in st.session_state:
         {"ID": "BC-001", "PROYECTO": "Loreto Campos", "CHAT_ID": "6712325113", "CATEGORIA": "Administrador"}
     ]
 
-# --- FUNCIONES CORE ---
+# --- FUNCIONES TÉCNICAS ---
 def inicializar_gee():
     try:
         if 'gee_auth' not in st.session_state:
@@ -39,107 +39,96 @@ def procesar_coords(texto):
     if coords and coords[0] != coords[-1]: coords.append(coords[0])
     return coords
 
-# --- SIDEBAR TECNOLÓGICA ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     if os.path.exists(LOGO_PATH):
         with open(LOGO_PATH, "rb") as f:
-            data = base64.b64encode(f.read()).decode()
-            st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{data}" width="180"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{base64.b64encode(f.read()).decode()}" width="180"></div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    # Perfil de acceso
-    acceso = st.radio("Módulo de Acceso:", ["🛰️ Monitor de Auditoría", "👤 Portal de Clientes"])
+    acceso = st.radio("Módulo de Control:", ["🛰️ Monitor de Auditoría", "👤 Registro y Configuración"])
     st.markdown("---")
-    st.caption("BioCore Intelligence v2.1")
+    st.caption("BioCore Intelligence v2.5")
 
 # --- LÓGICA DE INTERFAZ ---
 if inicializar_gee():
 
-    # --- PANTALLA: PORTAL DE CLIENTES (VER Y EDITAR DATOS) ---
-    if acceso == "👤 Portal de Clientes":
-        st.header("Centro de Gestión de Cuentas")
-        st.write("Aquí tanto tú como el cliente pueden verificar los datos de enlace.")
+    if acceso == "👤 Registro y Configuración":
+        st.header("Configuración de Reportes Diarios")
+        st.write("Registre al cliente aquí para activar su reporte automático a Telegram.")
 
-        # Vista de Tabla Profesional
+        # Tabla de Clientes para que el cliente vea sus datos
         if st.session_state.suscripciones:
+            st.markdown("### 📋 Suscripciones Activas")
             df = pd.DataFrame(st.session_state.suscripciones)
-            st.markdown("### 📋 Directorio de Proyectos Activos")
-            st.dataframe(df, use_container_width=True, hide_index=True) # Dataframe interactivo
+            st.dataframe(df, use_container_width=True, hide_index=True)
         
         st.markdown("---")
         
-        # Registro/Edición
-        col_reg, col_info = st.columns([1.5, 1])
-        
+        col_reg, col_help = st.columns([1, 1])
         with col_reg:
-            st.subheader("📝 Registro de Nuevas Credenciales")
-            with st.form("form_registro"):
-                nombre_p = st.text_input("Nombre del Proyecto / Cliente")
-                id_tele = st.text_input("ID Técnico de Telegram")
-                cat = st.selectbox("Tipo de Auditoría", ["Minería", "Humedales", "Glaciares", "Agrícola"])
-                
-                if st.form_submit_button("Vincular al Sistema"):
+            st.subheader("📝 Nuevo Registro Técnico")
+            with st.form("registro_p"):
+                nombre_p = st.text_input("Nombre del Proyecto")
+                id_tele = st.text_input("Chat ID de Telegram")
+                if st.form_submit_button("✅ Activar Monitoreo Diario"):
                     if nombre_p and id_tele:
-                        nuevo_id = f"BC-0{len(st.session_state.suscripciones)+1}"
+                        nuevo_id = f"BC-{len(st.session_state.suscripciones)+1:03}"
                         st.session_state.suscripciones.append({
-                            "ID": nuevo_id, "PROYECTO": nombre_p, "CHAT_ID": id_tele, "CATEGORIA": cat
+                            "ID": nuevo_id, "PROYECTO": nombre_p, "CHAT_ID": id_tele, "CATEGORIA": "Suscripción Activa"
                         })
-                        st.toast(f"LOG: Proyecto {nombre_p} inicializado.", icon="✅")
+                        st.toast("LOG: Enlace Diario Activado", icon="📡")
                         st.rerun()
-        
-        with col_info:
-            st.info("""
-            **Guía para el Cliente:**
-            1. Busque el bot en Telegram.
-            2. Presione /start.
-            3. Ingrese su ID en este panel.
-            4. El sistema verificará el enlace automáticamente.
-            """)
 
-    # --- PANTALLA: MONITOR DE AUDITORÍA (LO QUE EL CLIENTE VE) ---
     else:
-        if not st.session_state.suscripciones:
-            st.warning("No hay bases de datos cargadas.")
-        else:
-            nombres = [s['PROYECTO'] for s in st.session_state.suscripciones]
-            sel_cliente = st.selectbox("Seleccione Proyecto para Visualización:", nombres)
-            data_p = [s for s in st.session_state.suscripciones if s['PROYECTO'] == sel_cliente][0]
+        # PANTALLA DE AUDITORÍA (MAPA)
+        nombres = [s['PROYECTO'] for s in st.session_state.suscripciones]
+        sel_cliente = st.selectbox("Seleccione Proyecto para Generar Informe Especial:", nombres)
+        data_p = [s for s in st.session_state.suscripciones if s['PROYECTO'] == sel_cliente][0]
+        
+        st.title(f"Centro de Mando: {sel_cliente}")
+        
+        c1, c2 = st.columns([1, 2])
+        
+        with c1:
+            st.markdown("### 📊 Generador de Informe")
+            st.info(f"ID: {data_p['ID']} | Canal: {data_p['CHAT_ID']}")
             
-            st.title(f"Monitor de Vigilancia: {sel_cliente}")
+            raw = st.text_area("Coordenadas del incidente (Lat, Lon):", height=200, placeholder="-29.3177, -70.0191...")
+            puntos = procesar_coords(raw) if raw else []
+            geom = ee.Geometry.Polygon(puntos) if len(puntos) > 2 else None
             
-            # Layout Tech
-            c1, c2 = st.columns([1, 2])
-            
-            with c1:
-                st.markdown("### 📊 Parámetros de Telemetría")
-                st.write(f"**ID Proyecto:** `{data_p['ID']}`")
-                st.write(f"**Enlace:** `Telegram Encrypted ({data_p['CHAT_ID']})`")
-                
-                raw = st.text_area("Coordenadas de Análisis (Lat, Lon):", height=200, placeholder="-29.3177, -70.0191...")
-                puntos = procesar_coords(raw) if raw else []
-                geom = ee.Geometry.Polygon(puntos) if len(puntos) > 2 else None
-                
-                if geom:
-                    if st.button("🛰️ DISPARAR TRANSMISIÓN"):
-                        url = f"https://api.telegram.org/bot{T_TOKEN}/sendMessage"
-                        msg = (f"🛰 **BIOCORE INTELLIGENCE**\n"
-                               f"━━━━━━━━━━━━━━\n"
-                               f"✅ **ID:** {data_p['ID']}\n"
-                               f"👤 **CLIENTE:** {sel_cliente}\n"
-                               f"📅 **STATUS:** Monitoreo Exitoso\n"
-                               f"━━━━━━━━━━━━━━")
-                        try:
-                            res = requests.post(url, data={"chat_id": data_p['CHAT_ID'], "text": msg, "parse_mode": "Markdown"})
-                            if res.status_code == 200:
-                                st.toast("Transmisión Completada", icon="📡")
-                            else: st.error("Fallo de enlace.")
-                        except: st.error("Error de red.")
+            if geom:
+                st.write("---")
+                if st.button("📤 TRANSMITIR INFORME AHORA"):
+                    # Barra de progreso tech
+                    progreso = st.progress(0)
+                    for i in range(100):
+                        import time
+                        time.sleep(0.01)
+                        progreso.progress(i + 1)
+                    
+                    url = f"https://api.telegram.org/bot{T_TOKEN}/sendMessage"
+                    msg = (f"🛰 **INFORME ESPECIAL BIOCORE**\n"
+                           f"━━━━━━━━━━━━━━\n"
+                           f"✅ **ID:** {data_p['ID']}\n"
+                           f"👤 **PROYECTO:** {sel_cliente}\n"
+                           f"🛰 **ALERTA:** Análisis de área completado.\n"
+                           f"📅 **FECHA:** 27/04/2026\n"
+                           f"━━━━━━━━━━━━━━")
+                    
+                    res = requests.post(url, data={"chat_id": data_p['CHAT_ID'], "text": msg, "parse_mode": "Markdown"})
+                    if res.status_code == 200:
+                        st.toast("Transmisión Exitosa", icon="📡")
+                        st.success("Informe enviado al terminal móvil.")
+                    else:
+                        st.error("Error de enlace.")
 
-            with c2:
-                if geom:
-                    m = folium.Map(location=[puntos[0][1], puntos[0][0]], zoom_start=14)
-                    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
-                    folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#00ffcc', 'weight': 2, 'fillOpacity': 0.1}).add_to(m)
-                    st_folium(m, width="100%", height=500)
-                else:
-                    st_folium(folium.Map(location=[-37, -72], zoom_start=5), width="100%", height=500)
+        with c2:
+            if geom:
+                m = folium.Map(location=[puntos[0][1], puntos[0][0]], zoom_start=14)
+                folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
+                folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#00ffcc', 'weight': 2, 'fillOpacity': 0.1}).add_to(m)
+                st_folium(m, width="100%", height=500)
+            else:
+                st_folium(folium.Map(location=[-37, -72], zoom_start=5), width="100%", height=500)

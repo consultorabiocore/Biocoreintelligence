@@ -6,38 +6,39 @@ from streamlit_folium import st_folium
 from folium.plugins import Draw
 from datetime import datetime
 
-# --- INICIALIZACIÓN PROFESIONAL ---
+# --- INICIALIZACIÓN PROFESIONAL CORREGIDA ---
 def iniciar_gee():
     try:
         # Streamlit Cloud usa st.secrets para manejar las llaves
         if "GEE_JSON" in st.secrets:
-            # Cargamos los secretos
+            # Cargamos el secreto como diccionario
             creds_info = json.loads(st.secrets["GEE_JSON"])
-            credentials = ee.ServiceAccountCredentials(creds_info['client_email'], key_data=st.secrets["GEE_JSON"])
+            
+            # Usamos el diccionario directamente para las credenciales
+            # Esto corrige el error de "could not be converted to bytes"
+            credentials = ee.ServiceAccountCredentials(
+                creds_info['client_email'], 
+                key_data=st.secrets["GEE_JSON"]
+            )
             
             # Inicialización moderna
             ee.Initialize(credentials)
         else:
             st.error("⚠️ No se encontró la variable GEE_JSON en los Secrets de Streamlit.")
     except Exception as e:
-        # Si ya estaba inicializado, evitamos el error
-        try:
-            ee.Initialize()
-        except:
-            st.error(f"❌ Error crítico de GEE: {e}")
+        st.error(f"❌ Error crítico de GEE: {e}")
 
-# Llamamos a la función
+# Llamamos a la función de inicialización
 iniciar_gee()
 
-
-# --- LÓGICA DE PROCESAMIENTO (TU CÓDIGO INTEGRADO) ---
+# --- LÓGICA DE PROCESAMIENTO ---
 def procesar_biocore(coords, tipo, glaciar):
     p = ee.Geometry.Polygon(coords)
     
     # Imagen Sentinel-2 más reciente
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(p).sort('system:time_start', False).first()
     
-    # Índices (Tus fórmulas exactas)
+    # Índices ambientales
     idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {
         'B8': s2.select('B8'), 'B4': s2.select('B4')
     }).rename('sa').addBands(
@@ -49,11 +50,9 @@ def procesar_biocore(coords, tipo, glaciar):
     return idx
 
 # --- INTERFAZ STREAMLIT ---
-
-# --- INTERFAZ STREAMLIT ---
 st.set_page_config(
     page_title="BioCore Intelligence SaaS", 
-    page_icon="logo.png", # Esto pone el logo en la pestaña del navegador
+    page_icon="assets/logo.png", # Corregido: apunta a la carpeta assets
     layout="wide"
 )
 
@@ -62,26 +61,22 @@ if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
 with st.sidebar:
-    # --- AQUÍ AGREGA EL LOGO ---
-    st.image("logo.png", use_container_width=True) 
-    st.title("🛡️ BioCore SaaS")
-    # --------------------------
-    user = st.text_input("Usuario")
-    passw = st.text_input("Password", type="password")
-
-# Login Simple
-if 'autenticado' not in st.session_state:
-    st.session_state.autenticado = False
-
-with st.sidebar:
+    # --- LOGO CORREGIDO ---
+    # Se agrega la ruta 'assets/' porque ahí es donde está el archivo en tu GitHub
+    try:
+        st.image("assets/logo.png", use_container_width=True) 
+    except:
+        st.warning("⚠️ No se pudo cargar el logo desde assets/logo.png")
+        
     st.title("🛡️ BioCore SaaS")
     user = st.text_input("Usuario")
     passw = st.text_input("Password", type="password")
+    
     if st.button("Ingresar"):
-        if user == "admin" and passw == "loreto2026": # Define tu clave aquí
+        if user == "admin" and passw == "loreto2026":
             st.session_state.autenticado = True
             st.session_state.rol = "admin"
-        elif user == "cliente": # Simulación cliente
+        elif user == "cliente":
             st.session_state.autenticado = True
             st.session_state.rol = "cliente"
 
@@ -102,18 +97,14 @@ if st.session_state.autenticado:
             if st.button("Guardar y Analizar"):
                 if mapa['last_active_drawing']:
                     coords = mapa['last_active_drawing']['geometry']['coordinates'][0]
-                    # Ejecuta tu motor de procesamiento
                     resultados = procesar_biocore(coords, tipo, es_glaciar)
                     st.success(f"Proyecto {nombre} analizado con éxito.")
                     st.write(resultados)
-
     else:
         st.header("📊 Dashboard de Cumplimiento Ambiental")
         st.write("Bienvenido a su plataforma de vigilancia.")
-        # Aquí se mostrarían los resultados guardados para el cliente
         col1, col2 = st.columns(2)
         col1.metric("SAVI (Vigor)", "0.42", "Óptimo")
         col2.metric("NDSI (Nieve)", "0.55", "Estable")
-
 else:
     st.info("Por favor inicie sesión para acceder al sistema BioCore.")

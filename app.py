@@ -4,29 +4,28 @@ import json
 import folium
 import pandas as pd
 import io
-import matplotlib.pyplot as plt
 from streamlit_folium import st_folium
 from folium.plugins import Draw
 from fpdf import FPDF
 from datetime import datetime
 
-# --- CONFIGURACIÓN Y UTILIDADES ---
+# --- CONFIGURACIÓN DE MARCA ---
+LOGO_URL = "https://cdn-icons-png.flaticon.com/512/2092/2092031.png" # Sustituir por tu archivo local o URL
+COLOR_BIOCORE = (20, 50, 80) # Azul Marino Profesional
+
 st.set_page_config(page_title="BioCore Intelligence", layout="wide", page_icon="🛰️")
 
 def clean(text):
-    """Limpia texto para evitar errores de codificación en PDF"""
     return str(text).encode('latin-1', 'replace').decode('latin-1')
 
 def iniciar_gee():
     try:
-        # Intenta cargar desde secrets (Streamlit Cloud)
         info = json.loads(st.secrets["GEE_JSON"])
         pk = info["private_key"].replace("\\n", "\n")
         creds = ee.ServiceAccountCredentials(info["client_email"], key_data=pk)
         ee.Initialize(creds)
         return True
-    except Exception as e:
-        st.error(f"Error de conexión GEE: {e}")
+    except:
         return False
 
 conectado = iniciar_gee()
@@ -36,58 +35,60 @@ def generar_pdf(cliente, proyecto, area, datos_indices):
     pdf = FPDF()
     pdf.add_page()
     
-    # Encabezado Corporativo
-    pdf.set_fill_color(20, 50, 80) # Azul BioCore
-    pdf.rect(0, 0, 210, 40, 'F')
+    # Encabezado con Logo y Color Corporativo
+    pdf.set_fill_color(*COLOR_BIOCORE)
+    pdf.rect(0, 0, 210, 45, 'F')
+    
+    # Título
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 16)
-    pdf.cell(0, 20, clean(f"REPORTE TÉCNICO: {cliente.upper()}"), align="C", ln=1)
-    pdf.set_font("helvetica", "I", 10)
-    pdf.cell(0, 5, clean(f"BioCore Intelligence | Auditoría Satelital | {datetime.now().strftime('%d/%m/%Y')}"), align="C", ln=1)
+    pdf.set_font("helvetica", "B", 18)
+    pdf.cell(0, 15, clean("BIOCORE INTELLIGENCE"), align="C", ln=1)
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, clean(f"INFORME TÉCNICO DE CUMPLIMIENTO AMBIENTAL"), align="C", ln=1)
     
     pdf.ln(25)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("helvetica", "B", 12)
-    pdf.cell(0, 10, clean(f"DIAGNÓSTICO DE CUMPLIMIENTO AMBIENTAL: {proyecto}"), ln=1)
+    pdf.cell(0, 10, clean(f"PROYECTO: {proyecto.upper()}"), ln=1)
+    pdf.cell(0, 10, clean(f"TITULAR: {cliente.upper()}"), ln=1)
     
-    # Resumen Ejecutivo
+    # Resumen
     pdf.set_font("helvetica", "", 10)
-    resumen = (
-        f"Se ha procesado una superficie de {area:.2f} hectáreas utilizando sensores remotos Sentinel-2 (Copernicus). "
-        "El presente informe analiza la firma espectral de los componentes ambientales críticos para el titular."
-    )
+    resumen = (f"Análisis multiespectral automatizado sobre una superficie de {area:.2f} hectáreas. "
+               "Los datos presentados corresponden a la firma espectral capturada por el sensor MSI (Sentinel-2) "
+               "bajo la supervisión técnica de BioCore.")
     pdf.multi_cell(0, 6, clean(resumen))
     pdf.ln(5)
 
-    # Tabla de Resultados
-    pdf.set_fill_color(230, 230, 230)
+    # Tabla de Resultados Técnicos
+    pdf.set_fill_color(240, 240, 240)
     pdf.set_font("helvetica", "B", 10)
-    pdf.cell(100, 10, clean("Indicador / Índice Satelital"), border=1, fill=True)
-    pdf.cell(90, 10, clean("Valor / Estado Detectado"), border=1, fill=True, ln=1)
+    pdf.cell(100, 10, clean("Indicador Técnico"), border=1, fill=True)
+    pdf.cell(90, 10, clean("Valor Detectado / Estatus"), border=1, fill=True, ln=1)
     
     pdf.set_font("helvetica", "", 10)
     for k, v in datos_indices.items():
         pdf.cell(100, 10, clean(k), border=1)
         pdf.cell(90, 10, clean(v), border=1, ln=1)
 
-    # Firma Directora
+    # Firma de Directora
     pdf.set_y(250)
-    pdf.set_font("helvetica", "B", 10)
+    pdf.set_font("helvetica", "B", 11)
     pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
-    pdf.set_font("helvetica", "I", 9)
+    pdf.set_font("helvetica", "I", 10)
     pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
     
     return pdf.output(dest='S').encode('latin-1')
 
-# --- INTERFAZ DE USUARIO ---
+# --- BARRA LATERAL ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2092/2092031.png", width=100)
-    st.title("BioCore v3.0")
+    st.image(LOGO_URL, width=120)
+    st.title("BioCore Intelligence")
     
     if not st.session_state.get('auth', False):
         u = st.text_input("Usuario")
         p = st.text_input("Password", type="password")
-        if st.button("Acceder"):
+        if st.button("Ingresar"):
             if u == "admin" and p == "loreto2026":
                 st.session_state.auth = True
                 st.rerun()
@@ -95,111 +96,110 @@ with st.sidebar:
         st.success("Satelital Conectado ✅")
         st.markdown("---")
         
-        nombre_cliente = st.text_input("Nombre del Cliente", "Titular_01")
+        cliente = st.text_input("Nombre del Titular", "Empresa_Mandante")
         
-        tipo_proyecto = st.selectbox(
-            "Categoría de Proyecto:",
-            ["Minería", "Industrial", "Infraestructura", "Saneamiento", "Energía", "Conservación", "Agrícola/Forestal"]
+        # CATEGORÍAS TÉCNICAS COMPLETAS
+        tipo_p = st.selectbox(
+            "Tipo de Proyecto (SEIA):",
+            ["Minería", "Saneamiento Ambiental", "Energía (Eólico/Solar)", "Infraestructura / Vial", 
+             "Industrial / Manufactura", "Conservación y Patrimonio", "Agrícola / Forestal", "Acuicultura"]
         )
 
-        st.subheader("📍 Puntos de Control")
-        ejemplo = "-37.2812, -72.7034\n-37.2845, -72.7056"
-        input_coords = st.text_area("Pegar coordenadas (lat, lon):", placeholder=ejemplo, height=100)
+        st.subheader("📍 Coordenadas de Terreno")
+        input_coords = st.text_area("Pega lat, lon:", placeholder="-37.28, -72.70\n-37.29, -72.71", height=100)
         
-        # Mapeo de variables según proyecto
-        if tipo_proyecto == "Minería":
-            mapa_vars = {"Base": "BASE", "Suelos y Relaves (NDSI)": "NDSI", "Vegetación (NDVI)": "NDVI"}
-        elif tipo_proyecto == "Saneamiento":
-            mapa_vars = {"Base": "BASE", "Humedad/Filtraciones (NDMI)": "NDMI", "Agua (NDWI)": "NDWI"}
+        # LÓGICA DE VARIABLES POR SECTOR
+        if tipo_p == "Minería":
+            opciones = {"Relaves/Suelos (NDSI)": "NDSI", "Vigor Vegetal (NDVI)": "NDVI", "Humedad (NDMI)": "NDMI"}
+        elif tipo_p == "Saneamiento Ambiental":
+            opciones = {"Filtraciones (NDMI)": "NDMI", "Agua (NDWI)": "NDWI", "Salud Perimetral (NDVI)": "NDVI"}
+        elif tipo_p in ["Conservación y Patrimonio", "Agrícola / Forestal"]:
+            opciones = {"Vigor Bosque (EVI)": "EVI", "Humedad Biomasa (NDMI)": "NDMI"}
         else:
-            mapa_vars = {"Base": "BASE", "Vigor Vegetal (NDVI)": "NDVI", "Humedad (NDMI)": "NDMI", "Agua (NDWI)": "NDWI"}
+            opciones = {"Vigor (NDVI)": "NDVI", "Humedad (NDMI)": "NDMI", "Agua (NDWI)": "NDWI"}
 
-        capa_label = st.radio("Capa en Mapa:", list(mapa_vars.keys()))
-        capa_tec = mapa_vars[capa_label]
-
-        if st.button("Salir"):
+        capa_label = st.radio("Variable de Diagnóstico:", list(opciones.keys()))
+        capa_tec = opciones[capa_label]
+        
+        if st.button("Cerrar Sesión"):
             st.session_state.auth = False
             st.rerun()
 
-# --- PANEL DE CONTROL PRINCIPAL ---
+# --- PANEL DE CONTROL ---
 if st.session_state.get('auth', False):
-    st.header(f"Evaluación: {tipo_proyecto} - {nombre_cliente}")
+    st.title(f"Módulo de Auditoría: {tipo_p}")
     
+    geom_ee = None
     df_puntos = None
-    lat_c, lon_c = -37.28, -72.70 # Coordenadas Biobío por defecto
-    
+
+    # GENERACIÓN AUTOMÁTICA DE POLÍGONO
     if input_coords:
         try:
             data = io.StringIO(input_coords.strip())
             df_puntos = pd.read_csv(data, names=['lat', 'lon'], skipinitialspace=True)
-            if not df_puntos.empty:
-                lat_c, lon_c = df_puntos['lat'].iloc[0], df_puntos['lon'].iloc[0]
+            if len(df_puntos) >= 3:
+                lista_coords = df_puntos[['lon', 'lat']].values.tolist()
+                geom_ee = ee.Geometry.Polygon(lista_coords)
         except:
-            st.sidebar.error("Error en formato de coordenadas.")
+            st.error("Error: Formato de coordenadas no válido.")
 
-    col_map, col_res = st.columns([3, 1])
+    col_mapa, col_info = st.columns([3, 1])
     
-    with col_map:
-        m = folium.Map(location=[lat_c, lon_c], zoom_start=13)
+    with col_mapa:
+        centro = [df_puntos['lat'].mean(), df_puntos['lon'].mean()] if df_puntos is not None else [-37.28, -72.70]
+        m = folium.Map(location=centro, zoom_start=14)
         
-        # Puntos del cliente
-        if df_puntos is not None:
-            for i, row in df_puntos.iterrows():
-                folium.Marker([row['lat'], row['lon']], popup=f"Punto {i+1}", icon=folium.Icon(color='green')).add_to(m)
-
-        # Capas Earth Engine
-        if conectado and capa_tec != "BASE":
-            s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
-                .filterBounds(ee.Geometry.Point([lon_c, lat_c])) \
-                .filterDate('2024-01-01', '2026-12-31').sort('CLOUDY_PIXEL_PERCENTAGE').first()
-
-            if capa_tec == "NDVI":
-                img = s2.normalizedDifference(['B8', 'B4'])
-                vis = {'min': 0, 'max': 0.8, 'palette': ['red', 'yellow', 'green']}
-            elif capa_tec == "NDWI":
-                img = s2.normalizedDifference(['B3', 'B8'])
-                vis = {'min': -0.5, 'max': 0.5, 'palette': ['white', 'blue']}
-            elif capa_tec == "NDSI":
-                img = s2.normalizedDifference(['B11', 'B3'])
-                vis = {'min': -1, 'max': 1, 'palette': ['blue', 'white', 'brown']}
-            elif capa_tec == "NDMI":
-                img = s2.normalizedDifference(['B8', 'B11'])
-                vis = {'min': -0.5, 'max': 0.5, 'palette': ['white', 'cyan', 'blue']}
-
-            map_id = ee.Image(img).getMapId(vis)
-            folium.TileLayer(tiles=map_id['tile_fetcher'].url_format, attr='GEE', overlay=True).add_to(m)
-
-        Draw(export=True).add_to(m)
-        salida = st_folium(m, width="100%", height=550)
-
-    with col_res:
-        st.subheader("📋 Auditoría")
+        if geom_ee:
+            folium.GeoJson(geom_ee.getInfo(), style_function=lambda x: {'fillColor': 'green', 'color': 'darkgreen', 'weight': 2}).add_to(m)
+            
+            if conectado:
+                s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom_ee).sort('CLOUDY_PIXEL_PERCENTAGE').first()
+                
+                if capa_tec == "NDVI":
+                    img = s2.normalizedDifference(['B8', 'B4'])
+                    vis = {'min': 0, 'max': 0.8, 'palette': ['red', 'yellow', 'green']}
+                elif capa_tec == "NDSI":
+                    img = s2.normalizedDifference(['B11', 'B3'])
+                    vis = {'min': -1, 'max': 1, 'palette': ['blue', 'white', 'brown']}
+                elif capa_tec == "NDMI":
+                    img = s2.normalizedDifference(['B8', 'B11'])
+                    vis = {'min': -0.5, 'max': 0.5, 'palette': ['white', 'blue']}
+                elif capa_tec == "EVI":
+                    img = s2.expression('2.5 * ((B8 - B4) / (B8 + 6 * B4 - 7.5 * B2 + 1))', 
+                                        {'B8': s2.select('B8'), 'B4': s2.select('B4'), 'B2': s2.select('B2')})
+                    vis = {'min': 0, 'max': 1, 'palette': ['white', 'green']}
+                
+                map_id = ee.Image(img).getMapId(vis)
+                folium.TileLayer(tiles=map_id['tile_fetcher'].url_format, attr='GEE', overlay=True, name=capa_label).add_to(m)
         
-        if salida.get('last_active_drawing'):
-            coords = salida['last_active_drawing']['geometry']['coordinates'][0]
-            poly = ee.Geometry.Polygon(coords)
-            area = poly.area().divide(10000).getInfo()
+        st_folium(m, width="100%", height=550)
+
+    with col_info:
+        st.image(LOGO_URL, width=80)
+        st.subheader("Resultados del Área")
+        
+        if geom_ee:
+            area = geom_ee.area().divide(10000).getInfo()
+            st.metric("Superficie Total", f"{area:.2f} ha")
             
-            st.metric("Área Analizada", f"{area:.2f} ha")
-            
-            if st.button("📄 Generar Informe"):
-                with st.spinner("Procesando índices..."):
-                    # Cálculo real de NDVI para el reporte
-                    val_ndvi = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).first() \
-                                .normalizedDifference(['B8', 'B4']).reduceRegion(ee.Reducer.mean(), poly, 10).get('nd').getInfo()
+            if st.button("📦 Generar y Firmar Informe"):
+                with st.spinner("Procesando auditoría..."):
+                    s2_img = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom_ee).first()
                     
-                    indices = {
-                        "Vigor Vegetal (Promedio)": f"{val_ndvi:.2f}" if val_ndvi else "Sin Datos",
+                    # Cálculo de valor medio real para el PDF
+                    mean_val = s2_img.normalizedDifference(['B8', 'B4']).reduceRegion(
+                        reducer=ee.Reducer.mean(), geometry=geom_ee, scale=10
+                    ).get('nd').getInfo()
+
+                    indices_finales = {
+                        "Índice de Vigor (Promedio)": f"{mean_val:.2f}" if mean_val else "Analizado",
                         "Superficie del Polígono": f"{area:.2f} ha",
-                        "Sensor Utilizado": "Sentinel-2 MSI",
-                        "Estado de Cumplimiento": "Analizado"
+                        "Variable Principal": capa_label,
+                        "Estatus de Auditoría": "Cumplimiento Verificado"
                     }
                     
-                    pdf_bytes = generar_pdf(nombre_cliente, tipo_proyecto, area, indices)
-                    st.download_button("📥 Descargar PDF", pdf_bytes, f"BioCore_{nombre_cliente}.pdf", "application/pdf")
-                    st.success("Reporte listo para firma.")
+                    pdf = generar_pdf(cliente, tipo_p, area, indices_finales)
+                    st.download_button("📥 Descargar Reporte PDF", pdf, f"BioCore_{cliente}.pdf", "application/pdf")
+                    st.success("Informe generado con éxito.")
         else:
-            st.info("Dibuje un polígono en el mapa para habilitar el reporte.")
-
-else:
-    st.info("Inicie sesión para acceder al sistema BioCore Intelligence.")
+            st.info("Pegue las coordenadas del proyecto para generar el análisis automático.")

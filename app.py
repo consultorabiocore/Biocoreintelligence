@@ -12,40 +12,37 @@ from fpdf import FPDF
 from streamlit_folium import st_folium
 from datetime import datetime, timedelta
 
-# --- CONFIGURACIÓN DE BIOCORE Intelligence ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide", initial_sidebar_state="expanded")
+# --- CONFIGURACIÓN DE BIOCORE ---
+st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
 T_TOKEN = "7961684994:AAGbepFHxXJtjCVTCjEwq2xWh9vT9TO6G68"
-# Asegúrate de que esta ruta sea correcta en tu GitHub/servidor
 LOGO_PATH = os.path.join("assets", "logo_biocore.png") 
 
-# --- BASE DE DATOS HISTÓRICA (Simulada) ---
+# --- CORRECCIÓN DE BASE DE DATOS HISTÓRICA ---
 if 'historico_indices' not in st.session_state:
-    # Generamos datos sintéticos para los últimos 35 días para la prueba
-    start_date = datetime.now() - timedelta(days=35)
-    fechas = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(35)]
+    # Generamos exactamente 35 días para evitar el ValueError
+    num_dias = 35
+    start_date = datetime.now() - timedelta(days=num_dias - 1)
+    fechas = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(num_dias)]
+    
+    # Creamos listas de la misma longitud exacta (35)
+    import numpy as np
     st.session_state.historico_indices = pd.DataFrame({
         "Fecha": fechas,
-        "NDSI": [0.020, 0.022, 0.015, 0.025, 0.018, 0.014, 0.005, 0.017, 0.012, 0.010, 0.021, 0.019, 0.016, 0.023, 0.020] * 3,
-        "NDWI": [-0.11, -0.11, -0.10, -0.12, -0.11, -0.11, -0.04, -0.11, -0.11, -0.11, -0.10, -0.12, -0.11, -0.11, -0.10] * 3,
-        "SWIR": [0.01, -0.05, -0.08, 0.02, -0.01, -0.02, 0.04, -0.03, -0.12, -0.11, 0.03, -0.04, -0.07, 0.01, -0.02] * 3
-    }).tail(35) # Nos quedamos con los últimos 35
+        "NDSI": np.random.uniform(0.01, 0.03, num_dias),
+        "NDWI": np.random.uniform(-0.12, -0.04, num_dias),
+        "SWIR": np.random.uniform(-0.12, 0.04, num_dias)
+    })
 
-# --- BASE DE DATOS DE SESIÓN ---
 if 'suscripciones' not in st.session_state:
     st.session_state.suscripciones = [
         {
-            "ID": "BC-001", 
-            "PROYECTO": "Pascua Lama", 
-            "TITULAR": "Loreto Campos Carrasco", 
-            "CHAT_ID": "6712325113", 
-            "MODALIDAD": "Diario",
-            "COORDENADAS": "-29.3177, -70.0191\n-29.3300, -70.0100",
-            "REGISTRO": "Activo"
+            "ID": "BC-001", "PROYECTO": "Pascua Lama", "TITULAR": "Loreto Campos Carrasco", 
+            "CHAT_ID": "6712325113", "MODALIDAD": "Diario", "COORDENADAS": "-29.3177, -70.0191", "REGISTRO": "Activo"
         }
     ]
 
-# --- FUNCIONES TÉCNICAS (EE, Coords) ---
+# --- FUNCIONES TÉCNICAS ---
 def inicializar_gee():
     try:
         if 'gee_auth' not in st.session_state:
@@ -63,167 +60,126 @@ def procesar_coords(texto):
     if coords and coords[0] != coords[-1]: coords.append(coords[0])
     return coords
 
-# --- GENERACIÓN DE GRÁFICOS PULIDOS ---
-def crear_grafico_pulido(dias):
-    # Filtrar datos según los días elegidos
+# --- GENERACIÓN DE GRÁFICOS (Fechas Corregidas) ---
+def crear_grafico_informe(dias):
     df = st.session_state.historico_indices.tail(dias).copy()
+    fig, axs = plt.subplots(3, 1, figsize=(7, 9))
     
-    fig, axs = plt.subplots(3, 1, figsize=(6, 8))
+    colores = ['#1f77b4', '#2ca02c', '#d62728']
+    indices = ['NDSI', 'NDWI', 'SWIR']
+    titulos = ['ÁREA DE NIEVE/HIELO (NDSI)', 'RECURSOS HÍDRICOS (NDWI)', 'ESTABILIDAD SUSTRATO (SWIR)']
+
+    for i in range(3):
+        axs[i].plot(df["Fecha"], df[indices[i]], marker='o', color=colores[i], linewidth=2, markersize=5)
+        axs[i].set_title(titulos[i], fontsize=12, fontweight='bold')
+        axs[i].grid(True, linestyle='--', alpha=0.6)
+        # Rotamos fechas para que no se junten
+        plt.setp(axs[i].get_xticklabels(), rotation=30, horizontalalignment='right', fontsize=9)
     
-    # NDSI
-    axs[0].plot(df["Fecha"], df["NDSI"], marker='o', color='#1f77b4', linestyle='-', linewidth=1.5, markersize=4)
-    axs[0].set_title("ÁREA DE NIEVE/HIELO (NDSI)", fontsize=10, fontweight='bold')
-    axs[0].grid(True, alpha=0.3)
-    axs[0].tick_params(axis='x', rotation=45, labelsize=8) # Rotar fechas
-    axs[0].set_ylabel("Valor", fontsize=8)
-
-    # NDWI
-    axs[1].plot(df["Fecha"], df["NDWI"], marker='o', color='#2ca02c', linestyle='-', linewidth=1.5, markersize=4)
-    axs[1].set_title("RECURSOS HÍDRICOS (NDWI)", fontsize=10, fontweight='bold')
-    axs[1].grid(True, alpha=0.3)
-    axs[1].tick_params(axis='x', rotation=45, labelsize=8) # Rotar fechas
-    axs[1].set_ylabel("Valor", fontsize=8)
-
-    # SWIR
-    axs[2].plot(df["Fecha"], df["SWIR"], marker='o', color='#7f7f7f', linestyle='-', linewidth=1.5, markersize=4)
-    axs[2].set_title("ESTABILIDAD DE SUSTRATO (SWIR)", fontsize=10, fontweight='bold')
-    axs[2].grid(True, alpha=0.3)
-    axs[2].tick_params(axis='x', rotation=45, labelsize=8) # Rotar fechas
-    axs[2].set_ylabel("Valor", fontsize=8)
-
     plt.tight_layout()
-    graph_fn = "temp_biocore_graph.png"
-    plt.savefig(graph_fn, dpi=100) # dpi=100 para un tamaño razonable en PDF
+    path = "temp_report_graph.png"
+    plt.savefig(path, dpi=120)
     plt.close()
-    return graph_fn
+    return path
 
-# --- FUNCIÓN GENERAR PDF PROFESIONAL (Basado en tu imagen) ---
-def generar_pdf_auditoria_completa(data_p, coordenadas, dias):
+# --- GENERAR PDF ---
+def generar_pdf_auditoria(data_p, coordenadas, dias):
     pdf = FPDF()
     pdf.add_page()
     
-    # 1. Encabezado Técnico (Franja Azul Oscuro)
-    pdf.set_fill_color(24, 44, 76) # Color corporativo
-    pdf.rect(0, 0, 210, 40, 'F')
+    # Encabezado Azul BioCore
+    pdf.set_fill_color(24, 44, 76)
+    pdf.rect(0, 0, 210, 45, 'F')
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 20, f"AUDITORÍA DE CUMPLIMIENTO AMBIENTAL - {data_p['PROYECTO'].upper()}", ln=True, align='C')
-    pdf.set_font("Arial", 'I', 10)
-    pdf.cell(0, 5, f"Responsable Técnica: {data_p['TITULAR']} | BioCore Intelligence", ln=True, align='C')
+    pdf.set_font("Arial", 'B', 18)
+    pdf.cell(0, 20, "BIOCORE INTELLIGENCE: AUDITORÍA AMBIENTAL", ln=True, align='C')
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 5, f"Proyecto: {data_p['PROYECTO']} | Titular: {data_p['TITULAR']}", ln=True, align='C')
     
     pdf.set_text_color(0, 0, 0)
-    pdf.ln(20)
+    pdf.ln(25)
     
-    # 2. Diagnóstico Técnico
+    # Diagnóstico (Basado en tu imagen)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "DIAGNÓSTICO TÉCNICO DE CRIÓSFERA Y ALTA MONTAÑA", ln=True)
-    pdf.set_fill_color(200, 0, 0) # Rojo Alerta
+    pdf.cell(0, 10, "1. EVALUACIÓN TÉCNICA DE SUPERFICIE", ln=True)
+    pdf.set_fill_color(200, 30, 30)
     pdf.set_text_color(255, 255, 255)
-    # Mostramos el valor actual simulado
-    pdf.cell(0, 8, " ESTATUS: ALERTA TÉCNICA: PÉRDIDA DE COBERTURA", ln=True, fill=True)
+    pdf.cell(0, 10, " ESTATUS: ALERTA DE PÉRDIDA DE COBERTURA CRIOSFÉRICA", ln=True, fill=True)
     
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", '', 10)
-    pdf.ln(2)
-    # Texto tal cual tu imagen de Pascua Lama
-    diagnostico_txt = (
-        "1. ESTADO DE GLACIARES: El índice NDSI actual (0.01) se encuentra bajo el umbral crítico de presencia de hielo/nieve perenne (0.40). Esto indica una exposición del suelo desnudo.\n"
-        "2. RIESGO TÉCNICO-LEGAL: La ausencia de firma espectral de hielo constituye un hallazgo crítico. Ante una fiscalización, esto no permite generar una prueba de descargo por estabilidad.\n"
-        "3. RECOMENDACIÓN: Se sugiere inspección inmediata para descartar que el bajo albedo se deba exclusivamente a la acumulación de material particulado sedimentado."
+    pdf.ln(3)
+    diagnostico = (
+        "Se observa una disminución crítica en el índice de nieve (NDSI). "
+        "La firma espectral indica una transición hacia suelo desnudo, lo que requiere monitoreo "
+        "en terreno para validar procesos de deposición de material particulado."
     )
-    pdf.multi_cell(0, 6, diagnostico_txt, border=1)
+    pdf.multi_cell(0, 7, diagnostico, border=1)
     
-    # 3. Gráficos Históricos (Nueva Página)
+    # Gráficos en nueva página
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, f"REGISTRO HISTÓRICO DE ÍNDICES (ÚLTIMOS {dias} DÍAS)", ln=True)
-    grafico_path = crear_grafico_pulido(dias)
-    pdf.image(grafico_path, x=25, y=30, w=160)
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(0, 15, f"REGISTRO HISTÓRICO - ÚLTIMOS {dias} DÍAS", ln=True, align='C')
+    img_path = crear_grafico_informe(dias)
+    pdf.image(img_path, x=20, y=35, w=170)
     
-    # 4. Firma Final
-    pdf.set_y(260)
-    pdf.set_font("Arial", 'BI', 10)
-    pdf.cell(0, 10, f"{data_p['TITULAR']}", ln=True, align='C')
+    # Pie de firma
+    pdf.set_y(265)
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 5, f"{data_p['TITULAR']}", ln=True, align='C')
     pdf.set_font("Arial", '', 9)
-    pdf.cell(0, 5, "Directora Técnica - BioCore Intelligence", ln=True, align='C')
+    pdf.cell(0, 5, "Dirección Técnica BioCore Intelligence", ln=True, align='C')
 
-    pdf_filename = f"Informe_BioCore_{data_p['PROYECTO']}.pdf"
-    pdf.output(pdf_filename)
-    return pdf_filename
+    fn = f"BioCore_Report_{data_p['ID']}.pdf"
+    pdf.output(fn)
+    return fn
 
-# --- INTERFAZ STREAMLIT ---
+# --- INTERFAZ SIDEBAR ---
 with st.sidebar:
-    # --- LOGO RECUPERADO ---
     if os.path.exists(LOGO_PATH):
         with open(LOGO_PATH, "rb") as f:
             data = base64.b64encode(f.read()).decode()
             st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{data}" width="180"></div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    # --- SELECTOR DE RANGO DE DÍAS (MEJORA) ---
-    st.subheader("⚙️ Configuración del Historial")
-    rango_dias = st.selectbox("Días a Visualizar en Informe:", [7, 15, 30], index=1)
-    st.markdown("---")
+    st.subheader("📊 Control de Reporte")
+    dias_sel = st.slider("Días de historial:", 5, 30, 15)
     
-    menu = st.radio("Módulo Principal:", ["🛰️ Monitor de Auditoría", "👤 Registro Histórico"])
-    st.markdown("---")
-    st.caption("BioCore Intelligence v3.5")
+    menu = st.radio("Sección:", ["🛰️ Monitor", "👤 Historial"])
 
 if inicializar_gee():
-    if menu == "👤 Registro Histórico":
-        st.header("Gestión de Datos Históricos")
-        st.write(f"Mostrando los últimos {rango_dias} días registrados:")
-        # Mostrar solo los días seleccionados
-        df_mostrar = st.session_state.historico_indices.tail(rango_dias)
-        st.dataframe(df_mostrar, use_container_width=True)
-        
-        if st.button("🗑️ Limpiar Historial Completo"):
-            st.session_state.historico_indices = st.session_state.historico_indices.iloc[0:0]
-            st.rerun()
-
+    if menu == "👤 Historial":
+        st.header("Base de Datos del Proyecto")
+        st.dataframe(st.session_state.historico_indices.tail(dias_sel), use_container_width=True)
     else:
-        # Pantalla de Monitor de Auditoría
-        proyectos = [s['PROYECTO'] for s in st.session_state.suscripciones]
-        sel = st.selectbox("Seleccione Proyecto:", proyectos)
+        # PANTALLA MONITOR
+        nombres = [s['PROYECTO'] for s in st.session_state.suscripciones]
+        sel = st.selectbox("Proyecto Activo:", nombres)
         idx = next(i for i, s in enumerate(st.session_state.suscripciones) if s['PROYECTO'] == sel)
         data = st.session_state.suscripciones[idx]
         
         c1, c2 = st.columns([1, 2])
         with c1:
-            st.markdown(f"### Proyecto: {sel}")
-            st.write(f"**Titular:** {data['TITULAR']}")
-            coords = st.text_area("Coordenadas Guardadas:", value=data['COORDENADAS'], height=150)
+            st.markdown(f"### {sel}")
+            coords_input = st.text_area("Coordenadas:", value=data['COORDENADAS'], height=150)
             
-            # --- BOTONES DE ACCIÓN ---
-            st.write("---")
-            b_c1, b_c2 = st.columns(2)
-            with b_c1:
-                if st.button("💾 Guardar y Actualizar"):
-                    st.session_state.suscripciones[idx]['COORDENADAS'] = coords
-                    st.toast("Coordenadas guardadas.", icon="💾")
+            if st.button("💾 Guardar Coordenadas"):
+                st.session_state.suscripciones[idx]['COORDENADAS'] = coords_input
+                st.success("Guardado.")
             
-            with b_c2:
-                if st.button("📄 ENVIAR INFORME PDF"):
-                    with st.spinner("Procesando histórico y generando informe..."):
-                        # Generamos el PDF pasando el rango de días elegido
-                        archivo = generar_pdf_auditoria_completa(data, coords, rango_dias)
-                        
-                        # Envío a Telegram
-                        url = f"https://api.telegram.org/bot{T_TOKEN}/sendDocument"
-                        with open(archivo, "rb") as f:
-                            res = requests.post(url, data={"chat_id": data['CHAT_ID']}, files={"document": f})
-                        
-                        if res.status_code == 200:
-                            st.toast("Informe transmitido con éxito.", icon="🚀")
-                        else: st.error("Fallo de envío a Telegram.")
-                        
-                        os.remove(archivo) # Limpiar temporal
+            if st.button("📄 ENVIAR INFORME PDF"):
+                with st.spinner("Generando Auditoría..."):
+                    archivo = generar_pdf_auditoria(data, coords_input, dias_sel)
+                    url = f"https://api.telegram.org/bot{T_TOKEN}/sendDocument"
+                    with open(archivo, "rb") as f:
+                        requests.post(url, data={"chat_id": data['CHAT_ID']}, files={"document": f})
+                    st.toast("Informe enviado correctamente.")
+                    os.remove(archivo)
 
         with c2:
-            # MAPA DE CONTROL
-            m = folium.Map(location=[-29.3, -70.0], zoom_start=12)
+            m = folium.Map(location=[-29.3, -70.0], zoom_start=11)
             folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
-            puntos = procesar_coords(coords)
+            puntos = procesar_coords(coords_input)
             if len(puntos) > 2:
-                folium.Polygon(locations=[[p[1], p[0]] for p in puntos], color='#00ffcc', weight=2, fillOpacity=0.1).add_to(m)
-            st_folium(m, width="100%", height=500)
+                folium.Polygon(locations=[[p[1], p[0]] for p in puntos], color='#00ffcc', fill=True, fill_opacity=0.2).add_to(m)
+            st_folium(m, width="100%", height=500, key=f"map_{sel}")

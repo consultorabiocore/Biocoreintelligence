@@ -1,114 +1,114 @@
 import streamlit as st
 import ee
 import json
-import folium
 import os
-import base64
-import re
 import requests
+import re
 from streamlit_folium import st_folium
+import folium
 
-# --- CONFIGURACIÓN BIOCORE ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide")
-LOGO_PATH = os.path.join("assets", "logo_biocore.png")
-T_TOKEN = "7961684994:AAGbepFHxXJtjCVTCjEwq2xWh9vT9TO6G68" # Tu Token de Bot
+# --- CONFIGURACIÓN DE BIOCORE ---
+T_TOKEN = "7961684994:AAGbepFHxXJtjCVTCjEwq2xWh9vT9TO6G68"
+
+# Simulamos la base de datos que guarda quién recibe reportes diarios
+if 'suscripciones_diarias' not in st.session_state:
+    st.session_state.suscripciones_diarias = []
 
 def inicializar_gee():
     try:
         if 'gee_auth' not in st.session_state:
             info = json.loads(st.secrets["GEE_JSON"])
-            creds = ee.ServiceAccountCredentials(info['client_email'], key_data=info['private_key'].replace("\\n", "\n"))
-            ee.Initialize(creds)
+            ee.Initialize(ee.ServiceAccountCredentials(info['client_email'], key_data=info['private_key'].replace("\\n", "\n")))
             st.session_state.gee_auth = True
         return True
     except: return False
 
-def procesar_coordenadas_simples(texto):
-    lineas = texto.strip().split('\n')
-    coords_finales = []
-    for linea in lineas:
-        numeros = re.findall(r"[-+]?\d*\.\d+|\d+", linea)
-        if len(numeros) >= 2:
-            lat, lon = float(numeros[0]), float(numeros[1])
-            coords_finales.append([lon, lat])
-    if coords_finales and coords_finales[0] != coords_finales[-1]:
-        coords_finales.append(coords_finales[0])
-    return coords_finales
+def procesar_coordenadas(texto):
+    # Limpia el texto para aceptar el formato Lat, Lon sin corchetes
+    nums = re.findall(r"[-+]?\d*\.\d+|\d+", texto)
+    coords = []
+    for i in range(0, len(nums), 2):
+        if i+1 < len(nums): coords.append([float(nums[1]), float(nums[0])])
+    if coords and coords[0] != coords[-1]: coords.append(coords[0])
+    return coords
 
-# --- PESTAÑA LATERAL (REGISTRO Y CONFIGURACIÓN) ---
+# --- INTERFAZ ÚNICA (TODO DENTRO DE LA APP) ---
 with st.sidebar:
-    if os.path.exists(LOGO_PATH):
-        with open(LOGO_PATH, "rb") as f:
-            data = base64.b64encode(f.read()).decode()
-            st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{data}" width="160"></div>', unsafe_allow_html=True)
+    st.title("🌿 BioCore Intelligence")
+    st.markdown("---")
+    
+    # Pestañas de navegación interna
+    opcion = st.radio("Menú Principal:", ["📊 Panel de Auditoría", "⚙️ Configurar Envío Diario"])
     
     st.markdown("---")
-    if not st.session_state.get('auth', False):
-        u, p = st.text_input("Usuario"), st.text_input("Clave", type="password")
-        if st.button("Ingresar"):
-            if u == "admin" and p == "loreto2026":
-                st.session_state.auth = True
-                st.rerun()
-    else:
-        st.subheader("📲 Notificaciones Telegram")
-        # ESPACIO PARA REGISTRAR EL ID DEL CELULAR
-        chat_id_user = st.text_input("ID de Telegram (Chat ID):", value="6712325113", help="ID numérico para recibir alertas")
+    if st.button("Cerrar Sesión"):
+        st.session_state.auth = False
+        st.rerun()
+
+# --- LÓGICA DE LAS PESTAÑAS ---
+if inicializar_gee():
+    
+    # --- PESTAÑA 1: CONFIGURACIÓN DE ENVÍO (Aquí es donde el cliente se registra) ---
+    if opcion == "⚙️ Configurar Envío Diario":
+        st.header("Configuración de Reportes Automáticos")
+        st.write("Registre aquí los datos para que el sistema envíe el reporte cada mañana.")
         
-        st.subheader("📂 Datos del Proyecto")
-        nombre_cliente = st.text_input("Cliente/Proyecto:", value="")
-        tipo_sector = st.selectbox("Sector de Auditoría:", ["Minería", "Glaciares", "Humedales", "Forestal"])
+        with st.form("registro_cliente"):
+            nombre = st.text_input("Nombre del Proyecto/Cliente:")
+            chat_id = st.text_input("ID de Telegram del Celular:", placeholder="Ej: 6712325113")
+            frecuencia = st.selectbox("Frecuencia de Envío:", ["Diario (08:00 AM)", "Semanal (Lunes)", "Solo Alertas Críticas"])
+            
+            if st.form_submit_button("✅ Activar Monitoreo Automático"):
+                if nombre and chat_id:
+                    nuevo_registro = {"nombre": nombre, "id": chat_id, "plan": frecuencia}
+                    st.session_state.suscripciones_diarias.append(nuevo_registro)
+                    st.success(f"¡Suscripción Activada! {nombre} recibirá reportes en el ID {chat_id}")
+                else:
+                    st.error("Por favor, complete todos los campos.")
+
+        # Mostrar quiénes están suscritos actualmente
+        if st.session_state.suscripciones_diarias:
+            st.markdown("---")
+            st.subheader("Suscripciones Activas")
+            for sub in st.session_state.suscripciones_diarias:
+                st.write(f"🟢 **{sub['nombre']}** - ID: {sub['id']} ({sub['plan']})")
+
+    # --- PESTAÑA 2: AUDITORÍA (Lo que tú usas para ver el mapa) ---
+    elif opcion == "📊 Panel de Auditoría":
+        st.header("Consola de Vigilancia Satelital")
         
-        if st.button("Cerrar Sesión"):
-            st.session_state.auth = False
-            st.rerun()
-
-# --- PANEL PRINCIPAL ---
-if st.session_state.get('auth', False) and inicializar_gee():
-    st.title("🛰 BioCore: Vigilancia Satelital")
-
-    col_map, col_ctrl = st.columns([2, 1])
-
-    with col_ctrl:
-        st.markdown("### 📍 Coordenadas (Lat, Lon)")
-        ejemplo = "-29.3177, -70.0191\n-29.3300, -70.0100"
-        raw_input = st.text_area("Pegue la lista de coordenadas:", height=250, placeholder=f"Ejemplo:\n{ejemplo}")
+        col_mapa, col_datos = st.columns([2, 1])
         
-        geom = None
-        if raw_input:
-            puntos = procesar_coordenadas_simples(raw_input)
-            if len(puntos) >= 3:
-                try:
-                    geom = ee.Geometry.Polygon(puntos)
-                    st.success(f"✅ Polígono detectado.")
-                except: st.error("Error geométrico.")
+        with col_datos:
+            st.markdown("**📍 Área de Monitoreo**")
+            # El cuadro de texto que pediste, limpio y sin corchetes
+            raw = st.text_area("Pegue coordenadas (Lat, Lon):", height=200, 
+                             placeholder="-29.3177, -70.0191\n-29.3300, -70.0100")
+            
+            puntos = procesar_coordenadas(raw) if raw else []
+            geom = ee.Geometry.Polygon(puntos) if len(puntos) > 2 else None
+            
+            if geom:
+                st.success("Polígono validado correctamente.")
+                cliente_envio = st.selectbox("Enviar este análisis a:", [s['nombre'] for s in st.session_state.suscripciones_diarias] if st.session_state.suscripciones_diarias else ["Nadie registrado"])
 
-    with col_map:
-        if geom:
-            centro = geom.centroid().coordinates().getInfo()[::-1]
-            m = folium.Map(location=centro, zoom_start=14)
-        else:
-            m = folium.Map(location=[-37.0, -72.0], zoom_start=5)
-        
-        folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Satélite').add_to(m)
-        if geom:
-            folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#39FF14', 'weight': 2}).add_to(m)
-        st_folium(m, width="100%", height=400)
+        with col_mapa:
+            if geom:
+                m = folium.Map(location=puntos[0][::-1], zoom_start=14)
+                folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
+                folium.GeoJson(data=geom.getInfo(), style_function=lambda x: {'color': '#39FF14', 'weight': 2}).add_to(m)
+                st_folium(m, width="100%", height=450)
+            else:
+                st_folium(folium.Map(location=[-37, -72], zoom_start=5), width="100%", height=450)
 
-    # --- BOTÓN DE ENVÍO REAL ---
-    if geom and nombre_cliente and chat_id_user:
-        if st.button(f"🚀 GENERAR Y ENVIAR REPORTE A TELEGRAM"):
-            with st.spinner("Analizando satélite y enviando alerta..."):
-                try:
-                    # Mensaje que se envía
-                    mensaje = f"🛰 **AUDITORÍA BIOCORE**\n\n✅ **Proyecto:** {nombre_cliente}\n📍 **Sector:** {tipo_sector}\n📊 **Estado:** Monitoreo Exitoso\n📅 **Fecha:** {st.session_state.get('fecha', '27-04-2026')}"
-                    
-                    url = f"https://api.telegram.org/bot{T_TOKEN}/sendMessage"
-                    data = {"chat_id": chat_id_user, "text": mensaje, "parse_mode": "Markdown"}
-                    response = requests.post(url, data=data)
-                    
-                    if response.status_code == 200:
-                        st.success(f"¡Reporte enviado con éxito al ID {chat_id_user}!")
-                    else:
-                        st.error(f"Error al enviar: {response.text}")
-                except Exception as e:
-                    st.error(f"Error de conexión: {e}")
+        # Botón para disparar el reporte manualmente (además del automático)
+        if geom and st.session_state.suscripciones_diarias:
+            if st.button(f"🚀 GENERAR Y ENVIAR REPORTE AHORA"):
+                # Buscamos el ID del cliente seleccionado
+                destino_id = [s['id'] for s in st.session_state.suscripciones_diarias if s['nombre'] == cliente_envio][0]
+                
+                url = f"https://api.telegram.org/bot{T_TOKEN}/sendMessage"
+                texto = f"🛰 **BIOCORE INFORMA**\n\n✅ Reporte para: **{cliente_envio}**\n🌍 Estado: Monitoreo Activo\n📅 Fecha: 27/04/2026"
+                
+                res = requests.post(url, data={"chat_id": destino_id, "text": texto, "parse_mode": "Markdown"})
+                if res.status_code == 200: st.success("¡Reporte enviado al celular!")

@@ -4,62 +4,59 @@ import json
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw
-import re
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- CONFIGURACIÓN INICIAL ---
 st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
 def iniciar_gee():
     if "GEE_JSON" in st.secrets:
         try:
-            # 1. Cargamos el JSON
+            # Cargamos el JSON directamente
             info = json.loads(st.secrets["GEE_JSON"])
-            pk = info['private_key']
             
-            # 2. LIMPIEZA QUIRÚRGICA (Solución definitiva a InvalidPadding)
-            if isinstance(pk, str):
-                # Reemplazamos saltos de línea de texto por reales
-                pk = pk.replace("\\n", "\n")
-                # Eliminamos cualquier carácter extraño al inicio (puntos, espacios, etc.)
-                pk = re.sub(r'^[^{A-Za-z0-9\-]*', '', pk).strip()
+            # Recuperamos la llave asegurando que los saltos de línea sean correctos
+            # Esta es la parte que nos dio el 'verde' antes
+            pk = info['private_key'].replace('\\n', '\n')
             
-            # 3. Autenticación
             creds = ee.ServiceAccountCredentials(info['client_email'], key_data=pk)
             ee.Initialize(creds)
+            return True
         except Exception as e:
-            st.error(f"❌ Error de conexión con GEE: {e}")
-    else:
-        st.warning("⚠️ Esperando configuración de GEE_JSON en Secrets...")
+            st.error(f"❌ Error: {e}")
+            return False
+    return False
 
-iniciar_gee()
+# Intentar conectar
+conectado = iniciar_gee()
 
-# --- LÓGICA DE ACCESO ---
+# --- INTERFAZ ---
 if 'auth' not in st.session_state:
     st.session_state.auth = False
 
 with st.sidebar:
-    st.markdown("### 🛰️ **BioCore Intelligence**")
+    st.title("🛰️ BioCore")
+    
+    if conectado:
+        st.success("Google Earth Engine: ONLINE")
+    
     if not st.session_state.auth:
         u = st.text_input("Usuario")
         p = st.text_input("Password", type="password")
-        if st.button("Ingresar"):
+        if st.button("Entrar"):
             if u == "admin" and p == "loreto2026":
                 st.session_state.auth = True
                 st.rerun()
-            else:
-                st.error("Credenciales incorrectas")
     else:
-        st.success("Conexión Establecida")
+        st.success("Sesión activa")
         if st.button("Cerrar Sesión"):
             st.session_state.auth = False
             st.rerun()
 
 # --- PANEL PRINCIPAL ---
 if st.session_state.auth:
-    st.header("👨‍💻 Dashboard de Monitoreo")
-    # Mapa centrado en la zona de Laja/Biobío
+    st.header("Dashboard de Monitoreo")
     m = folium.Map(location=[-37.28, -72.70], zoom_start=12)
     Draw(export=True).add_to(m)
     st_folium(m, width="100%", height=500)
 else:
-    st.info("Inicie sesión para acceder al sistema.")
+    st.info("Inicie sesión para acceder.")

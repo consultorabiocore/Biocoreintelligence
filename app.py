@@ -39,34 +39,28 @@ if 'clientes_db' not in st.session_state:
 # --- 2. LÓGICA DE PROCESAMIENTO ---
 def obtener_datos_final(sheet_id, pestaña):
     try:
-        sh = G_CLIENT.open_by_key(sheet_id.strip())
+        # Limpiamos el ID de espacios o comillas accidentales
+        id_limpio = sheet_id.strip().split('/')[-1] if '/' in sheet_id else sheet_id.strip()
         
-        # DEBUG: Mostrar pestañas disponibles si falla
-        pestañas_reales = [h.title for h in sh.worksheets()]
-        if pestaña.strip() not in pestañas_reales:
-            st.error(f"❌ Pestaña '{pestaña}' no encontrada. En el Excel se llaman: {pestañas_reales}")
-            return pd.DataFrame()
-
+        sh = G_CLIENT.open_by_key(id_limpio)
         hoja = sh.worksheet(pestaña.strip())
         registros = hoja.get_all_records()
         
         if not registros:
-            st.warning("⚠️ El archivo se conectó, pero la pestaña está vacía.")
+            st.warning("⚠️ El archivo existe, pero no hay datos bajo los encabezados.")
             return pd.DataFrame()
             
-        df = pd.DataFrame(registros)
-        df.columns = [c.strip() for c in df.columns]
-        df['Fecha'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce')
-        df = df.dropna(subset=['Fecha']).sort_values('Fecha')
-        
-        indices = ["SAVI", "NDSI", "NDWI", "SWIR", "Deficit"]
-        for col in indices:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-        return df
+        return pd.DataFrame(registros)
+
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error("❌ ERROR 404: Google no encuentra el archivo. El ID que ingresaste no existe.")
+        st.info("💡 Consejo: Asegúrate de copiar el ID de la URL del navegador, no el nombre del archivo.")
+    except gspread.exceptions.WorksheetNotFound:
+        st.error(f"❌ La pestaña '{pestaña}' no existe en este Excel.")
     except Exception as e:
-        st.error(f"❌ Error de conexión: {str(e)}")
+        st.error(f"❌ Error de acceso: Verifica que compartiste el Excel con el correo de la cuenta de servicio.")
         return pd.DataFrame()
+
 
 # --- 3. REPORTE PDF ---
 class BioCorePDF(FPDF):

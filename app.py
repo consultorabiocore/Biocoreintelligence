@@ -1,7 +1,5 @@
 import streamlit as st
-import ee
 import json
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import gspread
@@ -9,117 +7,121 @@ import folium
 from google.oauth2.service_account import Credentials
 from streamlit_folium import st_folium
 
-# --- 1. CONFIGURACIÓN INICIAL ---
+# --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence", layout="wide", page_icon="🌿")
 
-def inicializar_conexiones():
+def conectar_google():
     try:
-        if "GEE_JSON" not in st.secrets:
-            st.error("Configura el secreto GEE_JSON en Streamlit Cloud.")
-            st.stop()
-        
         creds_dict = json.loads(st.secrets["GEE_JSON"])
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        gc = gspread.authorize(creds)
-        return gc, creds_dict["client_email"]
+        return gspread.authorize(creds)
     except Exception as e:
-        st.error(f"Error crítico de conexión: {e}")
-        st.stop()
+        st.error(f"Error de conexión: {e}")
+        return None
 
-gc, service_email = inicializar_conexiones()
+gc = conectar_google()
 
-# --- 2. GESTIÓN DE DATOS ---
+# --- 2. BASE DE DATOS DE PROYECTOS ---
+# Aquí gestionas tus clientes. Solo cambia los IDs cuando tengas carpetas nuevas.
+CLIENTES_DB = {
+    "Laguna Señoraza (Laja)": {
+        "id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU",
+        "hoja": "Hoja 1", # Ajusta si el nombre de la pestaña cambia
+        "coords": [-37.2713, -72.7095]
+    },
+    "Pascua Lama (Cordillera)": {
+        "id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
+        "hoja": "Hoja 1",
+        "coords": [-29.32, -70.02]
+    }
+}
 
-def crear_excel_desde_app(nombre_proyecto):
-    """Crea el Excel y añade cabeceras para que no esté vacío"""
-    try:
-        sh = gc.create(f"BioCore_DB_{nombre_proyecto}")
-        ws = sh.get_worksheet(0)
-        # Añadimos una fila inicial para que pandas no falle al leer
-        ws.append_row(["Fecha", "NDSI", "NDWI", "SWIR", "Polvo", "Deficit"])
-        return sh.id, sh.url
-    except Exception as e:
-        return None, str(e)
-
-def obtener_dataframe(sheet_id):
-    """Lee el Excel y limpia datos no numéricos para evitar errores de Matplotlib"""
-    try:
-        sh = gc.open_by_key(sheet_id).get_worksheet(0)
-        lista_datos = sh.get_all_records()
-        if not lista_datos:
-            return pd.DataFrame()
-            
-        df = pd.DataFrame(lista_datos)
-        # Limpieza crucial: Convertir a fecha y números
-        df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-        for col in ["NDSI", "NDWI", "SWIR", "Polvo", "Deficit"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        return df.dropna(subset=['Fecha']) # Elimina filas sin fecha válida
-    except:
-        return pd.DataFrame()
-
-# --- 3. INTERFAZ ---
-
+# --- 3. INTERFAZ (SIDEBAR) ---
 with st.sidebar:
     st.title("🌿 BioCore Admin")
-    menu = st.radio("Menú:", ["➕ Crear Nuevo Proyecto", "📊 Ver Auditoría"])
+    opcion = st.radio("Navegación:", ["📊 Panel de Auditoría", "⚙️ Configuración"])
     st.markdown("---")
-    st.caption(f"Cuenta activa: {service_email}")
+    st.caption("BioCore Intelligence © 2026")
 
-# --- MÓDULO A: CREAR EXCEL ---
-if menu == "➕ Crear Nuevo Proyecto":
-    st.header("Generar Nueva Base de Datos")
-    st.write("Si no hay ningún Excel, créalo aquí primero.")
+# --- MÓDULO: CONFIGURACIÓN ---
+if opcion == "⚙️ Configuración":
+    st.header("Gestión de Proyectos")
+    st.write("Crea tu Excel en Drive y vincula el ID aquí.")
     
-    with st.form("crear_forma"):
-        nombre = st.text_input("Nombre del Cliente/Proyecto")
-        enviar = st.form_submit_button("Crear Excel en Google Drive")
-        
-        if enviar and nombre:
-            with st.spinner("Creando archivo..."):
-                id_generado, url_generada = crear_excel_desde_app(nombre)
-                if id_generado:
-                    st.success(f"¡Excel creado para {nombre}!")
-                    st.markdown(f"**ID:** `{id_generado}`")
-                    st.link_button("📂 Abrir Hoja de Cálculo", url_generada)
-                    st.info("Copia el ID arriba para visualizarlo en el panel de Auditoría.")
-                else:
-                    st.error(f"No se pudo crear: {url_generada}")
+    with st.expander("➕ Cómo agregar un cliente nuevo"):
+        st.write("""
+        1. Crea un Excel en tu Drive personal.
+        2. Comparte el Excel con el correo de tu cuenta de servicio como **Editor**.
+        3. Copia el ID de la URL y agrégalo al código en `CLIENTES_DB`.
+        """)
+    
+    st.info(f"Correo de la App: `{json.loads(st.secrets['GEE_JSON'])['client_email']}`")
 
-# --- MÓDULO B: AUDITORÍA ---
+# --- MÓDULO: AUDITORÍA ---
 else:
-    st.header("Panel de Visualización")
-    sheet_id_input = st.text_input("Pega el ID del Excel del cliente aquí:")
+    st.header("Panel de Vigilancia Satelital")
+    proyecto_sel = st.selectbox("Seleccione Proyecto:", list(CLIENTES_DB.keys()))
+    conf = CLIENTES_DB[proyecto_sel]
     
-    if sheet_id_input:
-        if st.button("Sincronizar Datos"):
-            df = obtener_dataframe(sheet_id_input)
-            if not df.empty:
-                st.session_state["datos_actuales"] = df
-                st.success("Datos cargados correctamente.")
-            else:
-                st.warning("El Excel existe pero no tiene datos numéricos aún.")
-
-        if "datos_actuales" in st.session_state:
-            df_plot = st.session_state["datos_actuales"]
+    # Botón de Sincronización
+    if st.button("🔄 Sincronizar Datos Satelitales"):
+        try:
+            # Abrir el Excel por ID y nombre de pestaña
+            sh = gc.open_by_key(conf["id"]).get_worksheet(0)
+            data = sh.get_all_records()
             
-            # GRAFICAR (Blindado contra errores ValueError)
-            if not df_plot.empty and len(df_plot) > 0:
-                fig, ax = plt.subplots(figsize=(10, 4))
-                for col in ["NDSI", "NDWI", "SWIR"]:
-                    if col in df_plot.columns:
-                        ax.plot(df_plot['Fecha'], df_plot[col], marker='o', label=col)
+            if data:
+                df = pd.DataFrame(data)
+                df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+                # Limpiar datos numéricos
+                for c in ["NDSI", "NDWI", "SWIR", "Polvo", "Deficit"]:
+                    if c in df.columns:
+                        df[c] = pd.to_numeric(df[c], errors='coerce')
                 
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-                plt.xticks(rotation=35)
-                st.pyplot(fig)
-                st.dataframe(df_plot)
+                st.session_state[f"df_{proyecto_sel}"] = df
+                st.success("¡Datos actualizados!")
             else:
-                st.info("Esperando datos del monitor satelital...")
+                st.warning("El archivo está conectado pero no tiene datos registrados.")
+        except Exception as e:
+            st.error(f"No se pudo leer el archivo. ¿Compartiste el Excel con el correo de la App? Error: {e}")
+
+    # Visualización de Resultados
+    if f"df_{proyecto_sel}" in st.session_state:
+        df_viz = st.session_state[f"df_{proyecto_sel}"]
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("Tendencias de Índices")
+            fig, ax = plt.subplots(figsize=(10, 5))
+            for idx in ["NDSI", "NDWI", "SWIR"]:
+                if idx in df_viz.columns:
+                    ax.plot(df_viz['Fecha'], df_viz[idx], marker='o', label=idx, linewidth=2)
+            
+            ax.set_ylabel("Valor del Índice")
+            ax.legend()
+            ax.grid(True, linestyle='--', alpha=0.6)
+            plt.xticks(rotation=45)
+            st.pyplot(fig)
+            
+        with col2:
+            st.subheader("Último Registro")
+            if not df_viz.empty:
+                ultimo = df_viz.iloc[-1]
+                st.metric("NDWI (Agua)", f"{ultimo.get('NDWI', 0):.3f}")
+                st.metric("NDSI (Nieve)", f"{ultimo.get('NDSI', 0):.3f}")
+                st.metric("SWIR (Humedad)", f"{ultimo.get('SWIR', 0):.3f}")
+
+        st.markdown("---")
+        
+        # Mapa
+        st.subheader("Área de Monitoreo")
+        m = folium.Map(location=conf["coords"], zoom_start=14)
+        folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Google Satellite').add_to(m)
+        folium.Marker(conf["coords"], popup=proyecto_sel, icon=folium.Icon(color='green', icon='leaf')).add_to(m)
+        st_folium(m, width="100%", height=400, key=f"map_{proyecto_sel}")
+
+        # Tabla inferior
+        with st.expander("Ver tabla de datos completa"):
+            st.dataframe(df_viz.sort_values('Fecha', ascending=False), use_container_width=True)

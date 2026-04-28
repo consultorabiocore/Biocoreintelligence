@@ -1,9 +1,9 @@
-earthengine-api
 streamlit
-streamlit-folium
-folium
+earthengine-api
+gspread
+google-auth
 pandas
 matplotlib
 fpdf
-google-auth
-
+streamlit-folium
+folium

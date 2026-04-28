@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import folium
-from streamlit_folium import st_folium
 import gspread
 from google.oauth2.service_account import Credentials
 from fpdf import FPDF
@@ -9,122 +7,125 @@ import json
 import base64
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
+# --- CONEXIÓN A GOOGLE SHEETS ---
 try:
     creds_dict = json.loads(st.secrets["GEE_JSON"])
     SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
     G_CLIENT = gspread.authorize(CREDS)
 except:
-    st.error("Error en credenciales.")
+    st.error("Error: Revisa las credenciales en Streamlit Secrets.")
     st.stop()
 
+# --- TU BASE DE DATOS DE PROYECTOS ---
 CLIENTES_DB = {
     "Pascua Lama (Cordillera)": {
         "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
-        "pestaña": "ID_CARPETA_2",
-        "coords": [-29.32, -70.02]
+        "pestaña": "ID_CARPETA_2"
     }
 }
 
-# --- 2. FUNCIÓN DE LIMPIEZA AUTOMÁTICA ---
-def obtener_y_limpiar_datos(sheet_id, pestaña):
-    try:
-        hoja = G_CLIENT.open_by_key(sheet_id).worksheet(pestaña)
-        df = pd.DataFrame(hoja.get_all_records())
-        
-        if df.empty: return df
+# --- MOTOR DE INFORME MEJORADO ---
+class BioCorePDF(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, 'BIOCORE INTELLIGENCE - REPORTE TECNICO', 0, 1, 'C')
+        self.set_font('Arial', 'I', 10)
+        self.cell(0, 10, f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")}', 0, 1, 'R')
+        self.ln(5)
 
-        # A. Unificar Fechas
-        df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-        df = df.dropna(subset=['Fecha'])
-
-        # B. Limpieza de "Basura": Quitar filas donde todo sea 0 (excepto fecha)
-        # Esto elimina esas filas que te ensucian el Sheet
-        cols_indices = [c for c in df.columns if c != 'Fecha']
-        df[cols_indices] = df[cols_indices].apply(pd.to_numeric, errors='coerce')
-        df = df[(df[cols_indices] != 0).any(axis=1)]
-
-        # C. Quitar Duplicados: Si hay varias filas para el mismo día, deja la última
-        df = df.sort_values('Fecha').drop_duplicates(subset=['Fecha'], keep='last')
-        
-        return df
-    except Exception as e:
-        st.error(f"Error al limpiar: {e}")
-        return pd.DataFrame()
-
-# --- 3. FUNCIÓN DEL INFORME ---
-def generar_pdf(df, proyecto):
-    pdf = FPDF()
+def generar_informe_completo(df, proyecto):
+    pdf = BioCorePDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(190, 10, f"BioCore Intelligence - Informe Tecnico", ln=True, align='C')
-    pdf.set_font("Arial", size=12)
-    pdf.cell(190, 10, f"Proyecto: {proyecto}", ln=True, align='C')
-    pdf.ln(10)
-
-    # Solo las columnas que existen en tu Excel (SAVI, NDWI, Arcillas...)
-    columnas = [c for c in df.columns if c != 'Fecha']
     
-    # Tabla
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(35, 10, "Fecha", 1)
-    for c in columnas[:4]: # Limitamos a 4 columnas para que quepa en la hoja
-        pdf.cell(35, 10, c, 1)
+    # Resumen del Proyecto
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"PROYECTO: {proyecto}", 0, 1)
+    pdf.set_font("Arial", size=10)
+    pdf.multi_cell(0, 8, "Este documento presenta el análisis multiespectral y de índices ambientales procesados mediante sensores remotos para el área de estudio.")
+    pdf.ln(5)
+
+    # Tabla de Datos
+    pdf.set_font("Arial", 'B', 9)
+    # Definir columnas a imprimir (limitado al ancho de página)
+    cols = ["Fecha", "SAVI", "NDWI", "SWIR", "Arcillas", "Deficit"]
+    cols_presentes = [c for c in cols if c in df.columns]
+    
+    # Encabezados
+    w = 185 / len(cols_presentes)
+    for col in cols_presentes:
+        pdf.cell(w, 10, col, 1, 0, 'C')
     pdf.ln()
 
-    pdf.set_font("Arial", size=10)
-    for _, row in df.tail(20).iterrows():
-        pdf.cell(35, 10, row['Fecha'].strftime('%d/%m/%Y'), 1)
-        for c in columnas[:4]:
-            val = row[c]
-            txt = f"{val:.3f}" if pd.notnull(val) else "N/A"
-            pdf.cell(35, 10, txt, 1)
+    # Filas
+    pdf.set_font("Arial", size=8)
+    for _, row in df.iterrows():
+        for col in cols_presentes:
+            val = row[col]
+            if col == "Fecha":
+                txt = val.strftime('%d/%m/%Y') if hasattr(val, 'strftime') else str(val)
+            else:
+                txt = f"{val:.4f}" if isinstance(val, (int, float)) and val != 0 else str(val)
+            pdf.cell(w, 8, txt, 1, 0, 'C')
         pdf.ln()
     
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 4. INTERFAZ ---
+# --- INTERFAZ BIOCORE ---
 with st.sidebar:
     st.title("🌿 BioCore Admin")
-    opcion = st.radio("Menú", ["📊 Auditoría", "➕ Registrar"])
-    if opcion == "📊 Auditoría":
-        sel = st.selectbox("Proyecto:", list(CLIENTES_DB.keys()))
+    menu = st.radio("Menú", ["📊 Panel de Auditoría", "➕ Datos del Cliente"])
 
-if opcion == "📊 Auditoría":
-    conf = CLIENTES_DB[sel]
-    st.header(f"Control: {sel}")
+if menu == "📊 Panel de Auditoría":
+    proyecto_sel = st.selectbox("Seleccione Proyecto:", list(CLIENTES_DB.keys()))
+    config = CLIENTES_DB[proyecto_sel]
+    
+    st.header(f"Auditoría de Datos: {proyecto_sel}")
 
-    if st.button("🔄 Sincronizar y Limpiar Datos"):
-        with st.spinner("Procesando y eliminando duplicados..."):
-            df_limpio = obtener_y_limpiar_datos(conf["sheet_id"], conf["pestaña"])
-            if not df_limpio.empty:
-                st.session_state[f"clean_{sel}"] = df_limpio
-                st.success(f"¡Sincronizado! Se procesaron {len(df_limpio)} registros únicos.")
-            else:
-                st.error("No hay datos válidos.")
+    if st.button("🔄 Sincronizar y Recuperar Datos"):
+        with st.spinner("Procesando base de datos..."):
+            try:
+                hoja = G_CLIENT.open_by_key(config["sheet_id"]).worksheet(config["pestaña"])
+                df = pd.DataFrame(hoja.get_all_records())
+                
+                # Unificación de formatos de fecha
+                df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+                df = df.dropna(subset=['Fecha'])
+                
+                # Quitar duplicados exactos pero mantener historial
+                df = df.drop_duplicates().sort_values('Fecha', ascending=False)
+                
+                st.session_state["data_final"] = df
+                st.success(f"Se recuperaron {len(df)} registros correctamente.")
+            except Exception as e:
+                st.error(f"Error al conectar: {e}")
 
-    if f"clean_{sel}" in st.session_state:
-        data = st.session_state[f"clean_{sel}"]
-        st.dataframe(data.tail(15), use_container_width=True)
+    if "data_final" in st.session_state:
+        df_display = st.session_state["data_final"]
+        st.subheader("Registros en Nube")
+        st.dataframe(df_display, use_container_width=True)
 
-        if st.button("📄 Descargar Informe PDF"):
-            pdf_bytes = generar_pdf(data, sel)
+        st.markdown("---")
+        if st.button("📄 GENERAR INFORME TÉCNICO COMPLETO"):
+            pdf_bytes = generar_informe_completo(df_display, proyecto_sel)
             b64 = base64.b64encode(pdf_bytes).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="Informe_{sel}.pdf" style="text-decoration:none; background-color:#4CAF50; color:white; padding:10px 20px; border-radius:5px;">📥 CLICK AQUÍ PARA BAJAR PDF</a>'
+            href = f'<a href="data:application/pdf;base64,{b64}" download="Reporte_BioCore_{proyecto_sel}.pdf" style="padding:15px; background-color:#2E7D32; color:white; border-radius:8px; text-decoration:none;">📥 DESCARGAR REPORTE PDF</a>'
             st.markdown(href, unsafe_allow_html=True)
 
-    st.markdown("---")
-    m = folium.Map(location=conf["coords"], zoom_start=14)
-    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
-    st_folium(m, width="100%", height=400)
-
 else:
-    st.header("Registro de Datos de Cliente")
-    with st.form("reg"):
-        nombre = st.text_input("Nombre Proyecto")
-        sheet = st.text_input("ID Sheet")
-        if st.form_submit_button("Guardar"):
-            st.info("Datos guardados. Actualiza el diccionario CLIENTES_DB con esta info.")
+    st.header("Gestión de Datos del Cliente")
+    with st.form("form_cliente"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nombre = st.text_input("Nombre del Proyecto / Cliente")
+            tipo = st.selectbox("Rubro", ["Minería", "Forestal", "Agrícola"])
+        with col2:
+            sheet_id = st.text_input("ID del Google Sheet")
+            pestaña = st.text_input("Nombre de la Pestaña", value="Hoja 1")
+        
+        if st.form_submit_button("Guardar Perfil de Cliente"):
+            st.success("Perfil configurado. Copia estos datos en tu CLIENTES_DB.")
+            st.code(f"'{nombre}': {{ 'sheet_id': '{sheet_id}', 'pestaña': '{pestaña}' }}")

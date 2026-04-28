@@ -7,8 +7,9 @@ from google.oauth2.service_account import Credentials
 from fpdf import FPDF
 import json
 import base64
+from datetime import datetime
 
-# --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
+# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
 try:
@@ -17,109 +18,113 @@ try:
     CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
     G_CLIENT = gspread.authorize(CREDS)
 except:
-    st.error("Configura las credenciales en Secrets.")
+    st.error("Error en credenciales.")
     st.stop()
 
-# --- 2. BASE DE DATOS DE PROYECTOS ---
-# Aquí es donde el cliente guarda sus datos: Nombre, ID y Coordenadas
 CLIENTES_DB = {
     "Pascua Lama (Cordillera)": {
         "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
         "pestaña": "ID_CARPETA_2",
-        "coords": [-29.32, -70.02],
-        "tipo": "Minería"
+        "coords": [-29.32, -70.02]
     }
 }
 
-# --- 3. FUNCIONES DE APOYO ---
+# --- 2. FUNCIÓN DE LIMPIEZA AUTOMÁTICA ---
+def obtener_y_limpiar_datos(sheet_id, pestaña):
+    try:
+        hoja = G_CLIENT.open_by_key(sheet_id).worksheet(pestaña)
+        df = pd.DataFrame(hoja.get_all_records())
+        
+        if df.empty: return df
 
-def generar_pdf(df, nombre_proyecto):
-    """Crea un informe técnico en PDF con los índices"""
+        # A. Unificar Fechas
+        df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+        df = df.dropna(subset=['Fecha'])
+
+        # B. Limpieza de "Basura": Quitar filas donde todo sea 0 (excepto fecha)
+        # Esto elimina esas filas que te ensucian el Sheet
+        cols_indices = [c for c in df.columns if c != 'Fecha']
+        df[cols_indices] = df[cols_indices].apply(pd.to_numeric, errors='coerce')
+        df = df[(df[cols_indices] != 0).any(axis=1)]
+
+        # C. Quitar Duplicados: Si hay varias filas para el mismo día, deja la última
+        df = df.sort_values('Fecha').drop_duplicates(subset=['Fecha'], keep='last')
+        
+        return df
+    except Exception as e:
+        st.error(f"Error al limpiar: {e}")
+        return pd.DataFrame()
+
+# --- 3. FUNCIÓN DEL INFORME ---
+def generar_pdf(df, proyecto):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(190, 10, f"Informe Técnico: {nombre_proyecto}", ln=True, align='C')
-    pdf.ln(10)
-    
+    pdf.cell(190, 10, f"BioCore Intelligence - Informe Tecnico", ln=True, align='C')
     pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, f"Resumen de monitoreo ambiental generado el {pd.Timestamp.now().strftime('%d/%m/%Y')}.")
-    pdf.ln(5)
+    pdf.cell(190, 10, f"Proyecto: {proyecto}", ln=True, align='C')
+    pdf.ln(10)
+
+    # Solo las columnas que existen en tu Excel (SAVI, NDWI, Arcillas...)
+    columnas = [c for c in df.columns if c != 'Fecha']
     
-    # Tabla de datos en el PDF
+    # Tabla
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(40, 10, "Fecha", 1)
-    pdf.cell(30, 10, "NDSI", 1)
-    pdf.cell(30, 10, "NDWI", 1)
-    pdf.cell(30, 10, "SWIR", 1)
+    pdf.cell(35, 10, "Fecha", 1)
+    for c in columnas[:4]: # Limitamos a 4 columnas para que quepa en la hoja
+        pdf.cell(35, 10, c, 1)
     pdf.ln()
-    
+
     pdf.set_font("Arial", size=10)
-    for i, row in df.tail(10).iterrows():
-        pdf.cell(40, 10, str(row['Fecha'].date()), 1)
-        pdf.cell(30, 10, str(row['NDSI']), 1)
-        pdf.cell(30, 10, str(row['NDWI']), 1)
-        pdf.cell(30, 10, str(row['SWIR']), 1)
+    for _, row in df.tail(20).iterrows():
+        pdf.cell(35, 10, row['Fecha'].strftime('%d/%m/%Y'), 1)
+        for c in columnas[:4]:
+            val = row[c]
+            txt = f"{val:.3f}" if pd.notnull(val) else "N/A"
+            pdf.cell(35, 10, txt, 1)
         pdf.ln()
     
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 4. INTERFAZ (SIDEBAR) ---
+# --- 4. INTERFAZ ---
 with st.sidebar:
     st.title("🌿 BioCore Admin")
-    opcion = st.radio("Ir a:", ["📊 Panel de Auditoría", "➕ Registrar Proyecto"])
-    
-    if opcion == "📊 Panel de Auditoría":
-        proyecto_sel = st.selectbox("Proyecto Activo:", list(CLIENTES_DB.keys()))
-        dias_ver = st.slider("Registros a mostrar:", 5, 50, 15)
+    opcion = st.radio("Menú", ["📊 Auditoría", "➕ Registrar"])
+    if opcion == "📊 Auditoría":
+        sel = st.selectbox("Proyecto:", list(CLIENTES_DB.keys()))
 
-# --- 5. MÓDULOS ---
+if opcion == "📊 Auditoría":
+    conf = CLIENTES_DB[sel]
+    st.header(f"Control: {sel}")
 
-if opcion == "➕ Registrar Proyecto":
-    st.header("Registro de Nuevo Cliente")
-    with st.form("registro_cliente"):
-        nom = st.text_input("Nombre del Proyecto")
-        s_id = st.text_input("ID del Google Sheet")
-        tipo = st.selectbox("Tipo de Proyecto", ["Minería", "Forestal", "Agrícola"])
-        lat = st.number_input("Latitud", value=-29.0)
-        lon = st.number_input("Longitud", value=-70.0)
-        
-        if st.form_submit_button("Guardar Datos de Cliente"):
-            st.success(f"Proyecto '{nom}' registrado localmente.")
-            # Esto genera el código para que el cliente lo pegue en su base de datos
-            nuevo_entry = {nom: {"sheet_id": s_id, "coords": [lat, lon], "tipo": tipo}}
-            st.code(f"Añadir a CLIENTES_DB:\n{nuevo_entry}")
+    if st.button("🔄 Sincronizar y Limpiar Datos"):
+        with st.spinner("Procesando y eliminando duplicados..."):
+            df_limpio = obtener_y_limpiar_datos(conf["sheet_id"], conf["pestaña"])
+            if not df_limpio.empty:
+                st.session_state[f"clean_{sel}"] = df_limpio
+                st.success(f"¡Sincronizado! Se procesaron {len(df_limpio)} registros únicos.")
+            else:
+                st.error("No hay datos válidos.")
 
-elif opcion == "📊 Panel de Auditoría":
-    info = CLIENTES_DB[proyecto_sel]
-    st.header(f"Gestión de Proyecto: {proyecto_sel}")
-    
-    if st.button("🔄 Sincronizar Base de Datos"):
-        try:
-            hoja = G_CLIENT.open_by_key(info["sheet_id"]).worksheet(info.get("pestaña", "Hoja 1"))
-            df = pd.DataFrame(hoja.get_all_records())
-            df['Fecha'] = pd.to_datetime(df['Fecha'])
-            st.session_state[f"data_{proyecto_sel}"] = df
-        except:
-            st.error("No se pudo acceder a los datos. Verifique el ID y permisos del Sheet.")
+    if f"clean_{sel}" in st.session_state:
+        data = st.session_state[f"clean_{sel}"]
+        st.dataframe(data.tail(15), use_container_width=True)
 
-    if f"data_{proyecto_sel}" in st.session_state:
-        df = st.session_state[f"data_{proyecto_sel}"]
-        
-        # Dashboard sin índices (Solo tabla de gestión y botones)
-        st.subheader("Registros en Nube")
-        st.dataframe(df.tail(dias_ver), use_container_width=True)
-        
-        st.markdown("---")
-        # Generación del informe
-        if st.button("📄 Generar Informe Técnico para Cliente"):
-            pdf_data = generar_pdf(df, proyecto_sel)
-            b64_pdf = base64.b64encode(pdf_data).decode('utf-8')
-            href = f'<a href="data:application/octet-stream;base64,{b64_pdf}" download="Informe_{proyecto_sel}.pdf">📥 Descargar Informe PDF</a>'
+        if st.button("📄 Descargar Informe PDF"):
+            pdf_bytes = generar_pdf(data, sel)
+            b64 = base64.b64encode(pdf_bytes).decode()
+            href = f'<a href="data:application/pdf;base64,{b64}" download="Informe_{sel}.pdf" style="text-decoration:none; background-color:#4CAF50; color:white; padding:10px 20px; border-radius:5px;">📥 CLICK AQUÍ PARA BAJAR PDF</a>'
             st.markdown(href, unsafe_allow_html=True)
-            st.success("Informe generado con éxito (incluye índices y tendencias).")
 
-    # Mapa de ubicación
     st.markdown("---")
-    m = folium.Map(location=info["coords"], zoom_start=14)
+    m = folium.Map(location=conf["coords"], zoom_start=14)
     folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
     st_folium(m, width="100%", height=400)
+
+else:
+    st.header("Registro de Datos de Cliente")
+    with st.form("reg"):
+        nombre = st.text_input("Nombre Proyecto")
+        sheet = st.text_input("ID Sheet")
+        if st.form_submit_button("Guardar"):
+            st.info("Datos guardados. Actualiza el diccionario CLIENTES_DB con esta info.")

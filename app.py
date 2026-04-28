@@ -12,107 +12,131 @@ from streamlit_folium import folium_static
 from datetime import datetime
 import re
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN DE INTERFAZ ---
 st.set_page_config(page_title="BioCore Intelligence Admin", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
     .stButton>button { background-color: #183654; color: white; border-radius: 8px; font-weight: bold; height: 3.5em; }
+    .section-header { color: #183654; font-weight: bold; font-size: 24px; border-bottom: 2px solid #183654; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
+# Conexión Segura
 try:
     creds_dict = json.loads(st.secrets["GEE_JSON"])
     SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
     G_CLIENT = gspread.authorize(CREDS)
 except:
-    st.error("Error en credenciales GEE_JSON.")
+    st.error("Error crítico: Revisa las credenciales GEE_JSON en Secrets.")
     st.stop()
 
 if 'clientes_db' not in st.session_state:
     st.session_state.clientes_db = {}
 
-# --- 2. LÓGICA DE DATOS ---
-def obtener_datos_seguros(sheet_id, pestaña):
+# --- 2. LÓGICA DE PROCESAMIENTO ---
+def obtener_datos_final(sheet_id, pestaña):
     try:
-        # Limpieza del ID por si acaso
-        s_id = sheet_id.strip()
-        sh = G_CLIENT.open_by_key(s_id)
+        sh = G_CLIENT.open_by_key(sheet_id.strip())
         
-        # Verificar pestañas disponibles si hay error
-        nombres_pestañas = [h.title for h in sh.worksheets()]
-        if pestaña not in nombres_pestañas:
-            st.error(f"Pestaña '{pestaña}' no encontrada. Disponibles: {nombres_pestañas}")
+        # DEBUG: Mostrar pestañas disponibles si falla
+        pestañas_reales = [h.title for h in sh.worksheets()]
+        if pestaña.strip() not in pestañas_reales:
+            st.error(f"❌ Pestaña '{pestaña}' no encontrada. En el Excel se llaman: {pestañas_reales}")
             return pd.DataFrame()
 
-        hoja = sh.worksheet(pestaña)
-        df = pd.DataFrame(hoja.get_all_records())
-        df.columns = [c.strip() for c in df.columns]
+        hoja = sh.worksheet(pestaña.strip())
+        registros = hoja.get_all_records()
         
-        if df.empty: return pd.DataFrame()
-
+        if not registros:
+            st.warning("⚠️ El archivo se conectó, pero la pestaña está vacía.")
+            return pd.DataFrame()
+            
+        df = pd.DataFrame(registros)
+        df.columns = [c.strip() for c in df.columns]
         df['Fecha'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce')
         df = df.dropna(subset=['Fecha']).sort_values('Fecha')
         
-        for col in ["SAVI", "NDSI", "NDWI", "SWIR", "Deficit"]:
+        indices = ["SAVI", "NDSI", "NDWI", "SWIR", "Deficit"]
+        for col in indices:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         return df
     except Exception as e:
-        st.error(f"Error al acceder al Sheet: {e}")
+        st.error(f"❌ Error de conexión: {str(e)}")
         return pd.DataFrame()
 
-# --- 3. INTERFAZ ---
-st.sidebar.title("BioCore Intelligence")
-menu = st.sidebar.radio("Menú", ["Auditoría", "Gestión de Clientes"])
+# --- 3. REPORTE PDF ---
+class BioCorePDF(FPDF):
+    def header(self):
+        self.set_fill_color(24, 54, 84)
+        self.rect(0, 0, 210, 35, 'F')
+        self.set_text_color(255, 255, 255)
+        self.set_font("Arial", 'B', 15)
+        self.cell(0, 15, "AUDITORÍA DE CUMPLIMIENTO AMBIENTAL", 0, 1, 'C')
 
-if menu == "Auditoría":
-    st.header("🛡️ Panel de Auditoría")
+def generar_reporte_pdf(df, p_nombre):
+    pdf = BioCorePDF()
+    pdf.add_page()
+    pdf.ln(30)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"PROYECTO: {p_nombre.upper()}", 0, 1)
+    
+    # Gráficos (Resumen simple para evitar fallos de memoria)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(df['Fecha'], df['NDSI'], label='NDSI (Nieve)', color='#00B0F0')
+    ax.legend()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    
+    with open("temp.png", "wb") as f: f.write(buf.getbuffer())
+    pdf.image("temp.png", x=15, w=180)
+    return pdf.output(dest='S').encode('latin-1')
+
+# --- 4. INTERFAZ NAVEGABLE ---
+menu = st.sidebar.radio("Navegación", ["Panel Auditoría", "Gestión Clientes"])
+
+if menu == "Panel Auditoría":
+    st.markdown('<p class="section-header">🛡️ Auditoría BioCore</p>', unsafe_allow_html=True)
     if not st.session_state.clientes_db:
-        st.info("Registra un proyecto con su ID real de Google Sheet primero.")
+        st.info("No hay proyectos. Ve a 'Gestión Clientes' e ingresa el ID real del Excel.")
     else:
-        p_sel = st.selectbox("Proyecto:", list(st.session_state.clientes_db.keys()))
+        p_sel = st.selectbox("Seleccione Proyecto:", list(st.session_state.clientes_db.keys()))
         info = st.session_state.clientes_db[p_sel]
         
-        col_c, col_m = st.columns([1, 1.5])
-        with col_c:
-            if st.button("🚀 GENERAR INFORME"):
-                df_final = obtener_datos_seguros(info['sheet_id'], info['pestaña'])
-                if not df_final.empty:
-                    st.success("Datos cargados. Generando PDF...")
-                    # Aquí iría tu función de PDF (crear_pdf_final)
-                else:
-                    st.warning("La hoja está vacía o el ID es incorrecto.")
-        
-        with col_m:
-            m = folium.Map(location=info['coords'][0], zoom_start=14)
-            folium.Polygon(locations=info['coords'], color="#183654", fill=True).add_to(m)
-            folium_static(m)
+        if st.button("🚀 GENERAR INFORME"):
+            df_final = obtener_datos_final(info['sheet_id'], info['pestaña'])
+            if not df_final.empty:
+                pdf_bytes = generar_reporte_pdf(df_final, p_sel)
+                b64 = base64.b64encode(pdf_bytes).decode()
+                st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="BioCore_{p_sel}.pdf" style="text-decoration:none;"><div style="text-align:center; padding:15px; background-color:#183654; color:white; border-radius:8px; font-weight:bold;">📥 DESCARGAR PDF</div></a>', unsafe_allow_html=True)
+
+        m = folium.Map(location=info['coords'][0], zoom_start=14)
+        folium.Polygon(locations=info['coords'], color="#183654", fill=True).add_to(m)
+        folium_static(m)
 
 else:
-    st.header("📁 Gestión de Proyectos")
-    with st.form("reg_pro"):
+    st.markdown('<p class="section-header">📁 Gestión de Proyectos</p>', unsafe_allow_html=True)
+    with st.form("registro"):
         nom = st.text_input("Nombre Proyecto")
-        sid = st.text_input("ID real del Sheet (de la URL)")
+        sid = st.text_input("ID del Sheet (Cópialo de la URL del navegador)")
         pes = st.text_input("Pestaña", value="Hoja 1")
-        raw_c = st.text_area("Pegue coordenadas (Cualquier formato)")
+        raw_c = st.text_area("Coordenadas (Pégalas como vengan)")
         
-        if st.form_submit_button("Guardar"):
-            # Limpiador de coordenadas avanzado
-            numeros = re.findall(r"[-+]?\d*\.\d+|[-+]?\d+", raw_c)
-            coords = []
-            for i in range(0, len(numeros), 2):
-                if i+1 < len(numeros):
-                    coords.append([float(numeros[i]), float(numeros[i+1])])
+        if st.form_submit_button("Guardar Proyecto"):
+            # Extractor inteligente de números para coordenadas
+            nums = re.findall(r"[-+]?\d*\.\d+|[-+]?\d+", raw_c)
+            coords = [[float(nums[i]), float(nums[i+1])] for i in range(0, len(nums), 2) if i+1 < len(nums)]
             
-            if len(coords) >= 3:
+            if len(coords) >= 3 and sid != "ID_CARPETA_2":
                 st.session_state.clientes_db[nom] = {
-                    "sheet_id": sid.strip(), "pestaña": pes.strip(), "coords": coords
+                    "sheet_id": sid, "pestaña": pes, "coords": coords
                 }
-                st.success(f"Proyecto {nom} guardado con {len(coords)} puntos.")
+                st.success(f"✅ Proyecto '{nom}' guardado.")
             else:
-                st.error("Formato inválido o pocos puntos detectados.")
-    
-    st.write("Registros actuales:", st.session_state.clientes_db)
+                st.error("Error: Pocas coordenadas o sigues usando 'ID_CARPETA_2'.")
+
+    st.write("Historial:", st.session_state.clientes_db)

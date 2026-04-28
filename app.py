@@ -1,134 +1,155 @@
 import streamlit as st
 import ee
 import json
+import requests
+import re
+import os
+import base64
 import pandas as pd
 import matplotlib.pyplot as plt
-import gspread
-import folium
-from google.oauth2.service_account import Credentials
+from fpdf import FPDF
 from streamlit_folium import st_folium
+import folium
+import gspread
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN ESTÉTICA Y CONEXIÓN ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide", page_icon="🌿")
+# --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
+st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
-# Inyectar un poco de CSS para que se vea premium
-st.markdown("""
-    <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    </style>
-    """, unsafe_allow_html=True)
+# Credenciales desde Secrets
+try:
+    creds_dict = json.loads(st.secrets["GEE_JSON"])
+    # Añadimos 'drive' explícitamente para evitar el error 403 al crear archivos
+    SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
+    G_CLIENT = gspread.authorize(CREDS)
+except Exception as e:
+    st.error("❌ Error en Secrets: Configura GEE_JSON en el panel de Streamlit.")
+    st.stop()
 
-def inicializar_todo():
-    try:
-        creds_dict = json.loads(st.secrets["GEE_JSON"])
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        gc = gspread.authorize(creds)
-        return gc, creds_dict["client_email"]
-    except Exception as e:
-        st.error(f"Error de inicialización: {e}")
-        st.stop()
-
-gc, email_app = inicializar_todo()
-
-# --- 2. BASE DE DATOS DE PROYECTOS (Tu estructura original) ---
+# --- 2. BASE DE DATOS DE PROYECTOS ---
 CLIENTES_DB = {
-    "Laguna Señoraza (Laja)": {
-        "id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU",
-        "pestaña": "ID_CARPETA_1", # El nombre que me diste
-        "coords": [-37.2713, -72.7095]
-    },
     "Pascua Lama (Cordillera)": {
-        "id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
-        "pestaña": "Hoja 1",
+        "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
+        "pestaña": "ID_CARPETA_2",
         "coords": [-29.32, -70.02]
+    },
+    "Laguna Señoraza (Laja)": {
+        "sheet_id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU",
+        "pestaña": "ID_CARPETA_1",
+        "coords": [-37.2713, -72.7095]
     }
 }
 
-# --- 3. BARRA LATERAL PROFESIONAL ---
+# --- 3. FUNCIONES CORE ---
+
+def crear_excel_automatico(nombre):
+    """Crea un nuevo Google Sheet y devuelve su ID"""
+    try:
+        nueva_hoja = G_CLIENT.create(f"BioCore_DB_{nombre}")
+        hoja_activa = nueva_hoja.get_worksheet(0)
+        hoja_activa.append_row(["Fecha", "NDSI", "NDWI", "SWIR", "Polvo", "Deficit"])
+        return nueva_hoja.id
+    except Exception as e:
+        # Si falla por cuota, devolvemos el error detallado
+        return f"Error de Google: {str(e)}"
+
+def obtener_datos(sheet_id, pestaña):
+    """Extrae datos de Google Sheets y los convierte a DataFrame limpio"""
+    try:
+        hoja = G_CLIENT.open_by_key(sheet_id).worksheet(pestaña)
+        records = hoja.get_all_records()
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+            # LIMPIEZA: Aseguramos que los índices sean números para evitar el ValueError en Matplotlib
+            for col in ["NDSI", "NDWI", "SWIR"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            return df.sort_values('Fecha').dropna(subset=['Fecha'])
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
+
+# --- 4. INTERFAZ (SIDEBAR) ---
+
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/892/892903.png", width=100)
-    st.title("BioCore Intelligence")
-    st.subheader("Consultoría Ambiental")
-    menu = st.radio("Navegación", ["📊 Dashboard de Auditoría", "➕ Gestión de Clientes"])
+    st.title("🌿 BioCore Admin")
+    opcion = st.radio("Ir a:", ["📊 Panel de Auditoría", "➕ Registrar Proyecto"])
     st.markdown("---")
-    st.info(f"**App ID:** {email_app}")
-
-# --- MÓDULO 1: AUDITORÍA (EL DASHBOARD COMPLETO) ---
-if menu == "📊 Dashboard de Auditoría":
-    col_t1, col_t2 = st.columns([3, 1])
-    with col_t1:
-        proyecto = st.selectbox("Seleccione el Área de Estudio", list(CLIENTES_DB.keys()))
-    with col_t2:
-        st.write("") # Espaciador
-        sync = st.button("🔄 Sincronizar Satélite")
-
-    conf = CLIENTES_DB[proyecto]
-
-    if sync:
-        with st.spinner("Conectando con la base de datos en la nube..."):
-            try:
-                sh = gc.open_by_key(conf["id"]).worksheet(conf["pestaña"])
-                df = pd.DataFrame(sh.get_all_records())
-                if not df.empty:
-                    # Limpieza de datos profesional
-                    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-                    for c in ["NDSI", "NDWI", "SWIR", "Polvo", "Deficit"]:
-                        if c in df.columns:
-                            df[c] = pd.to_numeric(df[c], errors='coerce')
-                    st.session_state[f"data_{proyecto}"] = df.dropna(subset=['Fecha'])
-                else:
-                    st.warning("El archivo está conectado pero no tiene registros.")
-            except Exception as e:
-                st.error(f"Error de acceso: {e}")
-
-    if f"data_{proyecto}" in st.session_state:
-        df_view = st.session_state[f"data_{proyecto}"]
-        
-        # FILA 1: MÉTRICAS CLAVE
-        m1, m2, m3, m4 = st.columns(4)
-        ultimo = df_view.iloc[-1]
-        m1.metric("Última Fecha", ultimo['Fecha'].strftime('%d/%m/%Y'))
-        m2.metric("NDWI (Agua)", f"{ultimo.get('NDWI', 0):.3f}")
-        m3.metric("NDSI (Nieve)", f"{ultimo.get('NDSI', 0):.3f}")
-        m4.metric("SWIR (Humedad)", f"{ultimo.get('SWIR', 0):.3f}")
-
-        # FILA 2: GRÁFICOS Y MAPA
-        tab_graf, tab_map, tab_data = st.tabs(["📉 Tendencias Temporales", "🌍 Ubicación Espacial", "📑 Datos Crudos"])
-        
-        with tab_graf:
-            fig, ax = plt.subplots(figsize=(12, 5))
-            for idx in ["NDSI", "NDWI", "SWIR"]:
-                if idx in df_view.columns:
-                    ax.plot(df_view['Fecha'], df_view[idx], marker='o', label=idx, linewidth=2)
-            ax.set_title(f"Evolución Biofísica - {proyecto}", fontsize=14)
-            ax.grid(True, alpha=0.3)
-            ax.legend()
-            st.pyplot(fig)
-
-        with tab_map:
-            m = folium.Map(location=conf["coords"], zoom_start=14)
-            folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Google Satellite').add_to(m)
-            folium.Marker(conf["coords"], popup=proyecto).add_to(m)
-            st_folium(m, width="100%", height=500)
-
-        with tab_data:
-            st.dataframe(df_view.sort_values('Fecha', ascending=False), use_container_width=True)
-
-# --- MÓDULO 2: GESTIÓN (PARA CLIENTES NUEVOS) ---
-else:
-    st.header("⚙️ Configuración de Clientes")
-    st.write("Registra aquí los IDs de los nuevos Excels que crees.")
     
-    with st.form("nuevo_cliente"):
-        n = st.text_input("Nombre del Proyecto")
-        i = st.text_input("ID del Google Sheet")
-        la = st.number_input("Latitud", value=-37.0)
-        lo = st.number_input("Longitud", value=-72.0)
-        p = st.text_input("Nombre de la Pestaña", value="Hoja 1")
+    if opcion == "📊 Panel de Auditoría":
+        proyecto_sel = st.selectbox("Proyecto Activo:", list(CLIENTES_DB.keys()))
+        dias_ver = st.slider("Días de historial:", 5, 60, 15)
+    
+    st.markdown("---")
+    st.caption("BioCore Intelligence © 2026")
+
+# --- 5. MÓDULOS DE LA APP ---
+
+if opcion == "➕ Registrar Proyecto":
+    st.header("Registro de Nuevo Cliente")
+    st.write("Al crear un proyecto, se generará una base de datos en Google Drive automáticamente.")
+    
+    with st.form("form_nuevo"):
+        nuevo_nom = st.text_input("Nombre del Proyecto (ej: Mina El Teniente)")
+        submit = st.form_submit_button("Crear Base de Datos")
         
-        if st.form_submit_button("Vincular Proyecto"):
-            st.success(f"Proyecto {n} listo. Agrégalo a la lista 'CLIENTES_DB' en el código.")
-            st.code(f"'{n}': {{'id': '{i}', 'pestaña': '{p}', 'coords': [{la}, {lo}]}}")
+        if submit and nuevo_nom:
+            with st.spinner("Generando archivo en la nube..."):
+                nuevo_id = crear_excel_automatico(nuevo_nom)
+                if "Error" in str(nuevo_id):
+                    st.error(f"❌ {nuevo_id}")
+                    st.info("Nota: Si es un error de 'Quota', intenta crear el Excel manualmente y compartirlo con la cuenta de servicio.")
+                else:
+                    st.success(f"✅ ¡Éxito! Base de datos creada.")
+                    st.code(f"ID del Sheet: {nuevo_id}", language="text")
+
+elif opcion == "📊 Panel de Auditoría":
+    info = CLIENTES_DB[proyecto_sel]
+    st.header(f"Vigilancia Satelital: {proyecto_sel}")
+    
+    if st.button("🔄 Sincronizar Datos"):
+        with st.spinner("Leyendo Google Sheets..."):
+            df = obtener_datos(info["sheet_id"], info["pestaña"])
+            if not df.empty:
+                st.session_state[f"df_{proyecto_sel}"] = df
+            else:
+                st.error("No se encontraron datos válidos (revise si el Excel tiene números).")
+
+    if f"df_{proyecto_sel}" in st.session_state:
+        df = st.session_state[f"df_{proyecto_sel}"]
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.subheader("Estado Actual")
+            ultimos = df.tail(1)
+            if not ultimos.empty:
+                for col in ["NDSI", "NDWI", "SWIR"]:
+                    if col in ultimos.columns:
+                        st.metric(label=col, value=f"{ultimos[col].values[0]:.3f}")
+            
+            st.markdown("---")
+            if st.button("📄 Generar Informe para Cliente"):
+                st.toast("Preparando PDF técnico...")
+
+        with col2:
+            st.subheader("Análisis de Tendencias")
+            if not df.empty:
+                fig, ax = plt.subplots(figsize=(10, 5))
+                # Graficamos solo si son datos numéricos
+                for col in ["NDSI", "NDWI", "SWIR"]:
+                    if col in df.columns:
+                        ax.plot(df["Fecha"].tail(dias_ver), df[col].tail(dias_ver), marker='o', label=col)
+                ax.legend()
+                ax.grid(True, alpha=0.3)
+                plt.xticks(rotation=30)
+                st.pyplot(fig)
+
+    st.markdown("---")
+    m = folium.Map(location=info["coords"], zoom_start=14)
+    folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
+    folium.Marker(info["coords"], popup=proyecto_sel).add_to(m)
+    st_folium(m, width="100%", height=400, key=f"map_{proyecto_sel}")

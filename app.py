@@ -11,144 +11,154 @@ import folium
 from streamlit_folium import folium_static
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN E IDENTIDAD VISUAL ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide")
+# --- 1. CONFIGURACIÓN E IDENTIDAD ---
+st.set_page_config(page_title="BioCore Admin System", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
     .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 5px solid #183654; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .report-title { color: #183654; font-weight: bold; font-size: 24px; }
+    .section-header { color: #183654; font-weight: bold; font-size: 22px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
+# Autenticación
 try:
     creds_dict = json.loads(st.secrets["GEE_JSON"])
     SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
     G_CLIENT = gspread.authorize(CREDS)
 except Exception as e:
-    st.error(f"Fallo en la conexión: {e}")
+    st.error(f"Error de conexión: {e}")
     st.stop()
 
-# --- 2. BASE DE DATOS DE CLIENTES CORREGIDA ---
-CLIENTES_DB = {
-    "Pascua Lama (Cordillera)": {
-        "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
-        "pestaña": "ID_CARPETA_2",
-        "lat": -29.3200, "lon": -70.0200,
-        "rubro": "Minería",
-        "region": "Atacama / San Juan",  # CLAVE AGREGADA PARA EVITAR KEYERROR
-        "contacto": "Gerencia Medio Ambiente",
-        "sensores": "Sentinel-1 (SAR), Sentinel-2 (Óptico), Landsat 8/9"
+# --- 2. BASE DE DATOS DE CLIENTES (Simulada en Session State para persistencia en la sesión) ---
+if 'clientes_db' not in st.session_state:
+    st.session_state.clientes_db = {
+        "Pascua Lama (Cordillera)": {
+            "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc",
+            "pestaña": "ID_CARPETA_2",
+            "lat": -29.3200, "lon": -70.0200,
+            "region": "Atacama / San Juan",
+            "contacto": "Gerencia Medio Ambiente",
+            "rubro": "Minería"
+        }
     }
-}
 
-# --- 3. PROCESAMIENTO TÉCNICO DE DATOS ---
-def obtener_datos_audit(sheet_id, pestaña):
+# --- 3. FUNCIONES TÉCNICAS ---
+def procesar_datos_silencioso(sheet_id, pestaña):
     try:
         hoja = G_CLIENT.open_by_key(sheet_id).worksheet(pestaña)
         df = pd.DataFrame(hoja.get_all_records())
-        
         df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
         df = df.dropna(subset=['Fecha']).sort_values('Fecha')
         
-        columnas_tecnicas = ["SAVI", "NDSI", "NDWI", "SWIR", "Deficit", "Arcillas", "VV", "VH"]
-        presentes = []
-        
-        for col in columnas_tecnicas:
+        columnas = ["SAVI", "NDSI", "NDWI", "SWIR", "Deficit"]
+        for col in columnas:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-                df[col] = df[col].interpolate().fillna(0)
-                presentes.append(col)
-        
-        return df, presentes
-    except Exception as e:
-        st.error(f"Error al leer la base de datos: {e}")
-        return pd.DataFrame(), []
+                df[col] = pd.to_numeric(df[col], errors='coerce').interpolate().fillna(0)
+        return df
+    except:
+        return pd.DataFrame()
 
-# --- 4. MOTOR DE GRÁFICOS ---
-def generar_graficos_cascada(df, columnas):
-    n = len(columnas)
-    fig, axs = plt.subplots(n, 1, figsize=(10, 3.5 * n))
-    if n == 1: axs = [axs]
-    
-    colores = {"SAVI": "#2E7D32", "NDSI": "#0077b6", "NDWI": "#1565C0", "Deficit": "#C62828"}
-    
+def generar_graficos_informe(df):
+    columnas = [c for c in ["SAVI", "NDSI", "NDWI", "Deficit"] if c in df.columns]
+    fig, axs = plt.subplots(len(columnas), 1, figsize=(8, 3 * len(columnas)))
+    if len(columnas) == 1: axs = [axs]
     for i, col in enumerate(columnas):
-        axs[i].plot(df['Fecha'], df[col], color=colores.get(col, "#455A64"), linewidth=2, marker='o', markersize=4)
-        axs[i].set_title(f"TENDENCIA: {col}", fontsize=11, fontweight='bold', loc='left', color='#183654')
-        axs[i].grid(True, linestyle='--', alpha=0.6)
-    
+        axs[i].plot(df['Fecha'], df[col], color="#183654", linewidth=1.5)
+        axs[i].set_title(f"Análisis Histórico: {col}", fontsize=10, fontweight='bold')
+        axs[i].grid(True, alpha=0.3)
     plt.tight_layout()
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150)
+    plt.savefig(buf, format='png', dpi=120)
     return buf
 
-# --- 5. REPORTE TÉCNICO PDF ---
-class BioCoreReport(FPDF):
-    def header(self):
-        self.set_fill_color(24, 54, 84)
-        self.rect(0, 0, 210, 40, 'F')
-        self.set_text_color(255, 255, 255)
-        self.set_font("Arial", 'B', 16)
-        self.cell(0, 20, "AUDITORÍA DE CUMPLIMIENTO AMBIENTAL", 0, 1, 'C')
-
-def crear_pdf_final(df, proyecto_nombre, cols):
-    info = CLIENTES_DB[proyecto_nombre]
-    pdf = BioCoreReport()
+def crear_pdf_auditoria(df, nombre_proyecto):
+    info = st.session_state.clientes_db[nombre_proyecto]
+    pdf = FPDF()
     pdf.add_page()
-    pdf.ln(30)
     
-    pdf.set_font("Arial", 'B', 12)
+    # Encabezado
+    pdf.set_fill_color(24, 54, 84)
+    pdf.rect(0, 0, 210, 35, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 15, "INFORME DE AUDITORÍA AMBIENTAL", 0, 1, 'C')
+    
+    # Datos Cliente
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, f"PROYECTO: {proyecto_nombre.upper()}", 0, 1)
+    pdf.ln(25)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"PROYECTO: {nombre_proyecto}", 0, 1)
     pdf.set_font("Arial", '', 10)
-    pdf.multi_cell(0, 6, f"Localización: {info['region']}\nCoordenadas: {info['lat']}, {info['lon']}")
+    pdf.cell(0, 7, f"Ubicación: {info['region']} | Rubro: {info['rubro']}", 0, 1)
     
-    buf_g = generar_graficos_cascada(df, cols)
-    with open("report_graf.png", "wb") as f: f.write(buf_g.getbuffer())
-    pdf.image("report_graf.png", x=15, y=80, w=180)
+    # Gráficos (Solo en el PDF)
+    pdf.ln(10)
+    grafico_buf = generar_graficos_informe(df)
+    with open("temp_graf.png", "wb") as f: f.write(grafico_buf.getbuffer())
+    pdf.image("temp_graf.png", x=15, w=180)
     
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 6. INTERFAZ PRINCIPAL ---
-st.sidebar.title("Panel BioCore")
-menu = st.sidebar.radio("Navegación:", ["Dashboard Auditoría", "Registro de Clientes"])
+# --- 4. NAVEGACIÓN ---
+st.sidebar.title("BioCore Intelligence")
+menu = st.sidebar.radio("Ir a:", ["Dashboard de Auditoría", "Gestión de Clientes"])
 
-if menu == "Dashboard Auditoría":
-    st.markdown('<p class="report-title">🌿 BioCore Intelligence: Auditoría Satelital</p>', unsafe_allow_html=True)
+if menu == "Dashboard de Auditoría":
+    st.markdown('<p class="section-header">🛡️ Panel de Auditoría Satelital</p>', unsafe_allow_html=True)
     
-    proyecto_sel = st.sidebar.selectbox("Seleccione Proyecto:", list(CLIENTES_DB.keys()))
-    info = CLIENTES_DB[proyecto_sel]
-
-    col_map, col_data = st.columns([2, 1])
-
-    with col_data:
-        st.subheader("Ficha del Proyecto")
-        st.write(f"**Región:** {info['region']}") # Ya no dará error
-        st.write(f"**Rubro:** {info['rubro']}")
-        st.write(f"**Sensores:** {info['sensores']}")
-        
-    with col_map:
-        # Mapa Satelital blindado
-        m = folium.Map(location=[info['lat'], info['lon']], zoom_start=13, 
-                       tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                       attr='Esri World Imagery')
+    proyecto_sel = st.selectbox("Seleccione el Proyecto para Auditar:", list(st.session_state.clientes_db.keys()))
+    info = st.session_state.clientes_db[proyecto_sel]
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.write(f"**Ubicación:** {info['region']}")
+        st.write(f"**Coordenadas:** {info['lat']}, {info['lon']}")
+        if st.button("🚀 Ejecutar Auditoría y Generar Reporte"):
+            with st.spinner("Procesando datos..."):
+                df_audit = procesar_datos_silencioso(info['sheet_id'], info['pestaña'])
+                if not df_audit.empty:
+                    st.success("Análisis completado.")
+                    # Métricas rápidas
+                    m1, m2 = st.columns(2)
+                    m1.metric("Último SAVI", f"{df_audit.iloc[-1]['SAVI']:.4f}")
+                    m2.metric("Déficit Hídrico", f"{df_audit.iloc[-1]['Deficit']:.2f}")
+                    
+                    # Descarga de PDF
+                    pdf_bytes = crear_pdf_auditoria(df_audit, proyecto_sel)
+                    b64 = base64.b64encode(pdf_bytes).decode()
+                    href = f'<a href="data:application/pdf;base64,{b64}" download="Auditoria_{proyecto_sel}.pdf" style="text-decoration:none;"><div style="text-align:center; padding:10px; background-color:#183654; color:white; border-radius:5px;">📥 DESCARGAR INFORME PDF</div></a>'
+                    st.markdown(href, unsafe_allow_html=True)
+    
+    with col2:
+        m = folium.Map(location=[info['lat'], info['lon']], zoom_start=12)
         folium.Marker([info['lat'], info['lon']], popup=proyecto_sel).add_to(m)
         folium_static(m)
 
-    if st.button("🚀 EJECUTAR AUDITORÍA"):
-        df_final, cols_final = obtener_datos_audit(info['sheet_id'], info['pestaña'])
-        if not df_final.empty:
-            st.image(generar_graficos_cascada(df_final, cols_final))
-            pdf_bytes = crear_pdf_final(df_final, proyecto_sel, cols_final)
-            b64 = base64.b64encode(pdf_bytes).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="Reporte_{proyecto_sel}.pdf" style="text-decoration:none;"><div style="text-align:center; padding:15px; background-color:#183654; color:white; border-radius:10px; font-weight:bold;">📥 DESCARGAR REPORTE (PDF)</div></a>'
-            st.markdown(href, unsafe_allow_html=True)
+elif menu == "Gestión de Clientes":
+    st.markdown('<p class="section-header">📝 Registro y Gestión de Clientes</p>', unsafe_allow_html=True)
+    
+    # Formulario para nuevo ingreso
+    with st.expander("➕ Registrar Nuevo Proyecto"):
+        with st.form("nuevo_cliente"):
+            nombre = st.text_input("Nombre del Proyecto")
+            sid = st.text_input("ID de Google Sheet")
+            pest = st.text_input("Nombre de la Pestaña")
+            reg = st.text_input("Región")
+            rub = st.selectbox("Rubro", ["Minería", "Agrícola", "Energía", "Forestal"])
+            c_lat = st.number_input("Latitud", format="%.4f")
+            c_lon = st.number_input("Longitud", format="%.4f")
+            
+            if st.form_submit_button("Guardar Proyecto"):
+                st.session_state.clientes_db[nombre] = {
+                    "sheet_id": sid, "pestaña": pest, "lat": c_lat, "lon": c_lon, 
+                    "region": reg, "rubro": rub, "contacto": "Pendiente"
+                }
+                st.success(f"Proyecto {nombre} registrado correctamente.")
 
-elif menu == "Registro de Clientes":
-    st.subheader("📝 Gestión de Datos del Cliente")
-    with st.form("registro"):
-        st.text_input("Nombre del Proyecto")
-        st.form_submit_button("Guardar")
+    # Tabla de visualización de todos los clientes
+    st.markdown("### Base de Datos de Clientes Activos")
+    df_clientes = pd.DataFrame.from_dict(st.session_state.clientes_db, orient='index')
+    st.dataframe(df_clientes, use_container_width=True)

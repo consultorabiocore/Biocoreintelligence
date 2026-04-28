@@ -10,7 +10,7 @@ from datetime import datetime
 import io
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="BioCore Admin", layout="wide")
+st.set_page_config(page_title="BioCore Intelligence Admin", layout="wide")
 
 try:
     creds_dict = json.loads(st.secrets["GEE_JSON"])
@@ -18,7 +18,7 @@ try:
     CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
     G_CLIENT = gspread.authorize(CREDS)
 except:
-    st.error("Revisa las credenciales en Streamlit Secrets.")
+    st.error("Error: Configura las credenciales en Streamlit Secrets.")
     st.stop()
 
 CLIENTES_DB = {
@@ -30,8 +30,8 @@ CLIENTES_DB = {
     }
 }
 
-# --- 2. PROCESAMIENTO INTELIGENTE ---
-def procesar_datos_biocore(sheet_id, pestaña):
+# --- 2. PROCESAMIENTO AVANZADO ---
+def procesar_datos_completos(sheet_id, pestaña):
     try:
         hoja = G_CLIENT.open_by_key(sheet_id).worksheet(pestaña)
         df = pd.DataFrame(hoja.get_all_records())
@@ -40,101 +40,132 @@ def procesar_datos_biocore(sheet_id, pestaña):
         df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
         df = df.dropna(subset=['Fecha'])
 
+        # Todos los índices que BioCore debe monitorear
         indices = ["SAVI", "NDWI", "SWIR", "Arcillas", "Deficit", "VV", "VH"]
-        cols_presentes = []
+        cols_finales = []
+        
         for col in indices:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-                cols_presentes.append(col)
+                # Convertimos a número y tratamos los errores (como "Muy Alto")
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                # Si la columna tiene al menos un dato válido, la incluimos
+                if df[col].notna().any():
+                    cols_finales.append(col)
 
         df = df.sort_values('Fecha').drop_duplicates('Fecha')
-        return df, cols_presentes
+        # Llenamos vacíos con el promedio para no romper la línea del gráfico
+        df = df.interpolate(method='linear').fillna(0)
+        
+        return df, cols_finales
     except Exception as e:
-        st.error(f"Error en base de datos: {e}")
+        st.error(f"Error en procesamiento: {e}")
         return pd.DataFrame(), []
 
-# --- 3. MOTOR DE GRÁFICOS ---
-def generar_visualizacion(df, columnas):
-    plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(10, 5))
-    colores = {"SAVI": "#2ecc71", "NDWI": "#3498db", "SWIR": "#f1c40f", "Deficit": "#e74c3c"}
+# --- 3. MOTOR DE GRÁFICOS DE ALTO IMPACTO ---
+def generar_grafico_premium(df, columnas):
+    # Paleta de colores BioCore (Verdes, Azules, Tierras)
+    colores = {
+        "SAVI": "#27ae60", "NDWI": "#2980b9", "SWIR": "#f39c12", 
+        "Arcillas": "#a04000", "Deficit": "#c0392b", "VV": "#7f8c8d", "VH": "#34495e"
+    }
+    
+    plt.figure(figsize=(11, 5))
+    # Fondo gris muy claro para elegancia
+    ax = plt.axes()
+    ax.set_facecolor("#fdfdfd")
     
     for col in columnas:
-        if col in colores and not (df[col] == 0).all():
-            ax.plot(df['Fecha'], df[col], marker='o', label=col, color=colores[col], linewidth=2)
+        color = colores.get(col, "#000000")
+        plt.plot(df['Fecha'], df[col], marker='s', markersize=4, label=col, color=color, linewidth=2, alpha=0.8)
     
-    ax.set_title("ANÁLISIS TEMPORAL DE ÍNDICES AMBIENTALES", fontsize=12, pad=20)
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1), frameon=False)
-    plt.xticks(rotation=30)
-    plt.grid(True, alpha=0.1)
+    plt.title("SERIE TEMPORAL: ANÁLISIS MULTIESPECTRAL INTEGRADO", fontsize=13, fontweight='bold', color='#1e3d1e', pad=20)
+    plt.legend(loc='upper left', bbox_to_anchor=(1, 1), frameon=True, fontsize=9)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.xticks(rotation=35, fontsize=9)
     plt.tight_layout()
     
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150)
+    plt.savefig(buf, format='png', dpi=200)
     return buf
 
-# --- 4. EL NUEVO REPORTE PDF (NO ESCUETO) ---
-def crear_pdf_profesional(df, proyecto, columnas):
+# --- 4. REPORTE PDF CON IDENTIDAD VISUAL ---
+def crear_pdf_biocore(df, proyecto, columnas):
     info = CLIENTES_DB[proyecto]
     pdf = FPDF()
     pdf.add_page()
     
-    # Header Estilo BioCore
-    pdf.set_fill_color(30, 60, 30) # Verde Oscuro
-    pdf.rect(0, 0, 210, 40, 'F')
+    # 1. ENCABEZADO CON MARCA
+    pdf.set_fill_color(30, 60, 30) 
+    pdf.rect(0, 0, 210, 50, 'F')
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", 'B', 24)
-    pdf.cell(0, 20, "BIOCORE INTELLIGENCE", 0, 1, 'C')
-    pdf.set_font("Arial", 'I', 10)
-    pdf.cell(0, 5, "Monitoreo Satelital Avanzado y Análisis de Biodiversidad", 0, 1, 'C')
+    pdf.set_font("Arial", 'B', 26)
+    pdf.cell(0, 25, "BIOCORE INTELLIGENCE", 0, 1, 'C')
+    pdf.set_font("Arial", 'I', 11)
+    pdf.cell(0, 5, "Consultoría Ambiental y Análisis Geoespacial Avanzado", 0, 1, 'C')
     
-    # Cuerpo e Información
+    # 2. DATOS DEL PROYECTO
     pdf.set_text_color(40, 40, 40)
-    pdf.ln(25)
+    pdf.ln(30)
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, f"INFORME TÉCNICO: {proyecto.upper()}", 0, 1)
+    pdf.cell(0, 10, f"REPORTE TÉCNICO: {proyecto.upper()}", 0, 1)
     pdf.set_font("Arial", size=10)
-    pdf.cell(0, 6, f"Coordenadas de Control: {info['lat']}, {info['lon']}", 0, 1)
-    pdf.cell(0, 6, f"Sensores Integrados: {info['sensores']}", 0, 1)
-    pdf.cell(0, 6, f"Fecha de Generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 1)
+    pdf.set_fill_color(240, 245, 240)
+    pdf.cell(0, 8, f" Coordenadas de Control: {info['lat']}, {info['lon']}", 0, 1, fill=True)
+    pdf.cell(0, 8, f" Constelaciones Activas: {info['sensores']}", 0, 1)
+    pdf.cell(0, 8, f" Fecha de Análisis: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 1, fill=True)
     
-    # Gráfico
+    # 3. EL GRÁFICO (CENTRAL)
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "1. Tendencia de Índices Monitoreados", 0, 1)
+    pdf.set_text_color(30, 60, 30)
+    pdf.cell(0, 10, "1. VISUALIZACIÓN DE TENDENCIAS AMBIENTALES", 0, 1)
     
-    graf_buf = generar_visualizacion(df, columnas)
-    with open("temp_graf.png", "wb") as f:
-        f.write(graf_buf.getbuffer())
-    pdf.image("temp_graf.png", x=10, w=190)
+    buf = generar_grafico_premium(df, columnas)
+    with open("temp_p.png", "wb") as f:
+        f.write(buf.getbuffer())
+    pdf.image("temp_p.png", x=10, w=190)
     
-    # Tabla de Promedios
+    # 4. TABLA DE RESULTADOS CLAVE
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "2. Resumen Estadístico de Valores Recientes", 0, 1)
-    pdf.set_font("Arial", size=10)
+    pdf.cell(0, 10, "2. VALORES PROMEDIO DEL PERIODO", 0, 1)
     
-    promedios = df[columnas].tail(10).mean()
+    pdf.set_font("Arial", 'B', 10)
+    pdf.set_fill_color(220, 230, 220)
+    pdf.cell(90, 8, " Indicador Ambiental", 1, 0, 'L', fill=True)
+    pdf.cell(90, 8, " Valor Promedio", 1, 1, 'C', fill=True)
+    
+    pdf.set_font("Arial", size=10)
+    promedios = df[columnas].mean()
     for idx, val in promedios.items():
-        pdf.cell(50, 8, f"Promedio {idx}:", 1)
-        pdf.cell(50, 8, f"{val:.4f}", 1, 1)
+        pdf.cell(90, 8, f" {idx}", 1)
+        pdf.cell(90, 8, f"{val:.4f}", 1, 1, 'C')
+
+    # Pie de página
+    pdf.set_y(-20)
+    pdf.set_font("Arial", 'I', 8)
+    pdf.cell(0, 10, "Este documento es confidencial y propiedad de BioCore Intelligence. Datos procesados vía Google Earth Engine API.", 0, 0, 'C')
 
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 5. INTERFAZ ---
+# --- 5. INTERFAZ DASHBOARD ---
 st.title("🌿 BioCore Intelligence")
-sel = st.selectbox("Seleccione Proyecto Activo:", list(CLIENTES_DB.keys()))
+st.caption("Panel de Gestión de Datos Satelitales")
 
-if st.button("🔄 Sincronizar y Generar Informe"):
-    with st.spinner("Procesando datos de constelaciones satelitales..."):
+sel = st.selectbox("Proyecto Seleccionado:", list(CLIENTES_DB.keys()))
+
+if st.button("📊 Sincronizar y Generar Reporte"):
+    with st.spinner("Conectando con base de datos y procesando índices..."):
         config = CLIENTES_DB[sel]
-        df, cols = procesar_datos_biocore(config["sheet_id"], config["pestaña"])
+        df, cols = procesar_datos_completos(config["sheet_id"], config["pestaña"])
         
         if not df.empty:
-            st.success("Análisis Multi-satelital Completado.")
-            st.image(generar_visualizacion(df, cols))
+            st.success("Análisis completado con éxito.")
+            # Mostrar gráfico en la app
+            st.image(generar_grafico_premium(df, cols))
             
-            pdf_bytes = crear_pdf_profesional(df, sel, cols)
+            # Descarga del PDF
+            pdf_bytes = crear_pdf_biocore(df, sel, cols)
             b64 = base64.b64encode(pdf_bytes).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="BioCore_{sel}.pdf" style="display:block; text-align:center; padding:15px; background-color:#2E7D32; color:white; border-radius:10px; text-decoration:none; font-weight:bold;">📥 DESCARGAR INFORME TÉCNICO COMPLETO</a>'
+            href = f'<a href="data:application/pdf;base64,{b64}" download="BioCore_Reporte_{sel}.pdf" style="display:block; text-align:center; padding:15px; background-color:#1B5E20; color:white; border-radius:8px; text-decoration:none; font-weight:bold; font-size:18px; margin-top:20px;">📥 DESCARGAR INFORME TÉCNICO PDF</a>'
             st.markdown(href, unsafe_allow_html=True)

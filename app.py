@@ -1,137 +1,120 @@
 import streamlit as st
 import pandas as pd
-import re, json, requests
-from st_supabase_connection import SupabaseConnection
+import matplotlib.pyplot as plt
+from fpdf import FPDF
+import json, base64, requests, io, re
 import gspread
 from google.oauth2.service_account import Credentials
-import folium
-from streamlit_folium import folium_static
+from datetime import datetime
+from st_supabase_connection import SupabaseConnection
 
-# --- 1. CONFIGURACIÓN INICIAL ---
-st.set_page_config(page_title="BioCore Intelligence | SEIA", layout="wide")
+# --- 1. CONFIGURACIÓN ---
+st.set_page_config(page_title="BioCore Audit System", layout="wide")
 st.cache_resource.clear()
 
-# --- 2. CONEXIÓN A BASE DE DATOS (SUPABASE) ---
+# Conexión a Supabase
 try:
     s_url = st.secrets["connections"]["supabase"]["url"].strip()
     s_key = st.secrets["connections"]["supabase"]["key"].strip()
-
-    st_supabase = st.connection(
-        "supabase",
-        type=SupabaseConnection,
-        url=s_url,
-        key=s_key
-    )
-except Exception as e:
-    st.error("❌ Error de conexión con Supabase. Revisa tus Secrets.")
+    st_supabase = st.connection("supabase", type=SupabaseConnection, url=s_url, key=s_key)
+except:
+    st.error("Error de conexión a Base de Datos.")
     st.stop()
 
-# --- 3. FUNCIONES DE APOYO ---
-def enviar_telegram(mensaje, chat_id):
+# --- 2. FUNCIONES TÉCNICAS ---
+def enviar_pdf_telegram(pdf_bytes, filename, chat_id):
     try:
         token = st.secrets["telegram"]["token"]
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, json={"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"}, timeout=10)
-    except: pass
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+        files = {'document': (filename, pdf_bytes, 'application/pdf')}
+        data = {'chat_id': chat_id, 'caption': f"✅ Reporte de Auditoría: {datetime.now().strftime('%d/%m/%Y')}", 'parse_mode': 'Markdown'}
+        requests.post(url, data=data, files=files, timeout=20)
+        return True
+    except: return False
 
-def cargar_datos_google(sheet_id, pestana):
+def obtener_datos(sheet_id, pestaña):
     try:
         creds_info = json.loads(st.secrets["gee"]["json"])
-        creds = Credentials.from_service_account_info(creds_info, scopes=[
-            "https://spreadsheets.google.com/feeds", 
-            "https://www.googleapis.com/auth/drive"
-        ])
+        creds = Credentials.from_service_account_info(creds_info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         client = gspread.authorize(creds)
         sid = sheet_id.split("/d/")[1].split("/")[0] if "/d/" in sheet_id else sheet_id
-        sh = client.open_by_key(sid)
-        df = pd.DataFrame(sh.worksheet(pestana).get_all_records())
-        
-        # --- LIMPIEZA DE DATOS (EVITA EL ERROR DE TYPEERROR) ---
-        df.columns = [c.strip().upper() for c in df.columns]
-        
-        # Forzamos conversión a número en columnas críticas
-        for col in ['NDSI', 'NDWI', 'SAVI']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Eliminamos filas donde los índices sean nulos
-        df = df.dropna(subset=['NDSI', 'NDWI'], how='all')
-        
-        if 'FECHA' in df.columns:
-            df['FECHA'] = pd.to_datetime(df['FECHA'], dayfirst=True)
-        return df
-    except Exception as e:
-        st.error(f"Error leyendo Google Sheets: {e}")
-        return pd.DataFrame()
+        hoja = client.open_by_key(sid).worksheet(pestaña)
+        df = pd.DataFrame(hoja.get_all_records())
+        df.columns = [c.strip() for c in df.columns]
+        if 'Fecha' in df.columns:
+            df['Fecha'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce')
+            df = df.dropna(subset=['Fecha']).sort_values('Fecha')
+        cols = [c for c in ["SAVI", "NDWI", "NDSI", "Deficit"] if c in df.columns]
+        for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce').interpolate().fillna(0)
+        return df, cols
+    except: return pd.DataFrame(), []
 
-# --- 4. INTERFAZ Y NAVEGACIÓN ---
-menu = st.sidebar.radio("SISTEMA BIOCORE", ["🛡️ Auditoría", "⚙️ Gestión de Clientes"])
+class BioCorePDF(FPDF):
+    def header(self):
+        self.set_fill_color(24, 54, 84) 
+        self.rect(0, 0, 210, 35, 'F')
+        self.set_text_color(255, 255, 255)
+        self.set_font("Arial", 'B', 14)
+        self.cell(0, 15, "AUDITORÍA DE CUMPLIMIENTO AMBIENTAL", 0, 1, 'C')
+        self.set_font("Arial", 'I', 9)
+        self.cell(0, 5, "Responsable Técnica: Loreto Campos | BioCore Intelligence", 0, 1, 'C')
 
-if menu == "🛡️ Auditoría":
-    st.title("🛡️ Dashboard de Vigilancia Ambiental")
+def generar_pdf_bytes(df, proyecto, columnas, umbral):
+    val_ref = df[columnas[0]].iloc[-1] if columnas else 0
+    es_alerta = val_ref < umbral
+    pdf = BioCorePDF()
+    pdf.add_page()
+    pdf.ln(25)
+    pdf.set_fill_color(200, 0, 0) if es_alerta else pdf.set_fill_color(0, 100, 0)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"  ESTATUS: {'ALERTA' if es_alerta else 'NORMAL'}", 0, 1, 'L', True)
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 10, f"PROYECTO: {proyecto}", 0, 1)
+    pdf.set_font("Arial", size=10)
+    pdf.multi_cell(0, 7, f"Hallazgo: El valor de {columnas[0]} es {val_ref:.4f}.", border=1)
+    return pdf.output(dest='S').encode('latin-1')
+
+# --- 3. INTERFAZ ---
+st.title("🛡️ BioCore Intelligence | Revisión y Envío")
+
+res = st_supabase.table("proyectos").select("*").execute()
+db_proyectos = res.data
+
+if db_proyectos:
+    nombres = [p['nombre'] for p in db_proyectos]
+    sel = st.selectbox("Seleccione Proyecto:", nombres)
+    p_info = next(p for p in db_proyectos if p['nombre'] == sel)
+
+    col1, col2 = st.columns(2)
     
-    try:
-        res = st_supabase.table("proyectos").select("*").execute()
-        proyectos = res.data
-    except:
-        proyectos = []
+    with col1:
+        if st.button("📄 1. GENERAR PARA REVISIÓN"):
+            df_data, cols_data = obtener_datos(p_info["sheet_id"], p_info["pestana"])
+            if not df_data.empty:
+                pdf_bytes = generar_pdf_bytes(df_data, sel, cols_data, p_info["umbral"])
+                st.session_state['pdf_actual'] = pdf_bytes
+                st.session_state['proyecto_actual'] = sel
+                
+                # Opción de descarga inmediata
+                b64 = base64.b64encode(pdf_bytes).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="Revision_{sel}.pdf" style="text-decoration:none; padding:10px; background:#1a3a5a; color:white; border-radius:5px;">⬇️ DESCARGAR PARA REVISAR</a>'
+                st.markdown(href, unsafe_allow_html=True)
+                st.success("Informe listo para revisión.")
+            else:
+                st.error("Error al cargar datos del Excel.")
 
-    if proyectos:
-        nombres = [p['nombre'] for p in proyectos]
-        sel = st.selectbox("Seleccione Unidad de Monitoreo:", nombres)
-        info = next(p for p in proyectos if p['nombre'] == sel)
-        
-        c1, c2 = st.columns([1, 1.2])
-        with c1:
-            st.info(f"**Ecosistema:** {info['tipo']}")
-            if st.button("🚀 EJECUTAR MONITOREO"):
-                with st.spinner("Procesando datos..."):
-                    df = cargar_datos_google(info['sheet_id'], info['pestana'])
-                    
-                    if not df.empty:
-                        idx = "NDSI" if info['tipo'] == "MINERIA" else "NDWI"
-                        
-                        # Verificamos que la columna exista y tenga números
-                        if idx in df.columns and not df[idx].isnull().all():
-                            val_act = df[idx].iloc[-1]
-                            promedio = df[idx].mean() # Ahora seguro porque limpiamos el DF antes
-                            
-                            estado = "🟢 ESTABLE" if val_act >= info['umbral'] else "🔴 ALERTA"
-                            enviar_telegram(f"🛰 **BIOCORE: {info['nombre']}**\n{idx}: `{val_act:.3f}`\n{estado}", info['telegram_id'])
-                            
-                            st.metric(f"Último {idx}", f"{val_act:.3f}", f"{((val_act-promedio)/promedio)*100:+.1f}%")
-                            st.line_chart(df.set_index('FECHA')[[idx, 'SAVI']])
-                        else:
-                            st.error(f"La columna {idx} no tiene datos numéricos válidos.")
-        with c2:
-            if info['coordenadas']:
-                m = folium.Map(location=info['coordenadas'][0], zoom_start=13)
-                folium.Polygon(locations=info['coordenadas'], color="#1a3a5a", fill=True).add_to(m)
-                folium_static(m)
-    else:
-        st.warning("No hay proyectos. Regístralos en la pestaña de Gestión.")
-
+    with col2:
+        if 'pdf_actual' in st.session_state:
+            st.warning(f"¿Enviar reporte de {st.session_state['proyecto_actual']}?")
+            if st.button("🚀 2. ENVIAR A TELEGRAM"):
+                exito = enviar_pdf_telegram(st.session_state['pdf_actual'], f"Auditoria_{sel}.pdf", p_info["telegram_id"])
+                if exito:
+                    st.success("✅ ¡Enviado al cliente!")
+                    st.balloons()
+                else:
+                    st.error("Error en el envío.")
 else:
-    st.title("⚙️ Registro de Unidades")
-    with st.form("reg_form", clear_on_submit=True):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            n = st.text_input("Nombre del Proyecto")
-            t = st.selectbox("Ecosistema", ["MINERIA", "HUMEDAL"])
-            sid = st.text_input("Google Sheet ID")
-        with col_b:
-            tid = st.text_input("Telegram ID")
-            pes = st.text_input("Pestaña", value="Hoja 1")
-            umb = st.number_input("Umbral Alerta", value=0.35 if t=="MINERIA" else 0.10)
-        
-        cor = st.text_area("Coordenadas (Lat, Lon)")
-        
-        if st.form_submit_button("💾 Guardar"):
-            nums = re.findall(r"[-+]?\d*\.\d+|[-+]?\d+", cor)
-            coords = [[float(nums[i]), float(nums[i+1])] for i in range(0, len(nums), 2) if i+1 < len(nums)]
-            if n and coords:
-                st_supabase.table("proyectos").insert({
-                    "nombre": n, "tipo": t, "telegram_id": tid, 
-                    "sheet_id": sid, "pestana": pes, "umbral": umb, "coordenadas": coords
-                }).execute()
-                st.success("Guardado.")
+    st.info("Registra un proyecto primero.")

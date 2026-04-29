@@ -7,13 +7,15 @@ from google.oauth2.service_account import Credentials
 import folium
 from streamlit_folium import folium_static
 
-# --- LIMPIEZA PROFUNDA DE CONEXIONES ---
-# Esto obliga a la app a olvidar el error anterior cada vez que inicias
+# --- 1. CONFIGURACIÓN DE PÁGINA (DEBE IR PRIMERO) ---
+st.set_page_config(page_title="BioCore Intelligence | SEIA", layout="wide")
+
+# --- 2. LIMPIEZA DE CONEXIONES Y CACHÉ ---
 st.cache_resource.clear()
 
-# --- 1. CONEXIÓN INMUNE A ERRORES DE FORMATO ---
+# --- 3. CONEXIÓN A SUPABASE ---
 try:
-    # Extraemos y limpiamos espacios invisibles de la URL y Key
+    # Usamos strip() para limpiar cualquier espacio invisible en tus Secrets
     s_url = st.secrets["connections"]["supabase"]["url"].strip()
     s_key = st.secrets["connections"]["supabase"]["key"].strip()
 
@@ -24,22 +26,19 @@ try:
         key=s_key
     )
 except Exception as e:
-    st.error("❌ Error Crítico: No se pudo resolver la dirección de Supabase.")
-    st.info("Asegúrate de haber hecho 'Reboot App' en el panel de Streamlit Cloud.")
+    st.error("❌ Error de conexión. Revisa que los Secrets tengan la URL con la 'q'.")
     st.stop()
 
-# --- 2. CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="BioCore Intelligence | SEIA", layout="wide")
-
+# --- 4. ESTILOS PERSONALIZADOS ---
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
     .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .stButton>button { background-color: #1a3a5a; color: white; border-radius: 5px; }
+    .stButton>button { background-color: #1a3a5a; color: white; border-radius: 5px; width: 100%; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES LÓGICAS ---
+# --- 5. FUNCIONES LÓGICAS ---
 def enviar_telegram(mensaje, chat_id):
     try:
         token = st.secrets["telegram"]["token"]
@@ -55,7 +54,6 @@ def cargar_datos_google(sheet_id, pestana):
             "https://www.googleapis.com/auth/drive"
         ])
         client = gspread.authorize(creds)
-        # Limpiador de ID (por si pegan el link completo del Excel)
         sid = sheet_id.split("/d/")[1].split("/")[0] if "/d/" in sheet_id else sheet_id
         sh = client.open_by_key(sid)
         df = pd.DataFrame(sh.worksheet(pestana).get_all_records())
@@ -66,20 +64,19 @@ def cargar_datos_google(sheet_id, pestana):
     except Exception:
         return pd.DataFrame()
 
-# --- 4. NAVEGACIÓN ---
+# --- 6. NAVEGACIÓN ---
 menu = st.sidebar.radio("SISTEMA DE VIGILANCIA", ["🛡️ Auditoría", "⚙️ Gestión de Clientes"])
 
 # --- VISTA: AUDITORÍA ---
 if menu == "🛡️ Auditoría":
     st.title("🛡️ Dashboard de Vigilancia Ambiental")
     
-    # Consulta segura a Supabase
     try:
         res = st_supabase.table("proyectos").select("*").execute()
         proyectos = res.data
     except Exception:
         proyectos = []
-        st.warning("⚠️ Esperando conexión estable con la base de datos...")
+        st.warning("⚠️ Esperando datos de la base de datos...")
 
     if proyectos:
         nombres = [p['nombre'] for p in proyectos]
@@ -90,7 +87,7 @@ if menu == "🛡️ Auditoría":
         with c1:
             st.info(f"**Ecosistema:** {info['tipo']}")
             if st.button("🚀 EJECUTAR MONITOREO"):
-                with st.spinner("Procesando índices satelitales..."):
+                with st.spinner("Analizando satélites..."):
                     df = cargar_datos_google(info['sheet_id'], info['pestana'])
                     if not df.empty:
                         idx = "NDSI" if info['tipo'] == "MINERIA" else "NDWI"
@@ -103,19 +100,19 @@ if menu == "🛡️ Auditoría":
                         
                         st.metric(f"Último {idx}", f"{val_act:.3f}", f"{((val_act-promedio)/promedio)*100:+.1f}%")
                         st.line_chart(df.set_index('FECHA')[[idx, 'SAVI']])
-                        st.success("Auditoría reportada a Telegram.")
+                        st.success("Auditoría reportada.")
         with c2:
             if info['coordenadas']:
                 m = folium.Map(location=info['coordenadas'][0], zoom_start=13)
                 folium.Polygon(locations=info['coordenadas'], color="#1a3a5a", fill=True).add_to(m)
                 folium_static(m)
     else:
-        st.info("No hay proyectos en la base de datos. Use la pestaña de Gestión.")
+        st.info("No hay proyectos registrados. Ve a la pestaña de Gestión.")
 
 # --- VISTA: GESTIÓN ---
 else:
-    st.title("⚙️ Registro de Nuevas Unidades")
-    with st.form("registro_supabase", clear_on_submit=True):
+    st.title("⚙️ Registro de Clientes")
+    with st.form("registro_form", clear_on_submit=True):
         col_a, col_b = st.columns(2)
         with col_a:
             n = st.text_input("Nombre del Proyecto")
@@ -138,7 +135,9 @@ else:
                         "nombre": n, "tipo": t, "telegram_id": tid, 
                         "sheet_id": sid, "pestana": pes, "umbral": umb, "coordenadas": coords
                     }).execute()
-                    st.success(f"Proyecto {n} blindado en Supabase.")
+                    st.success(f"✅ Proyecto {n} registrado con éxito.")
                     st.balloons()
                 except Exception as e:
                     st.error(f"Error al guardar: {e}")
+            else:
+                st.error("Por favor, ingresa el nombre y las coordenadas.")

@@ -6,77 +6,68 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from fpdf import FPDF
 
-# --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide")
+# Título siempre visible
 st.title("🌿 BioCore Intelligence")
 
-# --- 2. CONEXIÓN A GOOGLE SHEETS (IMPORTANTE) ---
-# Asegúrate de que tu conexión se llame 'gsheets' en Secrets
+# --- INTENTO DE CONEXIÓN A SHEETS ---
 try:
     from streamlit_gsheets import GSheetsConnection
+    # Intentamos conectar con el nombre 'gsheets' definido en tus Secrets
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read()
+    conexion_ok = True
+except ModuleNotFoundError:
+    st.error("Falta instalar la librería: Ejecuta 'pip install st-gsheets-connection'")
+    conexion_ok = False
 except Exception as e:
-    st.error(f"Error de conexión con Excel: {e}")
-    df = pd.DataFrame() # Evita que la app colapse si no hay conexión
+    st.error(f"Error de configuración: {e}")
+    conexion_ok = False
 
-# --- 3. BARRA LATERAL Y LOGIN ---
+# --- LOGIN ---
 with st.sidebar:
-    st.header("Acceso de Auditoría")
+    st.header("Acceso Auditoría")
     with st.form("login_form"):
-        email_in = st.text_input("Email Corporativo").strip().lower()
+        email_in = st.text_input("Email").strip().lower()
         pass_in = st.text_input("Contraseña", type="password").strip()
         submit = st.form_submit_button("Ingresar")
 
-# --- 4. LÓGICA DE VALIDACIÓN ---
-if submit:
-    if not df.empty:
-        # Limpieza total: quitamos espacios y pasamos a minúsculas las columnas del Excel
-        df['Email_Clean'] = df['Email'].astype(str).str.strip().str.lower()
-        df['Pass_Clean'] = df['Password'].astype(str).str.strip()
+if submit and conexion_ok:
+    # Limpieza de datos del Excel para asegurar el 'match'
+    df['Email_Clean'] = df['Email'].astype(str).str.strip().str.lower()
+    df['Pass_Clean'] = df['Password'].astype(str).str.strip()
 
-        # Buscamos al usuario
-        usuario = df[df['Email_Clean'] == email_in]
+    usuario = df[df['Email_Clean'] == email_in]
 
-        if not usuario.empty:
-            if str(usuario.iloc[0]['Pass_Clean']) == pass_in:
-                st.session_state.autenticado = True
-                st.session_state.user_data = usuario.iloc[0].to_dict()
-                st.rerun()
-            else:
-                st.error("❌ Contraseña incorrecta.")
+    if not usuario.empty:
+        if str(usuario.iloc[0]['Pass_Clean']) == pass_in:
+            st.session_state.autenticado = True
+            st.session_state.user_data = usuario.iloc[0].to_dict()
+            st.rerun()
         else:
-            st.error(f"❌ El correo '{email_in}' no existe en el Excel.")
-            st.info("Asegúrate de que en la Columna A del Excel el correo esté completo.")
+            st.error("Contraseña incorrecta.")
     else:
-        st.error("No se pudo leer la base de datos de Google Sheets.")
+        st.error(f"El correo '{email_in}' no existe en la base de datos.")
 
-# --- 5. PANEL PRINCIPAL (Solo si entró) ---
+# --- PANEL PRINCIPAL ---
 if st.session_state.get('autenticado'):
     u = st.session_state.user_data
-    st.success(f"✅ Conectado a: {u['Proyecto']}")
+    st.success(f"✅ Proyecto: {u['Proyecto']}")
     
     col1, col2 = st.columns(2)
-    
     with col1:
-        st.subheader("Análisis de Datos")
-        # Aquí verificamos la fecha de inicio (Columna H) y meses (Columna I)
+        st.subheader("Estado de Cuenta")
         try:
             inicio = datetime.strptime(str(u['Fecha_Inicio']).strip(), "%d/%m/%Y")
             vence = inicio + relativedelta(months=int(u['Meses_Pagados']))
-            
             if datetime.now() > vence:
-                st.error(f"Suscripción Vencida el {vence.strftime('%d/%m/%Y')}")
+                st.error(f"Suscripción VENCIDA el {vence.strftime('%d/%m/%Y')}")
             else:
-                st.info(f"Suscripción válida hasta: {vence.strftime('%d/%m/%Y')}")
-                if st.button("🚀 Ejecutar Escaneo"):
-                    st.metric("Vigor Vegetal (SAVI)", "0.45")
-                    st.write("Generando reporte...")
+                st.info(f"Suscripción activa hasta {vence.strftime('%d/%m/%Y')}")
+                if st.button("🚀 Iniciar Análisis"):
+                    st.metric("Vigor Vegetal", "0.45")
         except:
-            st.warning("Revisa el formato de fecha (DD/MM/AAAA) en tu Excel.")
-
+            st.warning("Error en formato de fecha del Excel (usa DD/MM/AAAA)")
+    
     with col2:
-        st.subheader("Mapa del Proyecto")
+        st.subheader("Mapa")
         st.map()
-else:
-    st.info("Ingresa tus datos para ver el panel de monitoreo.")

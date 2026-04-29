@@ -1,4 +1,7 @@
+st-gsheets-connection
+pandas
 earthengine-api
+fpdf2
 streamlit
 pandas
 matplotlib

@@ -8,8 +8,13 @@ import folium
 from streamlit_folium import folium_static
 
 # --- 1. CONEXIÓN A BASE DE DATOS ---
-st_supabase = st.connection("supabase", type=SupabaseConnection)
-
+# Conexión manual ultra-segura
+st_supabase = st.connection(
+    "supabase",
+    type=SupabaseConnection,
+    url=st.secrets["connections"]["supabase"]["url"],
+    key=st.secrets["connections"]["supabase"]["key"]
+)
 # --- 2. CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="BioCore Intelligence | SEIA", layout="wide")
 st.markdown("""

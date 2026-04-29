@@ -2,129 +2,136 @@ import streamlit as st
 import pandas as pd
 import json
 import ee
-import requests
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from fpdf import FPDF
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide")
+# --- 1. INICIALIZACIÓN DE SERVICIOS ---
+# Asegúrate de haber configurado los Secretos de Streamlit para GEE
+try:
+    if not ee.data._credentials:
+        ee.Initialize()
+except Exception as e:
+    st.error(f"Error de conexión con Google Earth Engine: {e}")
 
-# --- FUNCIONES DE SEGURIDAD Y PAGOS ---
-def verificar_estado_pago(fecha_inicio_str, meses_pagados):
-    """Calcula si el cliente está al día basado en la fecha de inicio."""
+# --- 2. FUNCIONES DE LÓGICA DE NEGOCIO ---
+
+def verificar_pago(fecha_inicio_str, meses_pagados):
+    """Calcula si el cliente tiene acceso basado en su suscripción."""
     try:
-        fecha_inicio = datetime.strptime(fecha_inicio_str, "%d/%m/%Y")
-        fecha_limite = fecha_inicio + relativedelta(months=int(meses_pagados))
-        if datetime.now() > fecha_limite:
-            return "DEUDA"
-        return "AL_DIA"
+        inicio = datetime.strptime(fecha_inicio_str, "%d/%m/%Y")
+        vencimiento = inicio + relativedelta(months=int(meses_pagados))
+        if datetime.now() > vencimiento:
+            return False, vencimiento.strftime("%d/%m/%Y")
+        return True, vencimiento.strftime("%d/%m/%Y")
     except:
-        return "ERROR_FORMATO"
+        return False, "Error en fecha"
 
-# --- PROCESAMIENTO SATELITAL (GEE) ---
-def analizar_indices(poligono, tipo_proyecto):
-    """Calcula SAVI, Temperatura y Arcilla/NDWI según el tipo."""
-    # Nota: Requiere ee.Initialize() con tu cuenta de servicio
-    roi = ee.Geometry.Polygon(poligono)
-    
-    # Selección de Colecciones
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(roi).sort('CLOUDY_PIXEL_PERCENTAGE').first()
-    l8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2').filterBounds(roi).sort('CLOUD_COVER').first()
-
-    # Índices Base (SAVI y LST)
-    savi = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {
-        'B8': s2.select('B8'), 'B4': s2.select('B4')
-    }).reduceRegion(ee.Reducer.mean(), roi, 30).getInfo().get('B8', 0)
-    
-    temp = l8.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15)
-    lst = temp.reduceRegion(ee.Reducer.mean(), roi, 30).getInfo().get('ST_B10', 0)
-
-    # Índices Específicos
-    resultado = {"SAVI": savi, "TEMP": lst, "EXTRA": 0, "ETIQUETA_EXTRA": ""}
-    
-    if tipo_proyecto == "MINERIA":
-        # Índice de Minerales de Arcilla (SWIR1/SWIR2)
-        arcilla = s2.normalizedDifference(['B11', 'B12'])
-        resultado["EXTRA"] = arcilla.reduceRegion(ee.Reducer.mean(), roi, 30).getInfo().get('nd', 0)
-        resultado["ETIQUETA_EXTRA"] = "Índice de Arcillas"
-    elif tipo_proyecto == "HUMEDAL":
-        # NDWI (Agua)
-        ndwi = s2.normalizedDifference(['B3', 'B8'])
-        resultado["EXTRA"] = ndwi.reduceRegion(ee.Reducer.mean(), roi, 30).getInfo().get('nd', 0)
-        resultado["ETIQUETA_EXTRA"] = "Espejo de Agua (NDWI)"
+def procesar_satelite(coords_json, tipo_proyecto):
+    """Cálculo de índices específicos (SAVI, Temp, Arcilla)."""
+    try:
+        # Convertir texto del Excel a geometría de GEE
+        area = ee.Geometry.Polygon(json.loads(coords_json))
         
-    return resultado
+        # Colecciones (Sentinel-2 y Landsat 8)
+        s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(area).sort('CLOUDY_PIXEL_PERCENTAGE').first()
+        l8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2').filterBounds(area).sort('CLOUD_COVER').first()
 
-# --- GENERADOR DE PDF CON BLINDAJE LEGAL ---
-def crear_pdf(user_data, indices):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Encabezado
-    pdf.set_font("helvetica", "B", 16)
-    pdf.cell(0, 10, f"REPORTE BIOCORE: {user_data['Proyecto']}", ln=True, align="C")
-    pdf.ln(10)
-    
-    # Cuerpo
-    pdf.set_font("helvetica", "", 12)
-    pdf.cell(0, 10, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
-    pdf.cell(0, 10, f"Vigor Vegetal (SAVI): {indices['SAVI']:.2f}", ln=True)
-    pdf.cell(0, 10, f"Temperatura de Superficie: {indices['TEMP']:.1f}°C", ln=True)
-    
-    if indices["ETIQUETA_EXTRA"]:
-        pdf.cell(0, 10, f"{indices['ETIQUETA_EXTRA']}: {indices['EXTRA']:.2f}", ln=True)
-    
-    # Bloque Legal (Blindaje)
-    pdf.ln(20)
-    pdf.set_font("helvetica", "I", 8)
-    pdf.set_text_color(120, 120, 120)
-    legal = ("NOTA DE ALCANCE TÉCNICO: Este reporte ha sido generado mediante teledetección satelital. "
-             "La información es referencial y constituye un apoyo a la decisión. BioCore no se hace responsable "
-             "por interpretaciones o acciones de terceros. Se recomienda validación en terreno.")
-    pdf.multi_cell(0, 5, legal, align="C")
-    
-    return pdf.output(dest='S').encode('latin-1')
+        # SAVI (Vigor Vegetal)
+        savi = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {
+            'B8': s2.select('B8'), 'B4': s2.select('B4')
+        }).reduceRegion(ee.Reducer.mean(), area, 30).getInfo().get('B8', 0)
 
-# --- INTERFAZ PRINCIPAL ---
-st.title("🌿 BioCore Intelligence")
+        # LST (Temperatura Superficie)
+        temp = l8.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15)
+        lst = temp.reduceRegion(ee.Reducer.mean(), area, 30).getInfo().get('ST_B10', 0)
 
-# 1. Login (Simulado desde tu Sheets)
-with st.sidebar:
-    st.header("Acceso Clientes")
-    user_email = st.text_input("Email")
-    user_pass = st.text_input("Password", type="password")
-    # Aquí conectarías con tu Sheets ID: 1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU
+        res = {"SAVI": round(savi, 2), "TEMP": round(lst, 1), "EXTRA": 0, "ETIQUETA": ""}
 
-# 2. Lógica de Sesión (Ejemplo con datos cargados)
-if user_email: 
-    # Supongamos que recuperamos estos datos del Excel
-    user_data = {
-        "Proyecto": "Auditoría Pascua Lama",
-        "Tipo": "MINERIA",
-        "Coordenadas": [[-70.03,-29.31], [-70.01,-29.31], [-70.01,-29.33], [-70.03,-29.33]],
-        "Fecha_Inicio": "01/04/2026",
-        "Meses_Pagados": 1,
-        "Telegram_ID": "12345678"
-    }
-    
-    # Verificar Pago
-    estado = verificar_estado_pago(user_data["Fecha_Inicio"], user_data["Meses_Pagados"])
-    
-    if estado == "DEUDA":
-        st.error("⚠️ Suscripción Pendiente de Pago")
-        st.info(f"Su plan de {user_data['Proyecto']} requiere renovación para descargar nuevos reportes.")
-        btn_bloqueado = True
-    else:
-        st.success(f"Bienvenido a la consola de {user_data['Proyecto']}")
-        btn_bloqueado = False
-
-    # 3. Botón de Acción
-    if st.button("Ejecutar Escaneo Satelital", disabled=btn_bloqueado):
-        with st.spinner("Procesando datos de NASA y ESA..."):
-            res = analizar_indices(user_data["Coordenadas"], user_data["Tipo"])
-            st.metric("Vigor Vegetal", f"{res['SAVI']:.2f}")
-            st.metric("Temperatura", f"{res['TEMP']:.1f} °C")
+        # Lógica por tipo de proyecto
+        if tipo_proyecto == "MINERIA":
+            arcilla = s2.normalizedDifference(['B11', 'B12'])
+            res["EXTRA"] = round(arcilla.reduceRegion(ee.Reducer.mean(), area, 30).getInfo().get('nd', 0), 2)
+            res["ETIQUETA"] = "Índice de Arcillas"
+        elif tipo_proyecto == "HUMEDAL":
+            ndwi = s2.normalizedDifference(['B3', 'B8'])
+            res["EXTRA"] = round(ndwi.reduceRegion(ee.Reducer.mean(), area, 30).getInfo().get('nd', 0), 2)
+            res["ETIQUETA"] = "Índice de Agua (NDWI)"
             
-            pdf_bytes = crear_pdf(user_data, res)
-            st.download_button("📥 Descargar Reporte PDF", pdf_bytes, "Reporte_BioCore.pdf", "application/pdf")
+        return res
+    except Exception as e:
+        st.error(f"Error en procesamiento satelital: {e}")
+        return None
+
+# --- 3. INTERFAZ DE USUARIO ---
+
+st.set_page_config(page_title="BioCore Intelligence", page_icon="🌿")
+st.title("🌿 BioCore: Monitoreo Ambiental Pro")
+
+# Sidebar de Login
+with st.sidebar:
+    st.image("https://via.placeholder.com/150?text=BioCore+Logo") # Aquí puedes poner tu logo
+    email_input = st.text_input("Usuario (Email)")
+    pass_input = st.text_input("Contraseña", type="password")
+
+# Simulación de carga de datos desde tu Google Sheets
+# Nota: Aquí debes usar tu lógica de st.connection("gsheets", ...)
+# Por ahora simulamos que 'df' es tu tabla de Excel
+if email_input and pass_input:
+    # --- BUSCAR USUARIO ---
+    # df = tu_conexion_a_sheets() 
+    # (Simulación de fila encontrada)
+    user_found = True # Esto vendría de validar email/pass en el df
+    
+    if user_found:
+        # Extraemos datos de la fila (Asegúrate que los nombres coincidan con tu Excel)
+        u_data = {
+            "Proyecto": "Auditoría Pascua Lama", # Columna C
+            "Tipo": "MINERIA",                  # Columna G
+            "Coordenadas": "[[-70.03, -29.31], [-70.01, -29.31], [-70.01, -29.33], [-70.03, -29.33]]", # Columna E
+            "Fecha_Inicio": "01/01/2026",        # Columna H
+            "Meses_Pagados": 5                   # Columna I
+        }
+
+        # Validar Suscripción
+        esta_al_dia, fecha_vence = verificar_pago(u_data["Fecha_Inicio"], u_data["Meses_Pagados"])
+
+        if not esta_al_dia:
+            st.error(f"❌ SUSCRIPCIÓN VENCIDA (Expiró el {fecha_vence})")
+            st.warning("Por favor regularice su pago para acceder a los nuevos reportes.")
+        else:
+            st.success(f"✅ CONECTADO: {u_data['Proyecto']}")
+            st.info(f"Suscripción activa hasta: {fecha_vence}")
+
+            # --- ACCIONES PRINCIPALES ---
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🚀 Iniciar Escaneo Satelital"):
+                    with st.spinner("Analizando espectro electromagnético..."):
+                        resultados = procesar_satelite(u_data["Coordenadas"], u_data["Tipo"])
+                        if resultados:
+                            st.metric("Vigor Vegetal (SAVI)", resultados["SAVI"])
+                            st.metric("Temperatura Suelo", f"{resultados['TEMP']} °C")
+                            if resultados["ETIQUETA"]:
+                                st.metric(resultados["ETIQUETA"], resultados["EXTRA"])
+                            
+                            # Generación de PDF
+                            pdf = FPDF()
+                            pdf.add_page()
+                            pdf.set_font("Arial", "B", 16)
+                            pdf.cell(40, 10, f"Reporte BioCore - {u_data['Proyecto']}")
+                            pdf.ln(20)
+                            pdf.set_font("Arial", "", 12)
+                            pdf.cell(40, 10, f"SAVI: {resultados['SAVI']}")
+                            pdf.ln(10)
+                            pdf.set_font("Arial", "I", 8)
+                            pdf.multi_cell(0, 5, "\n\nDISCLAIMER: Este reporte es referencial. BioCore no se responsabiliza por decisiones de terceros.")
+                            
+                            pdf_output = pdf.output(dest='S').encode('latin-1')
+                            st.download_button("📥 Descargar Reporte PDF", pdf_output, "BioCore_Reporte.pdf")
+
+            with col2:
+                st.write("### Mapa de Área de Interés")
+                # Aquí iría tu código de folium para mostrar el polígono
+                st.map() # Mapa simplificado por ahora

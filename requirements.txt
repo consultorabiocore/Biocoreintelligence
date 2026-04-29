@@ -1,9 +1,10 @@
 streamlit
-earthengine-api
-gspread
-google-auth
 pandas
 matplotlib
 fpdf
-streamlit-folium
+gspread
+google-auth
+st-supabase-connection
 folium
+streamlit-folium
+requests

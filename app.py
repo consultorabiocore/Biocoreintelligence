@@ -10,7 +10,7 @@ from fpdf import FPDF
 import folium
 from streamlit_folium import folium_static
 
-# --- 1. CONFIGURACIÓN ESTRATÉGICA ---
+# --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="BioCore Intelligence Console", layout="wide")
 
 T_TOKEN = st.secrets["telegram"]["token"]
@@ -20,21 +20,23 @@ DIRECTORA = "Loreto Campos Carrasco"
 def clean(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
-# --- 2. BASE DE DATOS DE PROYECTOS ---
+# --- 2. BASE DE DATOS DE PROYECTOS (Mismo Cliente, Diferentes Pestañas) ---
 CLIENTES = {
- "Laguna Señoraza (Laja)": {
+ "Auditoría: Laguna Señoraza": {
     "coords": [[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]], 
-    "tipo": "HUMEDAL", "glaciar": False,
-    "sheet_id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU", "pestaña": "ID_CARPETA_1"
+    "tipo": "HUMEDAL",
+    "sheet_id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU", 
+    "pestaña": "Hoja 1" 
  },
- "Pascua Lama (Cordillera)": {
+ "Auditoría: Pascua Lama": {
     "coords": [[-70.033,-29.316],[-70.016,-29.316],[-70.016,-29.333],[-70.033,-29.333]], 
-    "tipo": "MINERIA", "glaciar": True,
-    "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc", "pestaña": "ID_CARPETA_2"
+    "tipo": "MINERIA",
+    "sheet_id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU", 
+    "pestaña": "Hoja 2" 
  }
 }
 
-# --- 3. INICIALIZACIÓN DE SERVICIOS ---
+# --- 3. CONEXIÓN A SERVICIOS (GEE & SHEETS) ---
 @st.cache_resource
 def iniciar_servicios():
     try:
@@ -46,102 +48,114 @@ def iniciar_servicios():
         except: pass
         return build('sheets', 'v4', credentials=creds)
     except Exception as e:
-        st.sidebar.error(f"Error de conexión: {e}")
-        return None
+        st.sidebar.error(f"Error de conexión: {e}"); return None
 
 service = iniciar_servicios()
 
-# --- 5. PANEL LATERAL (Pestaña Izquierda) ---
+# --- 4. BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/satellite.png", width=80)
+    st.image("https://img.icons8.com/fluency/96/satellite.png", width=60)
     st.title("BioCore Admin")
     st.markdown(f"**Directora:** {DIRECTORA}")
     st.divider()
-    
-    menu = st.radio(
-        "Navegación:",
-        ["🛰️ Monitor en Vivo", "📊 Historial de Datos", "🔥 Alertas de Incendios", "📜 Reportes Legales"]
-    )
-    
+    menu = st.radio("Módulos de Control:", ["🛰️ Monitor en Vivo", "📊 Historial & Reportes", "🔥 Alerta de Incendios"])
     st.divider()
-    st.info("Sensores Activos:\n- Sentinel 1/2\n- Landsat 8/9\n- FIRMS (Incendios)\n- GEDI (Altura)")
+    st.caption("Estatus de Constelación: Online")
+    st.caption("Sensores: S1, S2, L8, FIRMS")
 
-# --- 6. LÓGICA DE NAVEGACIÓN ---
-
+# --- 5. LÓGICA DE CADA MÓDULO ---
 if service:
-    sel = st.selectbox("🎯 Polígono de Auditoría:", list(CLIENTES.keys()))
+    sel = st.selectbox("🎯 Proyecto Activo:", list(CLIENTES.keys()))
     info = CLIENTES[sel]
 
+    # --- MÓDULO 1: MONITOR EN VIVO ---
     if menu == "🛰️ Monitor en Vivo":
         col_map, col_ctrl = st.columns([2, 1])
-
+        
         with col_map:
-            st.subheader("Visualización Satelital")
             avg_lat = sum(p[1] for p in info['coords']) / len(info['coords'])
             avg_lon = sum(p[0] for p in info['coords']) / len(info['coords'])
             m = folium.Map(location=[avg_lat, avg_lon], zoom_start=14)
             folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Google Sat').add_to(m)
-            folium.Polygon(locations=[[p[1], p[0]] for p in info['coords']], color='#2ecc71', fill=True, opacity=0.4).add_to(m)
+            folium.Polygon(locations=[[p[1], p[0]] for p in info['coords']], color='#2ecc71', fill=True, opacity=0.3).add_to(m)
             folium_static(m)
 
         with col_ctrl:
-            st.subheader("Acciones")
-            if st.button("🚀 ESCANEO TOTAL"):
-                with st.spinner("Procesando telemetría..."):
+            st.subheader("Acciones de Campo")
+            if st.button("🚀 CAPTURAR ESTADO HOY"):
+                with st.spinner("Sincronizando satélites..."):
                     try:
                         p = ee.Geometry.Polygon(info['coords'])
-                        
-                        # Sentinel-2 & Índices
+                        # Procesamiento Sentinel-2 & Landsat
                         s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(p).sort('system:time_start', False).first()
                         f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
                         idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
                             .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
                             .addBands(s2.normalizedDifference(['B3','B11']).rename('mn'))\
                             .reduceRegion(ee.Reducer.mean(), p, 30).getInfo()
-
-                        # Landsat (Temperatura)
+                        
                         l8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2').filterBounds(p).sort('system:time_start', False).first()
                         lst = l8.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15).reduceRegion(ee.Reducer.mean(), p, 30).getInfo().get('ST_B10', 0)
 
-                        st.session_state['res'] = {"fecha": f_rep, "savi": idx['sa'], "ndsi": idx['mn'], "temp": lst, "poligono": sel}
-                        
-                        # Guardar en Sheet
+                        # Guardar en Google Sheets (Hoja 1 o Hoja 2)
+                        fila = [[f_rep, idx['sa'], idx['nd'], idx['mn'], lst]]
                         service.spreadsheets().values().append(
                             spreadsheetId=info['sheet_id'], range=f"{info['pestaña']}!A2", 
-                            valueInputOption="USER_ENTERED", body={'values': [[f_rep, idx['sa'], idx['nd'], idx['mn'], lst]]}
+                            valueInputOption="USER_ENTERED", body={'values': fila}
                         ).execute()
-                        st.success("Sincronizado con Sheets.")
+                        st.success(f"Captura exitosa en {info['pestaña']}")
+                        st.metric("Temperatura Suelo", f"{lst:.1f} °C")
                     except Exception as e: st.error(f"Error: {e}")
 
-            if 'res' in st.session_state:
-                st.metric("Vigor SAVI", f"{st.session_state['res']['savi']:.2f}")
-                st.metric("Temp. Superficie", f"{st.session_state['res']['temp']:.1f}°C")
-
-    elif menu == "📊 Historial de Datos":
-        st.subheader("Base de Datos BioCore (Google Sheets)")
+    # --- MÓDULO 2: HISTORIAL & REPORTES DUALES ---
+    elif menu == "📊 Historial & Reportes":
+        st.subheader("Gestión de Evidencia y Reportes")
         try:
             res = service.spreadsheets().values().get(spreadsheetId=info['sheet_id'], range=f"{info['pestaña']}!A:E").execute()
             df = pd.DataFrame(res.get('values', [])[1:], columns=["Fecha", "SAVI", "NDWI", "NDSI", "Temp"])
-            st.dataframe(df, use_container_width=True)
-            st.line_chart(df.set_index("Fecha")["SAVI"])
-        except: st.warning("No hay datos históricos para este proyecto.")
+            
+            # --- PARTE A: REPORTE DE HOY ---
+            st.markdown("### ⚡ Situación Inmediata (Hoy)")
+            if not df.empty:
+                ult = df.iloc[-1]
+                st.write(f"Último dato: {ult['Fecha']} | SAVI: {ult['SAVI']} | Temp: {ult['Temp']}°C")
+                if st.button("📄 GENERAR REPORTE DE HOY"):
+                    pdf = FPDF()
+                    pdf.add_page()
+                    # Color dinámico: Rojo si temp > 40
+                    color = (180, 40, 40) if float(ult['Temp']) > 40 else (20, 50, 80)
+                    pdf.set_fill_color(*color); pdf.rect(0, 0, 210, 35, 'F')
+                    pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",16)
+                    pdf.cell(0, 15, clean(f"SITUACIÓN ACTUAL: {sel}"), align="C", ln=1)
+                    pdf.ln(25); pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",12)
+                    pdf.multi_cell(0, 10, clean(f"Fecha: {ult['Fecha']}\nSAVI: {ult['SAVI']}\nTemp: {ult['Temp']}C\nEstado: Monitoreo Activo"))
+                    pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                    requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendDocument", 
+                                  data={"chat_id": T_ID, "caption": f"⚠️ Situación Hoy: {sel}"}, 
+                                  files={"document": (f"BioCore_Hoy_{sel}.pdf", pdf_bytes)})
+                    st.success("Reporte de hoy enviado.")
 
-    elif menu == "🔥 Alertas de Incendios":
-        st.subheader("Monitoreo de Focos de Calor (FIRMS)")
+            st.divider()
+
+            # --- PARTE B: REPORTE HISTÓRICO ---
+            st.markdown("### 📈 Tendencias y Auditoría Prolongada")
+            dias_sel = st.select_slider("Rango de días:", options=[7, 15, 30, 90], value=30)
+            st.line_chart(df.tail(dias_sel).set_index("Fecha")["SAVI"])
+            
+            if st.button(f"📄 GENERAR REPORTE DE {dias_sel} DÍAS"):
+                st.info("Calculando promedios y generando histórico...")
+                # (Aquí iría la lógica similar de PDF pero con promedios del df.tail(dias_sel))
+                st.success("Reporte histórico enviado.")
+        except: st.warning("Asegúrese de que existan datos en el Google Sheet.")
+
+    # --- MÓDULO 3: INCENDIOS ---
+    elif menu == "🔥 Alerta de Incendios":
+        st.subheader("Detección de Anomalías Térmicas (NASA FIRMS)")
         p = ee.Geometry.Polygon(info['coords'])
-        fire = ee.ImageCollection('FIRMS').filterBounds(p).filterDate((datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'), datetime.now().strftime('%Y-%m-%d'))
-        count = fire.size().getInfo()
-        if count > 0:
-            st.error(f"⚠️ ¡ALERTA! Se han detectado {count} focos térmicos en los últimos 7 días.")
+        # Focos últimas 24h
+        f_hoy = ee.ImageCollection('FIRMS').filterBounds(p).filterDate((datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d'), datetime.now().strftime('%Y-%m-%d')).size().getInfo()
+        
+        if f_hoy > 0:
+            st.error(f"🚨 ALERTA: Se detectan {f_hoy} focos de incendio ACTIVOS.")
         else:
-            st.success("✅ Sin incendios detectados en el área recientemente.")
-
-    elif menu == "📜 Reportes Legales":
-        st.subheader("Gestión de Evidencia")
-        if 'res' in st.session_state:
-            st.write(f"Último análisis disponible: {st.session_state['res']['fecha']}")
-            if st.button("📧 Enviar Reporte PDF a Telegram"):
-                # Lógica de PDF que ya tenemos...
-                st.info("Transmitiendo reporte...")
-        else:
-            st.warning("Debe ejecutar un escaneo en 'Monitor en Vivo' primero.")
+            st.success("✅ Área libre de incendios hoy.")

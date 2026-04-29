@@ -7,8 +7,10 @@ from google.oauth2.service_account import Credentials
 import folium
 from streamlit_folium import folium_static
 
-# --- 1. CONEXIÓN A BASE DE DATOS (SUPABASE) ---
-# Usamos el conector oficial para asegurar persistencia
+# --- 1. CONEXIÓN Y LIMPIEZA DE CACHÉ ---
+# Forzamos la limpieza para evitar errores de conexión persistentes
+st.cache_resource.clear()
+
 try:
     st_supabase = st.connection(
         "supabase",
@@ -17,29 +19,30 @@ try:
         key=st.secrets["connections"]["supabase"]["key"]
     )
 except Exception as e:
-    st.error("Error de conexión con la base de datos. Verifica los Secrets.")
+    st.error("❌ Error de conexión con Supabase. Revisa la URL y Key en Secrets.")
     st.stop()
 
-# --- 2. CONFIGURACIÓN DE INTERFAZ ---
-st.set_page_config(page_title="BioCore Intelligence | SEIA", layout="wide")
+# --- 2. CONFIGURACIÓN VISUAL ---
+st.set_page_config(page_title="BioCore Intelligence | Auditoría Profesional", layout="wide")
 
 st.markdown("""
     <style>
-    .main { background-color: #f4f7f9; }
-    .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .sidebar .sidebar-content { background-color: #1a3a5a; }
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: white; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #1a3a5a; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES LÓGICAS ---
+# --- 3. FUNCIONES CORE ---
 def enviar_telegram(mensaje, chat_id):
     try:
         token = st.secrets["telegram"]["token"]
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(url, json={"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"}, timeout=10)
-    except: pass
+    except:
+        st.warning("No se pudo enviar la alerta a Telegram.")
 
-def cargar_datos_google(sheet_id, pestana):
+def cargar_google_sheets(sheet_id, pestana):
     try:
         creds_info = json.loads(st.secrets["gee"]["json"])
         creds = Credentials.from_service_account_info(creds_info, scopes=[
@@ -47,26 +50,29 @@ def cargar_datos_google(sheet_id, pestana):
             "https://www.googleapis.com/auth/drive"
         ])
         client = gspread.authorize(creds)
-        # Limpiador de ID de Google Sheets
+        
+        # Limpiar ID de la URL si es necesario
         sid = sheet_id.split("/d/")[1].split("/")[0] if "/d/" in sheet_id else sheet_id
+        
         sh = client.open_by_key(sid)
         df = pd.DataFrame(sh.worksheet(pestana).get_all_records())
         df.columns = [c.strip().upper() for c in df.columns]
+        
         if 'FECHA' in df.columns:
             df['FECHA'] = pd.to_datetime(df['FECHA'], dayfirst=True)
         return df
     except Exception as e:
-        st.error(f"Error de acceso a datos: {e}")
+        st.error(f"Error accediendo a Google Sheets: {e}")
         return pd.DataFrame()
 
 # --- 4. NAVEGACIÓN ---
-menu = st.sidebar.radio("MENÚ PRINCIPAL", ["🛡️ Auditoría Ambiental", "⚙️ Gestión de Clientes"])
+menu = st.sidebar.radio("SISTEMA DE VIGILANCIA", ["🛡️ Auditoría", "⚙️ Gestión de Clientes"])
 
-# --- VISTA: AUDITORÍA ---
-if menu == "🛡️ Auditoría Ambiental":
-    st.title("🛡️ Dashboard de Vigilancia de Alto Nivel")
+# --- VISTA 1: AUDITORÍA ---
+if menu == "🛡️ Auditoría":
+    st.title("🛡️ Dashboard de Vigilancia Ambiental")
     
-    # Consulta a Supabase para obtener la lista de clientes
+    # Recuperar datos de Supabase
     res = st_supabase.table("proyectos").select("*").execute()
     proyectos = res.data
     
@@ -75,70 +81,67 @@ if menu == "🛡️ Auditoría Ambiental":
         seleccion = st.selectbox("Seleccione Unidad de Monitoreo:", nombres)
         info = next(p for p in proyectos if p['nombre'] == seleccion)
         
-        col_info, col_map = st.columns([1, 1.2])
+        col1, col2 = st.columns([1, 1.2])
         
-        with col_info:
-            st.subheader(f"Ecosistema: {info['tipo']}")
-            if st.button("🚀 INICIAR AUDITORÍA SATELITAL"):
-                with st.spinner("Procesando índices..."):
-                    df = cargar_datos_google(info['sheet_id'], info['pestana'])
+        with col1:
+            st.info(f"**Cliente:** {info['nombre']} | **Tipo:** {info['tipo']}")
+            if st.button("🚀 INICIAR MONITOREO"):
+                with st.spinner("Conectando con satélites..."):
+                    df = cargar_google_sheets(info['sheet_id'], info['pestana'])
                     if not df.empty:
                         idx = "NDSI" if info['tipo'] == "MINERIA" else "NDWI"
-                        val_actual = df[idx].iloc[-1]
+                        val_act = df[idx].iloc[-1]
                         promedio = df[idx].mean()
                         
-                        # Alerta
-                        estado = "🟢 ESTABLE" if val_actual >= info['umbral'] else "🔴 ALERTA"
-                        msg = f"🛰 **BIOCORE INFORME: {info['nombre']}**\nIndicador {idx}: `{val_actual:.3f}`\nEstado: {estado}"
+                        # Lógica de Alerta
+                        estado = "🟢 ESTABLE" if val_act >= info['umbral'] else "🔴 ALERTA"
+                        msg = f"🛰 **BIOCORE INFORME: {info['nombre']}**\nIndicador {idx}: `{val_act:.3f}`\nEstado: {estado}"
                         enviar_telegram(msg, info['telegram_id'])
                         
-                        # Dashboard Visual
-                        st.metric(f"Último {idx}", f"{val_actual:.3f}", f"{((val_actual-promedio)/promedio)*100:+.2f}% vs Media")
+                        # Métricas
+                        st.metric(f"Índice {idx}", f"{val_act:.3f}", f"{((val_act-promedio)/promedio)*100:+.1f}%")
                         st.line_chart(df.set_index('FECHA')[[idx, 'SAVI']])
-                        st.success("Auditoría completada y reportada a Telegram.")
+                        st.success("Auditoría enviada con éxito.")
         
-        with col_map:
-            st.subheader("Ubicación del Polígono")
+        with col2:
             if info['coordenadas']:
+                st.subheader("Mapa de Área Protegida")
                 m = folium.Map(location=info['coordenadas'][0], zoom_start=13)
                 folium.Polygon(locations=info['coordenadas'], color="#1a3a5a", fill=True, fill_opacity=0.4).add_to(m)
                 folium_static(m)
     else:
-        st.info("No hay proyectos registrados. Vaya a la pestaña de Gestión.")
+        st.warning("Base de datos vacía. Registre un cliente en 'Gestión'.")
 
-# --- VISTA: GESTIÓN ---
+# --- VISTA 2: GESTIÓN ---
 else:
-    st.title("⚙️ Registro de Clientes y Proyectos")
-    st.markdown("Añada nuevos polígonos de vigilancia directamente a la base de datos SQL.")
-    
+    st.title("⚙️ Registro de Unidades BioCore")
     with st.form("registro_supabase", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            n = st.text_input("Nombre del Proyecto / Empresa")
-            t = st.selectbox("Tipo de Ecosistema", ["MINERIA", "HUMEDAL"])
-            sid = st.text_input("ID Google Sheet")
-        with col2:
-            tid = st.text_input("Chat ID Telegram (Notificación)")
-            pes = st.text_input("Nombre de la Pestaña", value="Hoja 1")
-            umb = st.number_input("Umbral Crítico de Índice", value=0.35 if t=="MINERIA" else 0.10)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            n = st.text_input("Nombre del Proyecto")
+            t = st.selectbox("Ecosistema", ["MINERIA", "HUMEDAL"])
+            sid = st.text_input("ID Planilla Google")
+        with col_b:
+            tid = st.text_input("Telegram ID Cliente")
+            pes = st.text_input("Pestaña Sheet", value="Hoja 1")
+            umb = st.number_input("Umbral de Alerta", value=0.35 if t=="MINERIA" else 0.10)
         
-        cor = st.text_area("Coordenadas del Polígono (Lat, Lon)")
+        cor = st.text_area("Coordenadas (Lat, Lon)")
         
-        if st.form_submit_button("💾 Guardar en Base de Datos"):
-            # Procesamiento de coordenadas
+        if st.form_submit_button("💾 Guardar en Supabase"):
             nums = re.findall(r"[-+]?\d*\.\d+|[-+]?\d+", cor)
-            lista_coords = [[float(nums[i]), float(nums[i+1])] for i in range(0, len(nums), 2) if i+1 < len(nums)]
+            coords = [[float(nums[i]), float(nums[i+1])] for i in range(0, len(nums), 2) if i+1 < len(nums)]
             
-            if n and lista_coords:
+            if n and coords:
                 try:
                     st_supabase.table("proyectos").insert({
                         "nombre": n, "tipo": t, "telegram_id": tid, 
-                        "sheet_id": sid, "pestana": pes, "umbral": umb, 
-                        "coordenadas": lista_coords
+                        "sheet_id": sid, "pestana": pes, 
+                        "coordenadas": coords, "umbral": umb
                     }).execute()
-                    st.success(f"Proyecto {n} guardado exitosamente en Supabase.")
+                    st.success(f"✅ Proyecto {n} registrado permanentemente.")
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Error al guardar: {e}")
+                    st.error(f"Error SQL: {e}")
             else:
-                st.warning("Asegúrese de ingresar el nombre y las coordenadas correctamente.")
+                st.error("Faltan datos obligatorios.")

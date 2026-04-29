@@ -8,136 +8,180 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 from st_supabase_connection import SupabaseConnection
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN E INTERFAZ ---
 st.set_page_config(page_title="BioCore Audit System", layout="wide")
 st.cache_resource.clear()
 
+# Conexión a Base de Datos (Supabase)
 try:
     s_url = st.secrets["connections"]["supabase"]["url"].strip()
     s_key = st.secrets["connections"]["supabase"]["key"].strip()
     st_supabase = st.connection("supabase", type=SupabaseConnection, url=s_url, key=s_key)
 except:
-    st.error("Error de conexión a Base de Datos.")
+    st.error("Error crítico: No se pudo conectar a la base de datos de gestión.")
     st.stop()
 
-# --- 2. FUNCIONES TÉCNICAS ---
-def enviar_pdf_telegram(pdf_bytes, filename, chat_id):
+# --- 2. FUNCIONES DE COMUNICACIÓN (Telegram) ---
+def enviar_a_telegram(pdf_bytes, filename, chat_id):
     try:
         token = st.secrets["telegram"]["token"].strip()
+        # Limpieza de seguridad para el ID
+        cid = str(chat_id).strip().replace(" ", "")
         url = f"https://api.telegram.org/bot{token}/sendDocument"
-        # Limpieza absoluta del ID para evitar errores de formato
-        clean_chat_id = str(chat_id).replace(" ", "").strip()
         
         files = {'document': (filename, pdf_bytes, 'application/pdf')}
-        data = {'chat_id': clean_chat_id, 'caption': f"📊 Reporte de Auditoría: {datetime.now().strftime('%d/%m/%Y')}"}
+        data = {'chat_id': cid, 'caption': f"📊 Reporte de Auditoría: {filename}\nFecha: {datetime.now().strftime('%d/%m/%Y')}"}
         
         r = requests.post(url, data=data, files=files, timeout=30)
-        if r.status_code == 200:
-            return True
-        else:
-            st.error(f"Error Telegram ({r.status_code}): {r.text}")
-            return False
-    except Exception as e:
-        st.error(f"Error de red: {e}")
+        return r.status_code == 200
+    except:
         return False
 
+# --- 3. PROCESAMIENTO DE DATOS (Google Sheets) ---
 def obtener_datos(sheet_id, pestaña):
     try:
-        creds_info = json.loads(st.secrets["gee"]["json"])
-        creds = Credentials.from_service_account_info(creds_info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-        client = gspread.authorize(creds)
+        creds_dict = json.loads(st.secrets["gee"]["json"]) # Usamos tu secreto gee
+        SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
+        client = gspread.authorize(CREDS)
+        
+        # Limpiamos el ID por si viene la URL completa
         sid = sheet_id.split("/d/")[1].split("/")[0] if "/d/" in sheet_id else sheet_id
         hoja = client.open_by_key(sid).worksheet(pestaña)
+        
         df = pd.DataFrame(hoja.get_all_records())
         df.columns = [c.strip() for c in df.columns]
+        
         if 'Fecha' in df.columns:
             df['Fecha'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce')
             df = df.dropna(subset=['Fecha']).sort_values('Fecha')
-        cols = [c for c in ["SAVI", "NDWI", "NDSI", "Deficit"] if c in df.columns]
-        for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce').interpolate().fillna(0)
-        return df, cols
-    except: return pd.DataFrame(), []
+        
+        # Columnas técnicas de BioCore
+        cols_tecnicas = ["SAVI", "NDWI", "NDSI", "SWIR", "Arcillas", "Deficit"]
+        presentes = [c for c in cols_tecnicas if c in df.columns]
+        
+        for c in presentes:
+            df[c] = pd.to_numeric(df[c], errors='coerce').interpolate().fillna(0)
+            
+        return df, presentes
+    except Exception as e:
+        st.error(f"Error leyendo la planilla: {e}")
+        return pd.DataFrame(), []
 
+# --- 4. MOTOR DE GRÁFICOS ---
+def crear_grafico_png(df, columnas):
+    fig, axs = plt.subplots(len(columnas), 1, figsize=(10, 3 * len(columnas)))
+    if len(columnas) == 1: axs = [axs]
+    
+    colores = {"SAVI": "#143654", "NDWI": "#2E7D32", "NDSI": "#C62828", "Deficit": "#555555"}
+    
+    for i, col in enumerate(columnas):
+        axs[i].plot(df['Fecha'], df[col], marker='.', color=colores.get(col, "black"), linewidth=1)
+        axs[i].set_title(f"MONITOREO: {col}", fontsize=10, fontweight='bold', loc='left')
+        axs[i].grid(True, linestyle=':', alpha=0.5)
+    
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=150)
+    buf.seek(0)
+    return buf
+
+# --- 5. REPORTE PDF PROFESIONAL ---
 class BioCorePDF(FPDF):
     def header(self):
-        self.set_fill_color(24, 54, 84) 
+        self.set_fill_color(24, 54, 84) # Azul Marino BioCore
         self.rect(0, 0, 210, 35, 'F')
         self.set_text_color(255, 255, 255)
         self.set_font("Arial", 'B', 14)
         self.cell(0, 15, "AUDITORÍA DE CUMPLIMIENTO AMBIENTAL", 0, 1, 'C')
         self.set_font("Arial", 'I', 9)
-        self.cell(0, 5, "Responsable Técnica: Loreto Campos | BioCore Intelligence", 0, 1, 'C')
+        self.cell(0, 5, "Responsable Técnica: Loreto Campos Carrasco | BioCore Intelligence", 0, 1, 'C')
 
-def generar_pdf_bytes(df, proyecto, columnas, umbral):
+def generar_pdf_reporte(df, proyecto, columnas, umbral):
+    # Usamos el primer índice disponible para la alerta
+    val_ref = df[columnas[0]].iloc[-1] if columnas else 0
+    es_alerta = val_ref < umbral
+    
     pdf = BioCorePDF()
     pdf.add_page()
     pdf.ln(25)
-    val_ref = df[columnas[0]].iloc[-1] if columnas else 0
-    alerta = val_ref < umbral
     
-    pdf.set_fill_color(200, 0, 0) if alerta else pdf.set_fill_color(0, 100, 0)
+    status_txt = "ALERTA TÉCNICA: DESVIACIÓN DETECTADA" if es_alerta else "NORMAL / CUMPLIMIENTO"
+    pdf.set_fill_color(200, 0, 0) if es_alerta else pdf.set_fill_color(0, 100, 0)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, f"  ESTATUS: {'ALERTA' if alerta else 'NORMAL'}", 0, 1, 'L', True)
+    pdf.cell(0, 10, f"  ESTATUS: {status_txt}", 0, 1, 'L', True)
     
     pdf.ln(5)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 10, f"PROYECTO: {proyecto}", 0, 1)
+    pdf.cell(0, 10, f"DIAGNÓSTICO PROYECTO: {proyecto}", 0, 1)
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 7, f"Hallazgo: El índice {columnas[0]} registra {val_ref:.4f}. Umbral: {umbral}.", border=1)
     
-    # Gráfico temporal
-    plt.figure(figsize=(10, 4))
-    plt.plot(df['Fecha'], df[columnas[0]], color='#143654', marker='o')
-    plt.grid(True, alpha=0.2)
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=120)
-    buf.seek(0)
-    with open("temp_audit.png", "wb") as f: f.write(buf.getbuffer())
-    
+    pdf.multi_cell(0, 7, f"1. HALLAZGO: El valor de {columnas[0]} es {val_ref:.4f}. Umbral: {umbral}.", border=1)
+    pdf.multi_cell(0, 7, "2. RIESGO: Posible alteración de parámetros ambientales según RCA.", border=1)
+
+    # Gráficos en página 2
     pdf.add_page()
     pdf.ln(20)
+    grafico_buf = crear_grafico_png(df, columnas)
+    with open("temp_audit.png", "wb") as f:
+        f.write(grafico_buf.getbuffer())
     pdf.image("temp_audit.png", x=15, w=180)
+    
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 3. INTERFAZ ---
-st.title("🛡️ BioCore Intelligence | Auditoría v2.0")
+# --- 6. INTERFAZ PRINCIPAL ---
+st.title("🛡️ BioCore Intelligence | Sistema de Auditoría")
 
-res = st_supabase.table("proyectos").select("*").execute()
-db_proyectos = res.data
+# Traer proyectos desde Supabase
+try:
+    res = st_supabase.table("proyectos").select("*").execute()
+    proyectos_db = res.data
+except:
+    proyectos_db = []
 
-if db_proyectos:
-    nombres = [p['nombre'] for p in db_proyectos]
+if proyectos_db:
+    nombres = [p['nombre'] for p in proyectos_db]
     sel = st.selectbox("Seleccione Proyecto:", nombres)
-    p_info = next(p for p in db_proyectos if p['nombre'] == sel)
+    p_info = next(p for p in proyectos_db if p['nombre'] == sel)
 
-    c_rev, c_env = st.columns(2)
-    
-    with c_rev:
-        if st.button("📄 1. GENERAR REPORTE"):
-            with st.spinner("Leyendo datos..."):
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Paso 1: Generar")
+        if st.button("🚀 EJECUTAR AUDITORÍA"):
+            with st.spinner("Procesando datos técnicos..."):
                 df_data, cols_data = obtener_datos(p_info["sheet_id"], p_info["pestana"])
+                
                 if not df_data.empty:
-                    pdf_bytes = generar_pdf_bytes(df_data, sel, cols_data, p_info["umbral"])
-                    st.session_state['pdf_actual'] = pdf_bytes
-                    st.session_state['nombre_actual'] = f"Audit_{sel}.pdf"
+                    pdf_bytes = generar_pdf_reporte(df_data, sel, cols_data, p_info["umbral"])
+                    st.session_state['pdf_bytes'] = pdf_bytes
+                    st.session_state['pdf_name'] = f"Auditoria_{sel}.pdf"
                     
-                    # Descarga forzada
+                    # Mostrar vista previa
+                    st.image(crear_grafico_png(df_data, cols_data))
+                    
+                    # Botón de Descarga
                     b64 = base64.b64encode(pdf_bytes).decode()
-                    href = f'<a href="data:application/pdf;base64,{b64}" download="{st.session_state["nombre_actual"]}" style="display:block; text-align:center; padding:12px; background:#1a3a5a; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">⬇️ DESCARGAR PARA REVISAR</a>'
+                    href = f'<a href="data:application/pdf;base64,{b64}" download="{st.session_state["pdf_name"]}" style="display:block; text-align:center; padding:15px; background-color:#183654; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">📄 DESCARGAR PARA REVISIÓN</a>'
                     st.markdown(href, unsafe_allow_html=True)
                 else:
-                    st.error("Error en Google Sheets.")
+                    st.error("No se encontraron datos en el Excel.")
 
-    with c_env:
-        if 'pdf_actual' in st.session_state:
-            st.info(f"Listo para enviar a ID: {p_info['telegram_id']}")
-            if st.button("🚀 2. ENVIAR A CLIENTE"):
-                if enviar_pdf_telegram(st.session_state['pdf_actual'], st.session_state['nombre_actual'], p_info["telegram_id"]):
-                    st.success("✅ ¡Reporte enviado!")
+    with col2:
+        st.subheader("Paso 2: Enviar")
+        if 'pdf_bytes' in st.session_state:
+            st.info(f"Reporte listo para ID: {p_info['telegram_id']}")
+            if st.button("📤 ENVIAR A TELEGRAM"):
+                exito = enviar_a_telegram(st.session_state['pdf_bytes'], st.session_state['pdf_name'], p_info["telegram_id"])
+                if exito:
+                    st.success("✅ ¡Informe enviado con éxito!")
                     st.balloons()
                 else:
-                    st.error("Error en envío. Revisa el ID y que el bot esté iniciado.")
+                    st.error("Error al enviar. Revisa el ID de Telegram.")
+        else:
+            st.write("Primero ejecuta la auditoría.")
+
 else:
-    st.info("Registra un proyecto en Gestión.")
+    st.warning("No hay proyectos registrados. Ve a la pestaña de Gestión.")

@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import pd
 import json
 import ee
 import requests
@@ -36,11 +36,10 @@ def init_gee():
     except Exception as e:
         st.error(f"Error GEE: {e}"); return False
 
-# --- 3. MOTORES DE CÁLCULO (MULTIMODAL & HISTÓRICO PROTEGIDO) ---
+# --- 3. MOTORES DE CÁLCULO ---
 def escanear_multimodal(coords_str):
     roi = ee.Geometry.Polygon(json.loads(coords_str))
     
-    # Captura de sensores con sort para asegurar la más reciente
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(roi).sort('system:time_start', False).first()
     s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(roi).filter(ee.Filter.eq('instrumentMode', 'IW')).sort('system:time_start', False).first()
     clima = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(roi).sort('system:time_start', False).first()
@@ -67,28 +66,25 @@ def obtener_historia_20_anos(coords_str):
         ahora = datetime.now().year
         años = ee.List.sequence(ahora - 20, ahora)
         
-        # Fusión Landsat 5, 7 y 8 para cubrir 2 décadas
-        l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(roi)
-        l7 = ee.ImageCollection("LANDSAT/LE07/C02/T1_L2").filterBounds(roi)
-        fusion = l8.merge(l7)
+        fusion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
 
         def calc_anual(a):
             f = ee.Date.fromYMD(a, 1, 1)
-            img = fusion.filterDate(f, f.advance(1, 'year')).median()
+            img = fusion.filterBounds(roi).filterDate(f, f.advance(1, 'year')).median()
             
-            # Protección contra imágenes vacías (evita error 'constant')
-            tiene_bandas = img.bandNames().size().gt(0)
+            bandas = img.bandNames()
+            tiene_bandas = bandas.contains('SR_B5').And(bandas.contains('SR_B4'))
             
-            savi = ee.Algorithms.If(tiene_bandas,
+            # Corrección: No usar defaultEmpty, usar casting directo o fallback
+            savi = ee.Image(ee.Algorithms.If(tiene_bandas,
                 img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {
-                    'B5': img.select(['SR_B5'], ['B5']).defaultEmpty(), 
-                    'B4': img.select(['SR_B4'], ['B4']).defaultEmpty()
+                    'B5': img.select('SR_B5'), 
+                    'B4': img.select('SR_B4')
                 }),
                 ee.Image(0).rename('constant')
-            )
+            ))
             
-            stats = ee.Image(savi).reduceRegion(ee.Reducer.mean(), roi, 100)
-            val = stats.get('constant')
+            val = savi.reduceRegion(ee.Reducer.mean(), roi, 100).get('constant')
             return ee.Feature(None, {'año': ee.Number(a).format('%d'), 'savi': ee.Algorithms.If(val, val, 0)})
 
         fc = ee.FeatureCollection(años.map(calc_anual)).getInfo()
@@ -96,7 +92,7 @@ def obtener_historia_20_anos(coords_str):
     except Exception as e:
         st.error(f"Error histórico: {e}"); return pd.DataFrame()
 
-# --- 4. INTERFAZ DE ACCESO ---
+# --- 4. INTERFAZ DE ACCESO (SUPABASE) ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 
 with st.sidebar:
@@ -111,24 +107,24 @@ with st.sidebar:
                 st.session_state.auth, st.session_state.user = True, res.data[0]
                 st.rerun()
     else:
-        st.success(f"Conectado: {st.session_state.user['Proyecto']}")
+        st.success(f"Proyecto: {st.session_state.user['Proyecto']}")
         menu = st.radio("Módulos:", ["🛰️ Monitor Pro", "📊 Auditoría 20 Años", "🔥 Riesgo Incendio"])
         if st.button("Cerrar Sesión"): st.session_state.auth = False; st.rerun()
 
-# --- 5. PANELES DE CONTROL ---
+# --- 5. PANEL DE CONTROL (USANDO TUS COORDENADAS DE BD) ---
 if st.session_state.auth:
     u = st.session_state.user
-    # Laguna Señoraza por defecto
-    coords_act = u.get('Coordenadas', '[[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]]')
+    # Se eliminó la laguna. Ahora toma las coordenadas directamente de tu usuario en Supabase.
+    coords_act = u['Coordenadas']
     fecha_hoy = datetime.now().strftime('%d/%m/%Y')
 
     if menu == "🛰️ Monitor Pro":
-        st.subheader(f"Proyecto: {u['Proyecto']}")
+        st.subheader(f"Auditoría Activa: {u['Proyecto']}")
         col1, col2 = st.columns([2, 1])
         
         with col1:
             c = json.loads(coords_act)
-            m = folium.Map(location=[c[0][1], c[0][0]], zoom_start=15)
+            m = folium.Map(location=[c[0][1], c[0][0]], zoom_start=14)
             folium.TileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', attr='Google', name='Sat').add_to(m)
             folium.Polygon(locations=[[p[1], p[0]] for p in c], color='#2ecc71', fill=True, opacity=0.3).add_to(m)
             folium_static(m)
@@ -136,14 +132,13 @@ if st.session_state.auth:
         with col2:
             if st.button("🚀 INICIAR ESCANEO BIOCORE"):
                 if init_gee():
-                    with st.spinner("Escaneando Laguna Señoraza..."):
+                    with st.spinner("Procesando datos satelitales..."):
                         data = escanear_multimodal(coords_act)
-                        
                         st.metric("Vigor (SAVI)", data['SAVI'])
-                        st.metric("Lluvia (Mes)", f"{data['Precip']} mm")
+                        st.metric("Precipitación", f"{data['Precip']} mm")
                         st.metric("Radar VV", data['Radar'])
                         
-                        # A. ENVÍO DE MENSAJE DE TEXTO A TELEGRAM
+                        # Mensaje directo a Telegram
                         msg = (f"📊 *REPORTE BIOCORE PRO*\n"
                                f"📍 *Proyecto:* {u['Proyecto']}\n"
                                f"📅 *Fecha:* {fecha_hoy}\n\n"
@@ -158,20 +153,19 @@ if st.session_state.auth:
                             st.success("✅ Reporte enviado a Telegram.")
                         except: st.warning("⚠️ Falló envío de mensaje.")
 
-                        # B. GENERACIÓN DE PDF PARA DESCARGA
+                        # Generación de PDF para descarga local
                         pdf = FPDF()
                         pdf.add_page(); pdf.set_font("helvetica", "B", 16)
-                        pdf.cell(0, 10, clean(f"REPORTE OFICIAL: {u['Proyecto']}"), ln=1)
+                        pdf.cell(0, 10, clean(f"INFORME BIOCORE: {u['Proyecto']}"), ln=1)
                         pdf.set_font("helvetica", "", 12)
                         pdf.multi_cell(0, 10, clean(f"Fecha: {fecha_hoy}\nSAVI: {data['SAVI']}\nLluvia: {data['Precip']}mm\nRadar: {data['Radar']}"))
                         
                         pdf_out = pdf.output(dest='S')
                         pdf_bytes = bytes(pdf_out) if not isinstance(pdf_out, str) else pdf_out.encode('latin-1')
-                        
                         st.download_button("📥 Descargar Reporte PDF", pdf_bytes, f"BioCore_{u['Proyecto']}.pdf")
 
     elif menu == "📊 Auditoría 20 Años":
-        st.subheader("Historial Interanual (Landsat)")
+        st.subheader(f"Historial Interanual: {u['Proyecto']}")
         if st.button("🔍 Cargar Cronología"):
             if init_gee():
                 with st.spinner("Procesando 20 años de datos..."):
@@ -181,12 +175,12 @@ if st.session_state.auth:
                         st.dataframe(df)
 
     elif menu == "🔥 Riesgo Incendio":
-        st.subheader("Focos Activos (NASA FIRMS)")
+        st.subheader("Detección de Focos (NASA FIRMS)")
         if init_gee():
             p = ee.Geometry.Polygon(json.loads(coords_act))
             f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
                 (datetime.now()-relativedelta(days=1)).strftime('%Y-%m-%d'), 
                 datetime.now().strftime('%Y-%m-%d')
             ).size().getInfo()
-            if f > 0: st.error(f"🚨 Alerta: {f} anomalías térmicas."); st.toast("RIESGO")
-            else: st.success("✅ Área segura.")
+            if f > 0: st.error(f"🚨 Alerta: {f} focos detectados."); st.toast("RIESGO")
+            else: st.success("✅ Sin anomalías térmicas en el área.")

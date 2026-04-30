@@ -28,16 +28,27 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. INICIALIZACIÓN DE SERVICIOS (GEE & SHEETS) ---
-    try:
-        if not ee.data._credentials:
-            creds_info = json.loads(st.secrets["gee"]["json"])
-            creds = service_account.Credentials.from_service_account_info(creds_info, 
-                    scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/earthengine'])
-            ee.Initialize(creds)
-            sheets = build('sheets', 'v4', credentials=creds)
-    except Exception as e:
-        st.error(f"Error de conexión crítica: {e}")
+    # --- 2. INICIALIZACIÓN DE SERVICIOS (CORREGIDA) ---
+try:
+    if not ee.data.get_info_all(): # Cambiamos la forma de chequear si está iniciado
+        creds_info = json.loads(st.secrets["gee"]["json"])
+        
+        # Nueva forma de configurar credenciales de cuenta de servicio
+        credentials = ee.ServiceAccountCredentials(
+            creds_info['client_email'], 
+            key_data=creds_info['private_key']
+        )
+        ee.Initialize(credentials)
+        
+        # Para Google Sheets seguimos usando el método de service_account
+        from google.oauth2 import service_account
+        scopes = ['https://www.googleapis.com/auth/spreadsheets']
+        sheets_creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
+        sheets = build('sheets', 'v4', credentials=sheets_creds)
+except Exception as e:
+    # Si ya está inicializado, no hacemos nada, si es otro error lo mostramos
+    if "not initialized" in str(e).lower() or "credentials" in str(e).lower():
+        st.error(f"Error de conexión técnica: {e}")
 
     # --- 3. DICCIONARIO DE PROYECTOS MULTIMODAL ---
     CLIENTES = {

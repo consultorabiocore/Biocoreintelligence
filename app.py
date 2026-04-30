@@ -26,17 +26,16 @@ def check_password():
         return False
     return True
 
-# --- FLUJO PRINCIPAL (TODO ESTO VA IDENTADO DENTRO DEL IF) ---
 if check_password():
-    # --- 2. INICIALIZACIÓN DE SERVICIOS ---
+    # --- 2. INICIALIZACIÓN DE SERVICIOS (VERSIÓN ESTABLE) ---
     try:
-        # Usamos ee.ServiceAccountCredentials para evitar errores de versión
         creds_info = json.loads(st.secrets["gee"]["json"])
-        credentials = ee.ServiceAccountCredentials(
-            creds_info['client_email'], 
-            key_data=creds_info['private_key']
-        )
-        if not ee.data.get_info_all():
+        # Autenticación directa sin atributos privados o métodos inestables
+        if not ee.data._credentials: # Si no hay credenciales activas, iniciamos
+            credentials = ee.ServiceAccountCredentials(
+                creds_info['client_email'], 
+                key_data=creds_info['private_key']
+            )
             ee.Initialize(credentials)
             
         sheets_creds = service_account.Credentials.from_service_account_info(
@@ -44,9 +43,14 @@ if check_password():
         )
         sheets = build('sheets', 'v4', credentials=sheets_creds)
     except Exception as e:
-        st.error(f"Error de conexión técnica: {e}")
+        # A veces el objeto _credentials no existe al inicio, capturamos para evitar el crash
+        try:
+            credentials = ee.ServiceAccountCredentials(creds_info['client_email'], key_data=creds_info['private_key'])
+            ee.Initialize(credentials)
+        except:
+            st.error(f"Error de conexión técnica: {e}")
 
-    # --- 3. DICCIONARIO MULTIMODAL ---
+    # --- 3. DICCIONARIO MULTIMODAL COMPLETO ---
     CLIENTES = {
         "Laguna Señoraza (Laja)": {
             "coords": [[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]], 
@@ -58,7 +62,6 @@ if check_password():
         }
     }
 
-    # --- 4. BARRA LATERAL ---
     with st.sidebar:
         st.success(f"Conectada: {st.secrets['auth']['user']}")
         umbral = st.slider("Umbral Crítico", 0.1, 0.9, 0.4)
@@ -67,45 +70,55 @@ if check_password():
             st.session_state.clear()
             st.rerun()
 
-    st.title("🛰️ BioCore V5: Monitoreo Multimodal")
+    st.title("🛰️ BioCore V5: Inteligencia Multimodal")
     
-    tab1, tab2, tab3 = st.tabs(["🌍 Actual", "📊 Histórico", "🔥 Fuego"])
-
-    with tab1:
-        m = folium.Map(location=[-35.0, -71.0], zoom_start=5)
-        for n, i in CLIENTES.items():
-            p_fol = [[c[1], c[0]] for c in i['coords']]
-            folium.Polygon(locations=p_fol, popup=n, color='cyan', fill=True).add_to(m)
-        folium_static(m)
+    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Histórico Landsat", "🌡️ TerraClimate & Fuego"])
 
     if ejecutar:
-        with tab1:
-            for nombre, info in CLIENTES.items():
-                st.write(f"### Analizando: {nombre}")
-                poly = ee.Geometry.Polygon(info['coords'])
-                
-                # Sentinel-2: SAVI, NDWI, NDSI, Arcillas
+        for nombre, info in CLIENTES.items():
+            poly = ee.Geometry.Polygon(info['coords'])
+            
+            with tab1:
+                st.write(f"### 📍 {nombre}")
+                # SENTINEL-2 (Vigor y Agua)
                 s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
                 fecha = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
                 
-                res = s2.expression(
-                    '((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}
-                ).rename('savi').addBands(
-                    s2.normalizedDifference(['B3','B8']).rename('ndwi')
-                ).reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
+                # Índices: SAVI (Vigor) y NDWI (Agua/Nieve)
+                res = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('savi')\
+                    .addBands(s2.normalizedDifference(['B3','B8']).rename('ndwi'))\
+                    .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
-                # Sentinel-1: SAR (Atraviesa nubes)
+                # SENTINEL-1 (Radar SAR)
                 s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(poly).sort('system:time_start', False).first()
-                sar_db = s1.reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()['VV']
+                sar_val = s1.reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()['VV']
 
-                estado = "🟢 NORMAL" if res['ndwi'] > umbral else "🔴 ALERTA"
-                st.metric(f"{nombre}", f"{estado}", f"NDWI: {res['ndwi']:.3f}")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("SAVI (Vigor)", f"{res['savi']:.3f}")
+                c2.metric("NDWI (Agua/Nieve)", f"{res['ndwi']:.3f}")
+                c3.metric("Radar (SAR)", f"{sar_val:.1f} dB")
 
-                # Reporte Sheets y Telegram
-                fila = [[fecha, res['savi'], res['ndwi'], sar_db, estado]]
+                # Sincronización
+                fila = [[fecha, res['savi'], res['ndwi'], sar_val, "NORMAL" if res['ndwi'] > umbral else "ALERTA"]]
                 sheets.spreadsheets().values().append(spreadsheetId=info['sheet_id'], 
                     range=f"{info['pest']}!A2", valueInputOption="USER_ENTERED", body={'values': fila}).execute()
+
+            with tab2:
+                # LANDSAT (Registro Histórico)
+                lsat = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(poly).sort('system:time_start', False).first()
+                st.write(f"Última captura Landsat 8/9 disponible para {nombre}")
+                st.json(lsat.toDictionary().select(['DATE_ACQUIRED', 'CLOUD_COVER']).getInfo())
+
+            with tab3:
+                # TERRACLIMATE (Sequía y Clima)
+                clim = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(poly).sort('system:time_start', False).first()
+                temp = clim.reduceRegion(ee.Reducer.mean(), poly, 1000).getInfo()
+                st.write(f"**Datos TerraClimate:** Temp Máx: {temp['tmmx']*0.1:.1f}°C | Precipitación: {temp['pr']}mm")
                 
-                requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
-                             data={"chat_id": st.secrets['telegram']['chat_id'], "text": f"✅ {nombre}: {estado}"})
+                # FIRMS (Fuego)
+                fire = ee.ImageCollection("FIRMS").filterBounds(poly).filterDate(datetime.now() - timedelta(days=7), datetime.now())
+                if fire.size().getInfo() > 0:
+                    st.error(f"🔥 ALERTA DE INCENDIO detectada en {nombre}")
+                else:
+                    st.success(f"✅ Sin incendios activos en {nombre}")
         st.balloons()

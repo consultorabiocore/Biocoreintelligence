@@ -118,7 +118,16 @@ if st.session_state.auth:
                         pdf.cell(0, 10, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=1)
                         pdf.multi_cell(0, 10, clean(f"SAVI: {data['SAVI']}\nLluvia: {data['Precip']}mm\nTemp: {data['Temp']}C"))
                         
-                        pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                        # Generación de Informe PDF corregida
+pdf_output = pdf.output(dest='S')
+# Verificamos si el output ya viene como bytes o hay que convertirlo
+if isinstance(pdf_output, str):
+    pdf_bytes = pdf_output.encode('latin-1')
+else:
+    pdf_bytes = bytes(pdf_output)
+
+# Ahora puedes usar pdf_bytes en Telegram y en st.download_button
+
                         requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendDocument", 
                                       data={"chat_id": T_ID, "caption": f"✅ Scan: {u['Proyecto']}"}, 
                                       files={"document": ("BioCore_Report.pdf", pdf_bytes)})

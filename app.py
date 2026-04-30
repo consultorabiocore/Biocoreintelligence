@@ -1,5 +1,5 @@
 import streamlit as st
-import pd
+import pandas as pd
 import json
 import ee
 import requests
@@ -36,7 +36,7 @@ def init_gee():
     except Exception as e:
         st.error(f"Error GEE: {e}"); return False
 
-# --- 3. MOTORES DE CÁLCULO ---
+# --- 3. MOTORES DE CÁLCULO (MULTIMODAL & HISTÓRICO PROTEGIDO) ---
 def escanear_multimodal(coords_str):
     roi = ee.Geometry.Polygon(json.loads(coords_str))
     
@@ -66,16 +66,17 @@ def obtener_historia_20_anos(coords_str):
         ahora = datetime.now().year
         años = ee.List.sequence(ahora - 20, ahora)
         
-        fusion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
+        l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(roi)
+        l7 = ee.ImageCollection("LANDSAT/LE07/C02/T1_L2").filterBounds(roi)
+        fusion = l8.merge(l7)
 
         def calc_anual(a):
             f = ee.Date.fromYMD(a, 1, 1)
-            img = fusion.filterBounds(roi).filterDate(f, f.advance(1, 'year')).median()
+            img = fusion.filterDate(f, f.advance(1, 'year')).median()
             
             bandas = img.bandNames()
             tiene_bandas = bandas.contains('SR_B5').And(bandas.contains('SR_B4'))
             
-            # Corrección: No usar defaultEmpty, usar casting directo o fallback
             savi = ee.Image(ee.Algorithms.If(tiene_bandas,
                 img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {
                     'B5': img.select('SR_B5'), 
@@ -111,10 +112,9 @@ with st.sidebar:
         menu = st.radio("Módulos:", ["🛰️ Monitor Pro", "📊 Auditoría 20 Años", "🔥 Riesgo Incendio"])
         if st.button("Cerrar Sesión"): st.session_state.auth = False; st.rerun()
 
-# --- 5. PANEL DE CONTROL (USANDO TUS COORDENADAS DE BD) ---
+# --- 5. PANEL DE CONTROL ---
 if st.session_state.auth:
     u = st.session_state.user
-    # Se eliminó la laguna. Ahora toma las coordenadas directamente de tu usuario en Supabase.
     coords_act = u['Coordenadas']
     fecha_hoy = datetime.now().strftime('%d/%m/%Y')
 
@@ -134,11 +134,12 @@ if st.session_state.auth:
                 if init_gee():
                     with st.spinner("Procesando datos satelitales..."):
                         data = escanear_multimodal(coords_act)
+                        
                         st.metric("Vigor (SAVI)", data['SAVI'])
                         st.metric("Precipitación", f"{data['Precip']} mm")
                         st.metric("Radar VV", data['Radar'])
                         
-                        # Mensaje directo a Telegram
+                        # Mensaje directo a Telegram (Texto)
                         msg = (f"📊 *REPORTE BIOCORE PRO*\n"
                                f"📍 *Proyecto:* {u['Proyecto']}\n"
                                f"📅 *Fecha:* {fecha_hoy}\n\n"
@@ -153,7 +154,7 @@ if st.session_state.auth:
                             st.success("✅ Reporte enviado a Telegram.")
                         except: st.warning("⚠️ Falló envío de mensaje.")
 
-                        # Generación de PDF para descarga local
+                        # Generación de PDF para descarga opcional
                         pdf = FPDF()
                         pdf.add_page(); pdf.set_font("helvetica", "B", 16)
                         pdf.cell(0, 10, clean(f"INFORME BIOCORE: {u['Proyecto']}"), ln=1)
@@ -175,12 +176,12 @@ if st.session_state.auth:
                         st.dataframe(df)
 
     elif menu == "🔥 Riesgo Incendio":
-        st.subheader("Detección de Focos (NASA FIRMS)")
+        st.subheader("Focos Activos (NASA FIRMS)")
         if init_gee():
             p = ee.Geometry.Polygon(json.loads(coords_act))
             f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
                 (datetime.now()-relativedelta(days=1)).strftime('%Y-%m-%d'), 
                 datetime.now().strftime('%Y-%m-%d')
             ).size().getInfo()
-            if f > 0: st.error(f"🚨 Alerta: {f} focos detectados."); st.toast("RIESGO")
-            else: st.success("✅ Sin anomalías térmicas en el área.")
+            if f > 0: st.error(f"🚨 Alerta: {f} anomalías térmicas."); st.toast("RIESGO")
+            else: st.success("✅ Área sin anomalías térmicas recientes.")

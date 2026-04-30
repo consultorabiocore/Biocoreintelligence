@@ -8,31 +8,34 @@ from google.oauth2 import service_account
 from streamlit_folium import folium_static
 import folium
 
-# --- 1. CONFIGURACIÓN E IDENTIDAD ---
+# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore V5", layout="wide")
 
 def check_password():
     if "password_correct" not in st.session_state:
         st.title("🛰️ BioCore Intelligence V5")
-        st.subheader("Acceso Restringido")
         
-        # Inputs limpios
-        u_input = st.text_input("Usuario / Correo")
-        p_input = st.text_input("Contraseña", type="password")
+        # Inputs con ayuda visual
+        u_input = st.text_input("Correo electrónico").lower().strip() # Convierte a minúsculas y quita espacios
+        p_input = st.text_input("Contraseña", type="password").strip() # Quita espacios
         
         if st.button("Entrar"):
-            # Comparación directa con tus Secrets
-            if u_input == st.secrets["auth"]["user"] and p_input == st.secrets["auth"]["password"]:
+            # Traemos los datos de Secrets con limpieza también
+            admin_user = st.secrets["auth"]["user"].lower().strip()
+            admin_pass = str(st.secrets["auth"]["password"]).strip()
+            
+            if u_input == admin_user and p_input == admin_pass:
                 st.session_state["password_correct"] = True
                 st.rerun()
             else:
-                st.error("Credenciales incorrectas. Revisa que no haya espacios al final.")
+                st.error("Credenciales incorrectas.")
+                st.info(f"Asegúrate de usar: {admin_user}") # Te ayuda a ver si hay un error de tipeo
         return False
     return True
 
 # --- 2. FLUJO PRINCIPAL ---
 if check_password():
-    # Variables desde tus Secrets
+    # El resto del código se mantiene igual...
     T_TOKEN = st.secrets["telegram"]["token"]
     T_ID = st.secrets["telegram"]["chat_id"]
     
@@ -44,9 +47,8 @@ if check_password():
             st.session_state.clear()
             st.rerun()
 
-    st.title("🛰️ Panel de Monitoreo")
+    st.title("🛰️ Panel de Monitoreo BioCore")
     
-    # Diccionario de Clientes
     CLIENTES = {
         "Laguna Señoraza (Laja)": {
             "coords": [[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]], 
@@ -58,7 +60,6 @@ if check_password():
         }
     }
 
-    # Mostrar Mapa
     m = folium.Map(location=[-35.0, -71.0], zoom_start=5)
     for n, i in CLIENTES.items():
         p_fol = [[c[1], c[0]] for c in i['coords']]
@@ -67,7 +68,6 @@ if check_password():
 
     if ejecutar:
         try:
-            # Autenticación GEE con tu JSON de Secrets
             creds_info = json.loads(st.secrets["gee"]["json"])
             creds = service_account.Credentials.from_service_account_info(creds_info, 
                     scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/earthengine'])
@@ -78,8 +78,6 @@ if check_password():
             for nombre, info in CLIENTES.items():
                 st.write(f"Procesando **{nombre}**...")
                 poly = ee.Geometry.Polygon(info['coords'])
-                
-                # Análisis Satelital
                 s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
                 fecha = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
                 
@@ -88,19 +86,14 @@ if check_password():
                     .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
                 estado = "🟢 NORMAL" if res['nd'] > umbral else "🔴 ALERTA"
-                
-                # Visualización
                 st.info(f"**{nombre}** | Estado: {estado} | SAVI: {res['sa']:.3f}")
 
-                # Guardar en Sheets
                 fila = [[fecha, res['sa'], res['nd'], estado]]
                 sheets.spreadsheets().values().append(spreadsheetId=info['sheet_id'], 
                     range=f"{info['pest']}!A2", valueInputOption="USER_ENTERED", body={'values': fila}).execute()
                 
-                # Notificar Telegram
                 requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
                              data={"chat_id": T_ID, "text": f"✅ REPORTE: {nombre}\nEstado: {estado}\nFecha: {fecha}"})
-
             st.balloons()
         except Exception as e:
             st.error(f"Error técnico: {e}")

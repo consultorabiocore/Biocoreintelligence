@@ -1,18 +1,17 @@
 import streamlit as st
-import pandas as pd
 import json
 import ee
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
-# --- 1. CONFIGURACIÓN BÁSICA ---
-st.set_page_config(page_title="BioCore V5", layout="centered") # Centrado es mejor para móvil
+# --- 1. CONFIGURACIÓN MÍNIMA ---
+st.set_page_config(page_title="BioCore V5", layout="centered")
 
 T_TOKEN = st.secrets["telegram"]["token"]
 T_ID = st.secrets["telegram"]["chat_id"]
-UMBRAL_CRITICO = 0.4
+UMBRAL = 0.4
 
 CLIENTES = {
     "Laguna Señoraza (Laja)": {
@@ -25,65 +24,64 @@ CLIENTES = {
     }
 }
 
-# --- 2. MOTOR DE PROCESAMIENTO ---
-def ejecutar_analisis():
+# --- 2. LÓGICA DE VISUALIZACIÓN ---
+st.title("🛰️ BioCore V5")
+st.write("Estado: Listo para escanear.")
+
+# Usamos session_state para forzar que los datos se queden en pantalla
+if 'resultados' not in st.session_state:
+    st.session_state.resultados = []
+
+if st.button("🚀 INICIAR ESCANEO AHORA", use_container_width=True):
     try:
-        # Autenticación GEE
-        creds_json = json.loads(st.secrets["gee"]["json"])
-        creds = service_account.Credentials.from_service_account_info(creds_json, 
-                scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/earthengine'])
-        if not ee.data._credentials:
-            ee.Initialize(creds)
-        
-        sheets_service = build('sheets', 'v4', credentials=creds)
-
-        for nombre, info in CLIENTES.items():
-            st.markdown(f"---")
-            st.header(f"📍 {nombre}")
+        with st.status("Conectando con Satélites...", expanded=True) as status:
+            # Autenticación Limpia
+            creds_info = json.loads(st.secrets["gee"]["json"])
+            creds = service_account.Credentials.from_service_account_info(creds_info, 
+                    scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/earthengine'])
             
-            p = ee.Geometry.Polygon(info['coords'])
+            if not ee.data._credentials:
+                ee.Initialize(creds)
             
-            # Captura Satelital (Sentinel-2)
-            s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(p).sort('system:time_start', False).first()
-            f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
+            sheets = build('sheets', 'v4', credentials=creds)
+            st.session_state.resultados = [] # Limpiar previos
+
+            for nombre, info in CLIENTES.items():
+                st.write(f"Procesando {nombre}...")
+                p = ee.Geometry.Polygon(info['coords'])
+                
+                # Análisis ultra rápido
+                s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(p).sort('system:time_start', False).first()
+                f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
+                
+                indices = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
+                    .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
+                    .reduceRegion(ee.Reducer.mean(), p, 30).getInfo()
+
+                estado = "🟢 NORMAL"
+                if info['tipo'] == "HUMEDAL" and indices['nd'] < UMBRAL: estado = "🔴 ALERTA HÍDRICA"
+                elif info['tipo'] == "GLACIAR" and indices['nd'] < UMBRAL: estado = "🔴 ALERTA NIEVE"
+
+                # Guardar resultado en el estado de la sesión
+                res = {"nombre": nombre, "fecha": f_rep, "savi": indices['sa'], "nd": indices['nd'], "estado": estado}
+                st.session_state.resultados.append(res)
+                
+                # Sincronización silenciosa a Sheets
+                fila = [[f_rep, indices['sa'], indices['nd'], estado]]
+                sheets.spreadsheets().values().append(spreadsheetId=info['sheet_id'], range=f"{info['pestaña']}!A2", valueInputOption="USER_ENTERED", body={'values': fila}).execute()
             
-            # Cálculo de Índices
-            idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
-                .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
-                .addBands(s2.normalizedDifference(['B3','B11']).rename('mn'))\
-                .reduceRegion(ee.Reducer.mean(), p, 30).getInfo()
-
-            # Lógica de Alerta
-            estado = "🟢 NORMAL"
-            if info['tipo'] == "HUMEDAL" and idx['nd'] < UMBRAL_CRITICO: estado = "🔴 ALERTA HÍDRICA"
-            elif info['tipo'] == "GLACIAR" and idx['mn'] < UMBRAL_CRITICO: estado = "🔴 ALERTA NIEVE"
-
-            # MOSTRAR RESULTADOS (Forzado para visibilidad)
-            st.subheader(f"Estado: {estado}")
-            st.write(f"📅 Fecha Satélite: {f_rep}")
-            st.write(f"🌿 Vigor Vegetal (SAVI): **{idx['sa']:.3f}**")
-            st.write(f"💧 Índice Agua/Nieve: **{idx['nd']:.3f}**")
-
-            # Sincronizar Google Sheets
-            fila = [[f_rep, idx['sa'], idx['nd'], idx['mn'], estado]]
-            sheets_service.spreadsheets().values().append(
-                spreadsheetId=info['sheet_id'], 
-                range=f"{info['pestaña']}!A2", 
-                valueInputOption="USER_ENTERED", 
-                body={'values': fila}).execute()
-            
-            st.info(f"✅ Datos sincronizados para {nombre}")
-
-        st.balloons()
+            status.update(label="✅ Escaneo Exitoso", state="complete", expanded=False)
+            st.balloons()
 
     except Exception as e:
-        st.error(f"Ocurrió un error: {e}")
+        st.error(f"Error de conexión: {str(e)}")
 
-# --- 3. INTERFAZ ---
-st.title("🛰️ BioCore V5")
-st.write("Presiona el botón para iniciar el monitoreo de los polígonos.")
-
-if st.button("🚀 INICIAR ESCANEO", use_container_width=True):
-    ejecutar_analisis()
-else:
-    st.warning("Esperando ejecución...")
+# --- 3. RENDERIZADO FORZADO ---
+# Esto asegura que los datos aparezcan sí o sí abajo del botón
+if st.session_state.resultados:
+    for r in st.session_state.resultados:
+        with st.container():
+            st.markdown(f"### 📍 {r['nombre']}")
+            st.info(f"**Estado:** {r['estado']} | **Fecha:** {r['fecha']}")
+            st.write(f"🌿 SAVI: `{r['savi']:.3f}` | 💧 NDWI: `{r['nd']:.3f}`")
+            st.divider()

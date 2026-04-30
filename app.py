@@ -61,36 +61,35 @@ def escanear_multimodal(coords_str):
 
 def obtener_historia_20_anos(coords_str):
     try:
-        roi = ee.Geometry.Polygon(json.loads(coords_str))
+        geom = ee.Geometry.Polygon(json.loads(coords_str))
         ahora = datetime.now().year
-        años = ee.List.sequence(ahora - 20, ahora)
-        fusion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
-
-        def calc_anual(a):
-            f = ee.Date.fromYMD(a, 1, 1)
-            img = fusion.filterBounds(roi).filterDate(f, f.advance(1, 'year')).median()
+        datos = []
+        
+        # Lógica recuperada de la conversación: iteración directa por año
+        for año in range(ahora - 20, ahora + 1):
+            inicio = f"{año}-01-01"
+            fin = f"{año}-12-31"
             
-            # Validación robusta: multiplicamos la existencia de ambas bandas
-            bandas = img.bandNames()
-            tiene_bandas = bandas.contains('SR_B5').multiply(bandas.contains('SR_B4'))
+            # Usamos Landsat 8/9 para años recientes y Landsat 7 para antiguos
+            coleccion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(geom).filterDate(inicio, fin).median()
             
-            savi = ee.Image(ee.Algorithms.If(tiene_bandas,
-                img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {
-                    'B5': img.select('SR_B5'), 
-                    'B4': img.select('SR_B4')
-                }),
-                ee.Image(0).rename('constant')
-            ))
+            # Verificación de bandas
+            info = coleccion.bandNames().getInfo()
+            if 'SR_B5' in info and 'SR_B4' in info:
+                savi_val = coleccion.expression(
+                    '((B5-B4)/(B5+B4+0.5))*1.5', 
+                    {'B5': coleccion.select('SR_B5'), 'B4': coleccion.select('SR_B4')}
+                ).reduceRegion(ee.Reducer.mean(), geom, 100).getInfo().get('constant', 0)
+            else:
+                savi_val = 0
+                
+            datos.append({'año': str(año), 'savi': savi_val if savi_val else 0})
             
-            val = savi.reduceRegion(ee.Reducer.mean(), roi, 100).get('constant')
-            return ee.Feature(None, {'año': ee.Number(a).format('%d'), 'savi': ee.Algorithms.If(val, val, 0)})
-
-        fc = ee.FeatureCollection(años.map(calc_anual)).getInfo()
-        return pd.DataFrame([f['properties'] for f in fc['features']])
+        return pd.DataFrame(datos)
     except Exception as e:
         st.error(f"Error histórico: {e}"); return pd.DataFrame()
 
-# --- 4. INTERFAZ DE ACCESO (SUPABASE) ---
+# --- 4. INTERFAZ DE ACCESO ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 
 with st.sidebar:
@@ -135,7 +134,7 @@ if st.session_state.auth:
                         st.metric("Precipitación", f"{data['Precip']} mm")
                         st.metric("Radar VV", data['Radar'])
                         
-                        # Telegram Directo
+                        # Mensaje directo a Telegram
                         msg = (f"📊 *REPORTE BIOCORE PRO*\n"
                                f"📍 *Proyecto:* {u['Proyecto']}\n"
                                f"📅 *Fecha:* {fecha_hoy}\n\n"
@@ -165,7 +164,7 @@ if st.session_state.auth:
         st.subheader(f"Historial Interanual: {u['Proyecto']}")
         if st.button("🔍 Cargar Cronología"):
             if init_gee():
-                with st.spinner("Calculando serie histórica..."):
+                with st.spinner("Procesando 20 años de datos..."):
                     df = obtener_historia_20_anos(coords_act)
                     if not df.empty:
                         st.line_chart(df.set_index('año'))
@@ -179,5 +178,5 @@ if st.session_state.auth:
                 (datetime.now()-relativedelta(days=1)).strftime('%Y-%m-%d'), 
                 datetime.now().strftime('%Y-%m-%d')
             ).size().getInfo()
-            if f > 0: st.error(f"🚨 Alerta: {f} focos térmicos."); st.toast("RIESGO")
-            else: st.success("✅ Área despejada.")
+            if f > 0: st.error(f"🚨 Alerta: {f} focos detectados."); st.toast("RIESGO")
+            else: st.success("✅ Área sin anomalías térmicas recientes.")

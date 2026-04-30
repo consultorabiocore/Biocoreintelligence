@@ -1,105 +1,99 @@
 import streamlit as st
-import pandas as pd
 import json
 import ee
 import requests
 from datetime import datetime
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+from streamlit_folium import folium_static
+import folium
 
-# --- CONFIGURACIÓN DE IDENTIDAD ---
-T_TOKEN = st.secrets["telegram"]["token"]
-T_ID = st.secrets["telegram"]["chat_id"]
-UMBRAL_CRITICO = 0.4
+# --- 1. CONFIGURACIÓN ---
+st.set_page_config(page_title="BioCore V5", layout="wide")
 
-# --- DICCIONARIO MAESTRO EXPANDIBLE (Los 5 Tipos) ---
-CLIENTES = {
-    "Laguna Señoraza (Laja)": {
-        "coords": [[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]], 
-        "tipo": "HUMEDAL", "sheet_id": "TU_ID_1", "pestaña": "Humedales"
-    },
-    "Pascua Lama (Cordillera)": {
-        "coords": [[-70.033,-29.316],[-70.016,-29.316],[-70.016,-29.333],[-70.033,-29.333]], 
-        "tipo": "GLACIAR", "sheet_id": "TU_ID_2", "pestaña": "Mineria"
-    },
-    "Predio Forestal Biobío": {
-        "coords": [[-72.50, -37.50], [-72.48, -37.50], [-72.48, -37.52], [-72.50, -37.52]],
-        "tipo": "FORESTAL", "sheet_id": "TU_ID_3", "pestaña": "Forestal"
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.title("🛰️ BioCore Intelligence V5")
+        
+        # Inputs con ayuda visual
+        u_input = st.text_input("Correo electrónico").lower().strip() # Convierte a minúsculas y quita espacios
+        p_input = st.text_input("Contraseña", type="password").strip() # Quita espacios
+        
+        if st.button("Entrar"):
+            # Traemos los datos de Secrets con limpieza también
+            admin_user = st.secrets["auth"]["user"].lower().strip()
+            admin_pass = str(st.secrets["auth"]["password"]).strip()
+            
+            if u_input == admin_user and p_input == admin_pass:
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("Credenciales incorrectas.")
+                st.info(f"Asegúrate de usar: {admin_user}") # Te ayuda a ver si hay un error de tipeo
+        return False
+    return True
+
+# --- 2. FLUJO PRINCIPAL ---
+if check_password():
+    # El resto del código se mantiene igual...
+    T_TOKEN = st.secrets["telegram"]["token"]
+    T_ID = st.secrets["telegram"]["chat_id"]
+    
+    with st.sidebar:
+        st.success(f"Conectada: {st.secrets['auth']['user']}")
+        umbral = st.slider("Umbral Crítico", 0.1, 0.9, 0.4)
+        ejecutar = st.button("🚀 INICIAR ESCANEO", use_container_width=True)
+        if st.button("Salir"):
+            st.session_state.clear()
+            st.rerun()
+
+    st.title("🛰️ Panel de Monitoreo BioCore")
+    
+    CLIENTES = {
+        "Laguna Señoraza (Laja)": {
+            "coords": [[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]], 
+            "sheet_id": "1x6yAXNNlea3e43rijJu0aqcRpe4oP3BEnzgSgLuG1vU", "pest": "Humedales"
+        },
+        "Pascua Lama (Cordillera)": {
+            "coords": [[-70.033,-29.316],[-70.016,-29.316],[-70.016,-29.333],[-70.033,-29.333]], 
+            "sheet_id": "1UTrDs939rPlVIR1OTIwbJ6rM3FazgjX43YnJdue-Dmc", "pest": "Mineria"
+        }
     }
-    # Se pueden agregar tipos 'INFRAESTRUCTURA' y 'RIESGO' siguiendo la misma lógica
-}
 
-def enviar_telegram(m):
-    requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
-                  data={"chat_id": T_ID, "text": m, "parse_mode": "Markdown"})
+    m = folium.Map(location=[-35.0, -71.0], zoom_start=5)
+    for n, i in CLIENTES.items():
+        p_fol = [[c[1], c[0]] for c in i['coords']]
+        folium.Polygon(locations=p_fol, popup=n, color='green', fill=True).add_to(m)
+    folium_static(m)
 
-# --- MOTOR OMNIMODAL BIOCORE ---
-def ejecutar_biocore_total():
-    try:
-        creds_json = json.loads(st.secrets["gee"]["json"])
-        creds = service_account.Credentials.from_service_account_info(creds_json, 
-                scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/earthengine'])
-        ee.Initialize(creds)
-        sheets = build('sheets', 'v4', credentials=creds)
-
-        for nombre, info in CLIENTES.items():
-            p = ee.Geometry.Polygon(info['coords'])
+    if ejecutar:
+        try:
+            creds_info = json.loads(st.secrets["gee"]["json"])
+            creds = service_account.Credentials.from_service_account_info(creds_info, 
+                    scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/earthengine'])
             
-            # 1. Captura de Sensores (Fusión Óptico + Radar)
-            s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(p).sort('system:time_start', False).first()
-            s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(p).filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).sort('system:time_start', False).first()
-            f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
+            if not ee.data._credentials: ee.Initialize(creds)
+            sheets = build('sheets', 'v4', credentials=creds)
 
-            # 2. Procesamiento Espectral Multimodal
-            idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('savi')\
-                .addBands(s2.normalizedDifference(['B3','B8']).rename('ndwi'))\
-                .addBands(s2.normalizedDifference(['B3','B11']).rename('ndsi'))\
-                .addBands(s2.select('B11').divide(s2.select('B12')).rename('clay'))\
-                .addBands(s2.select('B11').divide(10000).rename('swir'))\
-                .reduceRegion(ee.Reducer.mean(), p, 30).getInfo()
-            
-            # 3. Lógica de Diagnóstico según Tipo (Calibrada a 0.4)
-            estado = "🟢 BAJO CONTROL"
-            diagnostico = "Parámetros estables."
-            
-            if info['tipo'] == "HUMEDAL":
-                # Alerta si el agua (ndwi) cae bajo 0.4
-                if idx['ndwi'] < UMBRAL_CRITICO:
-                    estado = "🔴 ALERTA TÉCNICA"; diagnostico = f"Estrés hídrico severo detectado (NDWI: {idx['ndwi']:.2f})."
-            
-            elif info['tipo'] == "GLACIAR":
-                # Alerta si la nieve (ndsi) cae bajo 0.4
-                if idx['ndsi'] < UMBRAL_CRITICO:
-                    estado = "🔴 ALERTA TÉCNICA"; diagnostico = f"Pérdida de cobertura criosférica (NDSI: {idx['ndsi']:.2f})."
-            
-            elif info['tipo'] == "FORESTAL":
-                # Alerta si el vigor (savi) cae bajo 0.4
-                if idx['savi'] < UMBRAL_CRITICO:
-                    estado = "🔴 ALERTA TÉCNICA"; diagnostico = f"Degradación de dosel detectada (SAVI: {idx['savi']:.2f})."
+            for nombre, info in CLIENTES.items():
+                st.write(f"Procesando **{nombre}**...")
+                poly = ee.Geometry.Polygon(info['coords'])
+                s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
+                fecha = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
+                
+                res = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
+                    .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
+                    .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
-            elif info['tipo'] == "MINERIA":
-                # Alerta si hay movimiento de material (SWIR alto)
-                if idx['swir'] > UMBRAL_CRITICO:
-                    estado = "🔴 ALERTA TÉCNICA"; diagnostico = "Posible movimiento de estériles o excavación."
+                estado = "🟢 NORMAL" if res['nd'] > umbral else "🔴 ALERTA"
+                st.info(f"**{nombre}** | Estado: {estado} | SAVI: {res['sa']:.3f}")
 
-            # 4. Sincronización y Reporte
-            reporte = (
-                f"🛰 **BIOCORE OMNIMODAL**\n"
-                f"**{nombre}** ({info['tipo']})\n"
-                f"📅 **Análisis:** {f_rep}\n"
-                f"──────────────────\n"
-                f"🌿 **SAVI:** `{idx['savi']:.2f}`\n"
-                f"❄️ **NDSI/NDWI:** `{idx['ndsi']:.2f}`\n"
-                f"🏗 **Arcillas:** `{idx['clay']:.2f}`\n"
-                f"📡 **Radar VV:** `{s1.reduceRegion(ee.Reducer.mean(), p, 30).getInfo().get('VV', 0):.2f} dB`\n"
-                f"──────────────────\n"
-                f"✅ **ESTADO:** {estado}\n"
-                f"📝 **Diagnóstico:** {diagnostico}"
-            )
-            enviar_telegram(reporte)
-
-    except Exception as e:
-        enviar_telegram(f"❌ Error Crítico: {str(e)}")
-
-if st.button("🚀 Ejecutar BioCore Total (5 Módulos)"):
-    ejecutar_biocore_total()
+                fila = [[fecha, res['sa'], res['nd'], estado]]
+                sheets.spreadsheets().values().append(spreadsheetId=info['sheet_id'], 
+                    range=f"{info['pest']}!A2", valueInputOption="USER_ENTERED", body={'values': fila}).execute()
+                
+                requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
+                             data={"chat_id": T_ID, "text": f"✅ REPORTE: {nombre}\nEstado: {estado}\nFecha: {fecha}"})
+            st.balloons()
+        except Exception as e:
+            st.error(f"Error técnico: {e}")

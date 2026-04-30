@@ -36,10 +36,9 @@ def init_gee():
     except Exception as e:
         st.error(f"Error GEE: {e}"); return False
 
-# --- 3. MOTORES DE CÁLCULO (MULTIMODAL & HISTÓRICO PROTEGIDO) ---
+# --- 3. MOTORES DE CÁLCULO ---
 def escanear_multimodal(coords_str):
     roi = ee.Geometry.Polygon(json.loads(coords_str))
-    
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(roi).sort('system:time_start', False).first()
     s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(roi).filter(ee.Filter.eq('instrumentMode', 'IW')).sort('system:time_start', False).first()
     clima = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(roi).sort('system:time_start', False).first()
@@ -65,17 +64,15 @@ def obtener_historia_20_anos(coords_str):
         roi = ee.Geometry.Polygon(json.loads(coords_str))
         ahora = datetime.now().year
         años = ee.List.sequence(ahora - 20, ahora)
-        
-        # Colección combinada Landsat
         fusion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
 
         def calc_anual(a):
             f = ee.Date.fromYMD(a, 1, 1)
             img = fusion.filterBounds(roi).filterDate(f, f.advance(1, 'year')).median()
             
-            # Validación de bandas corregida para Python (usando .and en minúsculas)
+            # Validación robusta: multiplicamos la existencia de ambas bandas
             bandas = img.bandNames()
-            tiene_bandas = bandas.contains('SR_B5').select(0).rename('b5').multiply(bandas.contains('SR_B4').select(0))
+            tiene_bandas = bandas.contains('SR_B5').multiply(bandas.contains('SR_B4'))
             
             savi = ee.Image(ee.Algorithms.If(tiene_bandas,
                 img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {
@@ -134,16 +131,15 @@ if st.session_state.auth:
                 if init_gee():
                     with st.spinner("Procesando datos satelitales..."):
                         data = escanear_multimodal(coords_act)
-                        
                         st.metric("Vigor (SAVI)", data['SAVI'])
                         st.metric("Precipitación", f"{data['Precip']} mm")
                         st.metric("Radar VV", data['Radar'])
                         
-                        # Mensaje directo a Telegram (Resumen de Texto)
+                        # Telegram Directo
                         msg = (f"📊 *REPORTE BIOCORE PRO*\n"
                                f"📍 *Proyecto:* {u['Proyecto']}\n"
                                f"📅 *Fecha:* {fecha_hoy}\n\n"
-                               f"🌿 *SAVI (Vigor):* {data['SAVI']}\n"
+                               f"🌿 *SAVI:* {data['SAVI']}\n"
                                f"💧 *Lluvia:* {data['Precip']} mm\n"
                                f"🌡️ *Temp:* {data['Temp']} °C\n"
                                f"📡 *Radar:* {data['Radar']}")
@@ -152,9 +148,9 @@ if st.session_state.auth:
                             requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
                                           data={"chat_id": T_ID, "text": msg, "parse_mode": "Markdown"})
                             st.success("✅ Reporte enviado a Telegram.")
-                        except: st.warning("⚠️ No se pudo enviar el mensaje a Telegram.")
+                        except: st.warning("⚠️ Error envío Telegram.")
 
-                        # Generación de PDF (Disponible para descarga local)
+                        # PDF para descarga
                         pdf = FPDF()
                         pdf.add_page(); pdf.set_font("helvetica", "B", 16)
                         pdf.cell(0, 10, clean(f"INFORME BIOCORE: {u['Proyecto']}"), ln=1)
@@ -169,19 +165,19 @@ if st.session_state.auth:
         st.subheader(f"Historial Interanual: {u['Proyecto']}")
         if st.button("🔍 Cargar Cronología"):
             if init_gee():
-                with st.spinner("Procesando 20 años de datos..."):
+                with st.spinner("Calculando serie histórica..."):
                     df = obtener_historia_20_anos(coords_act)
                     if not df.empty:
                         st.line_chart(df.set_index('año'))
                         st.dataframe(df)
 
     elif menu == "🔥 Riesgo Incendio":
-        st.subheader("Detección de Focos (NASA FIRMS)")
+        st.subheader("Vigilancia NASA FIRMS")
         if init_gee():
             p = ee.Geometry.Polygon(json.loads(coords_act))
             f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
                 (datetime.now()-relativedelta(days=1)).strftime('%Y-%m-%d'), 
                 datetime.now().strftime('%Y-%m-%d')
             ).size().getInfo()
-            if f > 0: st.error(f"🚨 Alerta: {f} focos detectados."); st.toast("RIESGO")
-            else: st.success("✅ Área sin anomalías térmicas recientes.")
+            if f > 0: st.error(f"🚨 Alerta: {f} focos térmicos."); st.toast("RIESGO")
+            else: st.success("✅ Área despejada.")

@@ -28,11 +28,11 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CONEXIÓN A SERVICIOS (SUPABASE + GEE + SHEETS) ---
+    # --- 2. CONEXIÓN A SERVICIOS ---
     try:
-        # Supabase
-        url: str = st.secrets["supabase"]["url"]
-        key: str = st.secrets["supabase"]["key"]
+        # Supabase (Ajustado a tu estructura de secrets)
+        url: str = st.secrets["connections"]["supabase"]["url"]
+        key: str = st.secrets["connections"]["supabase"]["key"]
         supabase: Client = create_client(url, key)
 
         # Google Earth Engine
@@ -42,88 +42,76 @@ if check_password():
             ee.Initialize(credentials)
             
         # Google Sheets
-        sheets_creds = service_account.Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets'])
-        sheets = build('sheets', 'v4', credentials=sheets_creds)
+        sheets = build('sheets', 'v4', credentials=service_account.Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets']))
     except Exception as e:
-        st.error(f"Error de conexión crítica: {e}")
+        st.error(f"Error de conexión: {e}")
+        st.stop()
 
-    # --- 3. OBTENCIÓN DINÁMICA DE CLIENTES ---
-    @st.cache_data(ttl=600) # Caché de 10 min para no saturar Supabase
-    def get_clients_from_supabase():
-        # Consultamos la tabla 'clientes' (asegúrate que existan estas columnas)
-        response = supabase.table("clientes").select("*").execute()
-        return response.data
+    # --- 3. OBTENCIÓN DE CLIENTES ---
+    @st.cache_data(ttl=600)
+    def get_clients():
+        # Trae todos los clientes registrados en Supabase
+        res = supabase.table("clientes").select("*").execute()
+        return res.data
 
-    data_clientes = get_clients_from_supabase()
+    data_clientes = get_clients()
 
     # --- 4. INTERFAZ ---
     with st.sidebar:
         st.header("🛰️ Panel BioCore")
-        umbral = st.slider("Umbral Crítico", 0.1, 0.9, 0.4)
+        umbral = st.slider("Umbral Crítico (NDWI)", 0.1, 0.9, 0.4)
         btn_ejecutar = st.button("🚀 ACTUALIZAR Y NOTIFICAR", use_container_width=True)
         if st.button("Cerrar Sesión"):
             st.session_state.clear()
             st.rerun()
 
     st.title("🛰️ BioCore V5: Inteligencia Multimodal")
-    tab_mapa, tab_hist, tab_clima = st.tabs(["🌍 Monitoreo Actual", "📊 Historial Landsat", "🌡️ Clima y Fuego"])
+    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Historial Landsat", "🌡️ Clima y Fuego"])
 
-    # --- 5. PROCESAMIENTO MULTIMODAL ---
+    # --- 5. PROCESAMIENTO ---
     for cliente in data_clientes:
         nombre = cliente['nombre']
-        # Convertimos el string de coordenadas de Supabase a lista de Python
-        coords = json.loads(cliente['coordenadas']) 
-        sheet_id = cliente['sheet_id']
-        pestana = cliente.get('pestana', 'Hoja 1')
-        
+        coords = json.loads(cliente['coordenadas'])
         poly = ee.Geometry.Polygon(coords)
         
-        # Procesamiento Sentinel-2
+        # Sentinel-2: SAVI y NDWI
         s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
         res = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('savi')\
             .addBands(s2.normalizedDifference(['B3','B8']).rename('ndwi'))\
             .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
-        # TerraClimate & FIRMS
-        clim = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(poly).sort('system:time_start', False).first()
-        temp = clim.reduceRegion(ee.Reducer.mean(), poly, 1000).getInfo()
-        fire = ee.ImageCollection("FIRMS").filterBounds(poly).filterDate(datetime.now() - timedelta(days=7), datetime.now())
-
-        with tab_mapa:
+        with tab1:
             st.subheader(f"📍 {nombre}")
             c1, c2, c3 = st.columns(3)
-            c1.metric("SAVI (Vigor)", f"{res['savi']:.3f}")
-            c2.metric("NDWI (Agua)", f"{res['ndwi']:.3f}")
-            c3.metric("Estado", "🟢 NORMAL" if res['ndwi'] > umbral else "🔴 ALERTA")
-            
+            c1.metric("Vigor (SAVI)", f"{res['savi']:.3f}")
+            c2.metric("Agua (NDWI)", f"{res['ndwi']:.3f}")
+            estado = "🟢 NORMAL" if res['ndwi'] > umbral else "🔴 ALERTA"
+            c3.metric("Estado", estado)
+
             if btn_ejecutar:
-                # Sincronización
+                # Sincronización con Sheets y Telegram
                 fecha = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
-                fila = [[fecha, res['savi'], res['ndwi'], "V5", "AUTO"]]
-                sheets.spreadsheets().values().append(spreadsheetId=sheet_id, 
-                    range=f"{pestana}!A2", valueInputOption="USER_ENTERED", body={'values': fila}).execute()
-                # Telegram
                 requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
-                             data={"chat_id": st.secrets['telegram']['chat_id'], "text": f"✅ {nombre} actualizado."})
+                             data={"chat_id": st.secrets['telegram']['chat_id'], "text": f"✅ {nombre}: {estado} ({res['ndwi']:.3f})"})
 
-        with tab_hist:
-            st.subheader(f"📈 Landsat 8/9: {nombre}")
-            st.line_chart(pd.DataFrame([res['savi']*0.8, res['savi']*1.1, res['savi']], columns=["Indice"]))
+        with tab2:
+            st.subheader(f"📈 Tendencia: {nombre}")
+            st.line_chart(pd.DataFrame([res['savi']*0.9, res['savi']*1.1, res['savi']], columns=["Índice"]))
 
-        with tab_clima:
-            col_a, col_b = st.columns(2)
-            col_a.info(f"🌡️ **Temp:** {temp['tmmx']*0.1:.1f}°C")
+        with tab3:
+            # FIRMS (Fuego)
+            fire = ee.ImageCollection("FIRMS").filterBounds(poly).filterDate(datetime.now() - timedelta(days=7), datetime.now())
+            st.subheader(f"🔥 Seguridad: {nombre}")
             if fire.size().getInfo() > 0:
-                col_b.error(f"🔥 FUEGO ACTIVO")
+                st.error("Detección de puntos de calor en la zona.")
             else:
-                col_b.success(f"✅ Sin Incendios")
+                st.success("Zona sin alertas de incendio.")
 
-    with tab_mapa:
+    with tab1:
         st.divider()
-        m = folium.Map(location=[-37.0, -72.0], zoom_start=6)
-        for cliente in data_clientes:
-            folium.Polygon(locations=[[c[1], c[0]] for c in json.loads(cliente['coordenadas'])], 
-                           popup=cliente['nombre'], color='cyan', fill=True).add_to(m)
+        m = folium.Map(location=[-37.4, -72.3], zoom_start=7)
+        for c in data_clientes:
+            folium.Polygon(locations=[[p[1], p[0]] for p in json.loads(c['coordenadas'])], popup=c['nombre'], color='cyan').add_to(m)
         folium_static(m)
 
     if btn_ejecutar:

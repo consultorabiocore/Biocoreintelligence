@@ -5,12 +5,10 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from supabase import create_client, Client
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
 from streamlit_folium import folium_static
 import folium
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN E INICIO ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide", page_icon="🛰️")
 
 def check_password():
@@ -28,12 +26,9 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CONEXIÓN A SERVICIOS ---
+    # --- 2. CONEXIONES ---
     try:
-        url: str = st.secrets["connections"]["supabase"]["url"]
-        key: str = st.secrets["connections"]["supabase"]["key"]
-        supabase: Client = create_client(url, key)
-
+        supabase: Client = create_client(st.secrets["connections"]["supabase"]["url"], st.secrets["connections"]["supabase"]["key"])
         creds_info = json.loads(st.secrets["gee"]["json"])
         if not ee.data.is_initialized():
             ee.Initialize(ee.ServiceAccountCredentials(creds_info['client_email'], key_data=creds_info['private_key']))
@@ -41,76 +36,65 @@ if check_password():
         st.error(f"Error de conexión: {e}")
         st.stop()
 
-    # --- 3. DATOS DESDE SUPABASE ---
+    # --- 3. FUNCIONES DE ANÁLISIS ---
+    def enviar_reporte_telegram(mensaje):
+        token = st.secrets["telegram"]["token"]
+        chat_id = st.secrets["telegram"]["chat_id"]
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url, data={"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"})
+
     @st.cache_data(ttl=600)
-    def get_projects():
+    def obtener_proyectos():
         res = supabase.table("usuarios").select("*").execute()
         return res.data
 
-    data_proyectos = get_projects()
-
     # --- 4. INTERFAZ ---
-    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Historial Landsat", "🌡️ Clima y Fuego"])
+    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo por Tipo", "📊 Historial", "🌡️ Clima"])
+    data_proyectos = obtener_proyectos()
 
     with st.sidebar:
-        st.header("🛰️ Panel BioCore")
-        btn_ejecutar = st.button("🚀 INICIAR PROCESAMIENTO", use_container_width=True)
+        st.header("🛰️ Panel de Control")
+        tipo_filtro = st.multiselect("Filtrar por Tipo", ["Minería", "Humedal"], default=["Minería", "Humedal"])
+        btn_reporte = st.button("🚀 ENVIAR REPORTE AL CELULAR", use_container_width=True)
 
-    # --- 5. LÓGICA DE PROCESAMIENTO ---
+    # --- 5. PROCESAMIENTO Y REPORTES ---
+    resumen_reporte = "📋 *REPORTE BIOCORE V5*\n" + datetime.now().strftime("%d/%m/%Y %H:%M") + "\n\n"
+
     for proy in data_proyectos:
-        nombre = proy.get('Proyecto', 'Sin Nombre')
-        raw_coords = proy.get('Coordenadas')
-        
-        if not raw_coords: continue
-        
-        coords = json.loads(raw_coords)
+        # Lógica de tipos de proyecto
+        tipo = "Minería" if "Pascua" in proy['Proyecto'] else "Humedal"
+        if tipo not in tipo_filtro: continue
+
+        nombre = proy['Proyecto']
+        coords = json.loads(proy['Coordenadas'])
         poly = ee.Geometry.Polygon(coords)
 
-        #--- CÁLCULOS (Se hacen una sola vez por proyecto) ---
-        # Sentinel-2 (Actual)
-        s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
-        res_s2 = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('savi')\
-                  .addBands(s2.normalizedDifference(['B3','B8']).rename('ndwi'))\
-                  .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
+        # Análisis Sentinel-2
+        img = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
+        stats = img.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':img.select('B8'),'B4':img.select('B4')}).rename('savi')\
+                   .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
+        
+        val_savi = stats['savi']
+        resumen_reporte += f"📍 *{nombre}* ({tipo})\n• SAVI: {val_savi:.3f}\n"
 
-        # TerraClimate (Clima)
-        clim = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(poly).sort('system:time_start', False).first()
-        res_clim = clim.reduceRegion(ee.Reducer.mean(), poly, 1000).getInfo()
-
-        # FIRMS (Fuego)
-        fire = ee.ImageCollection("FIRMS").filterBounds(poly).filterDate(datetime.now() - timedelta(days=7), datetime.now())
-
-        #--- DISTRIBUCIÓN EN PESTAÑAS ---
+        # Mostrar en Pestaña 1
         with tab1:
-            st.subheader(f"📍 {nombre}")
-            col1, col2 = st.columns(2)
-            col1.metric("Vigor (SAVI)", f"{res_s2['savi']:.3f}")
-            col2.metric("Humedad (NDWI)", f"{res_s2['ndwi']:.3f}")
+            color = "orange" if tipo == "Minería" else "green"
+            st.markdown(f"### {nombre} <span style='color:{color}'>({tipo})</span>", unsafe_allow_html=True)
+            st.metric("Índice SAVI", f"{val_savi:.3f}")
 
-        with tab2:
-            st.subheader(f"📊 Análisis de Tendencia: {nombre}")
-            # Simulamos historial Landsat basado en el valor actual para el gráfico
-            chart_data = pd.DataFrame([res_s2['savi']*0.92, res_s2['savi']*1.05, res_s2['savi']], columns=["SAVI Histórico"])
-            st.line_chart(chart_data)
+    # Ejecución del reporte al celular
+    if btn_reporte:
+        enviar_reporte_telegram(resumen_reporte)
+        st.toast("Reporte enviado a Telegram ✅")
 
-        with tab3:
-            st.subheader(f"🌡️ Variables Ambientales: {nombre}")
-            c_clima1, c_clima2 = st.columns(2)
-            c_clima1.info(f"**Temperatura Máx:** {res_clim['tmmx']*0.1:.1f}°C")
-            if fire.size().getInfo() > 0:
-                c_clima2.error("🔥 Alerta: Puntos de calor detectados.")
-            else:
-                c_clima2.success("✅ Zona libre de incendios.")
-
-    # Mapa al final de la pestaña 1
+    # Mapa General
     with tab1:
         st.divider()
-        m = folium.Map(location=[-29.3, -70.0], zoom_start=9) # Centrado en el área de tu tabla
+        m = folium.Map(location=[-29.3, -70.0], zoom_start=9)
         for p in data_proyectos:
             if p.get('Coordenadas'):
+                color_map = "red" if "Pascua" in p['Proyecto'] else "blue"
                 folium.Polygon(locations=[[c[1], c[0]] for c in json.loads(p['Coordenadas'])], 
-                               popup=p['Proyecto'], color='cyan').add_to(m)
+                               popup=p['Proyecto'], color=color_map).add_to(m)
         folium_static(m)
-
-    if btn_ejecutar:
-        st.balloons()

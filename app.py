@@ -20,7 +20,7 @@ DIRECTORA = "Loreto Campos Carrasco"
 def clean(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
-# --- 2. CONEXIÓN SUPABASE (TU LOGIN) ---
+# --- 2. CONEXIÓN SUPABASE ---
 @st.cache_resource
 def init_supabase():
     return create_client(st.secrets["connections"]["supabase"]["url"], st.secrets["connections"]["supabase"]["key"])
@@ -36,11 +36,11 @@ def init_gee():
     except Exception as e:
         st.error(f"Error GEE: {e}"); return False
 
-# --- 3. MOTORES DE CÁLCULO (MULTIMODAL & HISTÓRICO) ---
+# --- 3. MOTORES DE CÁLCULO (MULTIMODAL & HISTÓRICO PROTEGIDO) ---
 def escanear_multimodal(coords_str):
     roi = ee.Geometry.Polygon(json.loads(coords_str))
     
-    # Captura de sensores
+    # Captura de sensores con sort para asegurar la más reciente
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(roi).sort('system:time_start', False).first()
     s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(roi).filter(ee.Filter.eq('instrumentMode', 'IW')).sort('system:time_start', False).first()
     clima = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(roi).sort('system:time_start', False).first()
@@ -62,24 +62,39 @@ def escanear_multimodal(coords_str):
     }
 
 def obtener_historia_20_anos(coords_str):
-    roi = ee.Geometry.Polygon(json.loads(coords_str))
-    ahora = datetime.now().year
-    años = ee.List.sequence(ahora - 20, ahora)
-    fusion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
+    try:
+        roi = ee.Geometry.Polygon(json.loads(coords_str))
+        ahora = datetime.now().year
+        años = ee.List.sequence(ahora - 20, ahora)
+        
+        # Fusión Landsat 5, 7 y 8 para cubrir 2 décadas
+        l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(roi)
+        l7 = ee.ImageCollection("LANDSAT/LE07/C02/T1_L2").filterBounds(roi)
+        fusion = l8.merge(l7)
 
-    def calc_anual(a):
-        f = ee.Date.fromYMD(a, 1, 1)
-        img = fusion.filterBounds(roi).filterDate(f, f.advance(1, 'year')).median()
-        bandas = img.bandNames()
-        tiene = bandas.contains('SR_B5').And(bandas.contains('SR_B4'))
-        savi = ee.Algorithms.If(tiene,
-            img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {'B5':img.select('SR_B5'), 'B4':img.select('SR_B4')}),
-            ee.Image(0))
-        val = ee.Image(savi).reduceRegion(ee.Reducer.mean(), roi, 100).get('constant')
-        return ee.Feature(None, {'año': ee.Number(a).format('%d'), 'savi': ee.Algorithms.If(val, val, 0)})
+        def calc_anual(a):
+            f = ee.Date.fromYMD(a, 1, 1)
+            img = fusion.filterDate(f, f.advance(1, 'year')).median()
+            
+            # Protección contra imágenes vacías (evita error 'constant')
+            tiene_bandas = img.bandNames().size().gt(0)
+            
+            savi = ee.Algorithms.If(tiene_bandas,
+                img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {
+                    'B5': img.select(['SR_B5'], ['B5']).defaultEmpty(), 
+                    'B4': img.select(['SR_B4'], ['B4']).defaultEmpty()
+                }),
+                ee.Image(0).rename('constant')
+            )
+            
+            stats = ee.Image(savi).reduceRegion(ee.Reducer.mean(), roi, 100)
+            val = stats.get('constant')
+            return ee.Feature(None, {'año': ee.Number(a).format('%d'), 'savi': ee.Algorithms.If(val, val, 0)})
 
-    fc = ee.FeatureCollection(años.map(calc_anual)).getInfo()
-    return pd.DataFrame([f['properties'] for f in fc['features']])
+        fc = ee.FeatureCollection(años.map(calc_anual)).getInfo()
+        return pd.DataFrame([f['properties'] for f in fc['features']])
+    except Exception as e:
+        st.error(f"Error histórico: {e}"); return pd.DataFrame()
 
 # --- 4. INTERFAZ DE ACCESO ---
 if 'auth' not in st.session_state: st.session_state.auth = False
@@ -103,11 +118,12 @@ with st.sidebar:
 # --- 5. PANELES DE CONTROL ---
 if st.session_state.auth:
     u = st.session_state.user
-    # Coordenadas por defecto Laguna Señoraza si no existen en BD
+    # Laguna Señoraza por defecto
     coords_act = u.get('Coordenadas', '[[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]]')
+    fecha_hoy = datetime.now().strftime('%d/%m/%Y')
 
     if menu == "🛰️ Monitor Pro":
-        st.subheader(f"Proyecto Activo: {u['Proyecto']}")
+        st.subheader(f"Proyecto: {u['Proyecto']}")
         col1, col2 = st.columns([2, 1])
         
         with col1:
@@ -120,51 +136,57 @@ if st.session_state.auth:
         with col2:
             if st.button("🚀 INICIAR ESCANEO BIOCORE"):
                 if init_gee():
-                    with st.spinner("Analizando Multimodalmente..."):
+                    with st.spinner("Escaneando Laguna Señoraza..."):
                         data = escanear_multimodal(coords_act)
+                        
                         st.metric("Vigor (SAVI)", data['SAVI'])
-                        st.metric("Precipitación", f"{data['Precip']} mm")
+                        st.metric("Lluvia (Mes)", f"{data['Precip']} mm")
                         st.metric("Radar VV", data['Radar'])
                         
-                        # Generación de PDF
+                        # A. ENVÍO DE MENSAJE DE TEXTO A TELEGRAM
+                        msg = (f"📊 *REPORTE BIOCORE PRO*\n"
+                               f"📍 *Proyecto:* {u['Proyecto']}\n"
+                               f"📅 *Fecha:* {fecha_hoy}\n\n"
+                               f"🌿 *SAVI:* {data['SAVI']}\n"
+                               f"💧 *Lluvia:* {data['Precip']} mm\n"
+                               f"🌡️ *Temp:* {data['Temp']} °C\n"
+                               f"📡 *Radar:* {data['Radar']}")
+                        
+                        try:
+                            requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
+                                          data={"chat_id": T_ID, "text": msg, "parse_mode": "Markdown"})
+                            st.success("✅ Reporte enviado a Telegram.")
+                        except: st.warning("⚠️ Falló envío de mensaje.")
+
+                        # B. GENERACIÓN DE PDF PARA DESCARGA
                         pdf = FPDF()
-                        pdf.add_page()
-                        pdf.set_font("helvetica", "B", 16)
-                        pdf.cell(0, 10, clean(f"REPORTE BIOCORE: {u['Proyecto']}"), ln=1)
+                        pdf.add_page(); pdf.set_font("helvetica", "B", 16)
+                        pdf.cell(0, 10, clean(f"REPORTE OFICIAL: {u['Proyecto']}"), ln=1)
                         pdf.set_font("helvetica", "", 12)
-                        pdf.multi_cell(0, 10, clean(f"Fecha: {datetime.now().strftime('%d/%m/%Y')}\nSAVI: {data['SAVI']}\nLluvia: {data['Precip']}mm\nRadar: {data['Radar']}"))
+                        pdf.multi_cell(0, 10, clean(f"Fecha: {fecha_hoy}\nSAVI: {data['SAVI']}\nLluvia: {data['Precip']}mm\nRadar: {data['Radar']}"))
                         
                         pdf_out = pdf.output(dest='S')
                         pdf_bytes = bytes(pdf_out) if not isinstance(pdf_out, str) else pdf_out.encode('latin-1')
                         
-                        try:
-                            requests.post(
-                                f"https://api.telegram.org/bot{T_TOKEN}/sendDocument", 
-                                data={"chat_id": T_ID, "caption": f"✅ Scan: {u['Proyecto']}"}, 
-                                files={"document": (f"BioCore_{u['Proyecto']}.pdf", pdf_bytes)}
-                            )
-                            st.success("Enviado a Telegram.")
-                        except:
-                            st.warning("Error enviando a Telegram.")
-                        
-                        st.download_button("📥 Descargar Reporte", pdf_bytes, f"BioCore_{u['Proyecto']}.pdf")
+                        st.download_button("📥 Descargar Reporte PDF", pdf_bytes, f"BioCore_{u['Proyecto']}.pdf")
 
     elif menu == "📊 Auditoría 20 Años":
-        st.subheader("Serie Histórica (2006-Presente)")
-        if st.button("🔄 Generar Historial Interanual"):
+        st.subheader("Historial Interanual (Landsat)")
+        if st.button("🔍 Cargar Cronología"):
             if init_gee():
-                with st.spinner("Procesando 20 años de Landsat..."):
-                    df_20 = obtener_historia_20_anos(coords_act)
-                    st.line_chart(df_20.set_index('año'))
-                    st.dataframe(df_20)
+                with st.spinner("Procesando 20 años de datos..."):
+                    df = obtener_historia_20_anos(coords_act)
+                    if not df.empty:
+                        st.line_chart(df.set_index('año'))
+                        st.dataframe(df)
 
     elif menu == "🔥 Riesgo Incendio":
-        st.subheader("Detección NASA FIRMS (24h)")
+        st.subheader("Focos Activos (NASA FIRMS)")
         if init_gee():
             p = ee.Geometry.Polygon(json.loads(coords_act))
-            focos = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
+            f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
                 (datetime.now()-relativedelta(days=1)).strftime('%Y-%m-%d'), 
                 datetime.now().strftime('%Y-%m-%d')
             ).size().getInfo()
-            if focos > 0: st.error(f"🚨 Alerta: {focos} focos detectados."); st.toast("RIESGO")
-            else: st.success("✅ Sin anomalías térmicas recientes.")
+            if f > 0: st.error(f"🚨 Alerta: {f} anomalías térmicas."); st.toast("RIESGO")
+            else: st.success("✅ Área segura.")

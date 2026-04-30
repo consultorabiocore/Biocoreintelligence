@@ -66,16 +66,16 @@ def obtener_historia_20_anos(coords_str):
         ahora = datetime.now().year
         años = ee.List.sequence(ahora - 20, ahora)
         
-        l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(roi)
-        l7 = ee.ImageCollection("LANDSAT/LE07/C02/T1_L2").filterBounds(roi)
-        fusion = l8.merge(l7)
+        # Colección combinada Landsat
+        fusion = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
 
         def calc_anual(a):
             f = ee.Date.fromYMD(a, 1, 1)
-            img = fusion.filterDate(f, f.advance(1, 'year')).median()
+            img = fusion.filterBounds(roi).filterDate(f, f.advance(1, 'year')).median()
             
+            # Validación de bandas corregida para Python (usando .and en minúsculas)
             bandas = img.bandNames()
-            tiene_bandas = bandas.contains('SR_B5').And(bandas.contains('SR_B4'))
+            tiene_bandas = bandas.contains('SR_B5').select(0).rename('b5').multiply(bandas.contains('SR_B4').select(0))
             
             savi = ee.Image(ee.Algorithms.If(tiene_bandas,
                 img.expression('((B5-B4)/(B5+B4+0.5))*1.5', {
@@ -139,11 +139,11 @@ if st.session_state.auth:
                         st.metric("Precipitación", f"{data['Precip']} mm")
                         st.metric("Radar VV", data['Radar'])
                         
-                        # Mensaje directo a Telegram (Texto)
+                        # Mensaje directo a Telegram (Resumen de Texto)
                         msg = (f"📊 *REPORTE BIOCORE PRO*\n"
                                f"📍 *Proyecto:* {u['Proyecto']}\n"
                                f"📅 *Fecha:* {fecha_hoy}\n\n"
-                               f"🌿 *SAVI:* {data['SAVI']}\n"
+                               f"🌿 *SAVI (Vigor):* {data['SAVI']}\n"
                                f"💧 *Lluvia:* {data['Precip']} mm\n"
                                f"🌡️ *Temp:* {data['Temp']} °C\n"
                                f"📡 *Radar:* {data['Radar']}")
@@ -152,9 +152,9 @@ if st.session_state.auth:
                             requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
                                           data={"chat_id": T_ID, "text": msg, "parse_mode": "Markdown"})
                             st.success("✅ Reporte enviado a Telegram.")
-                        except: st.warning("⚠️ Falló envío de mensaje.")
+                        except: st.warning("⚠️ No se pudo enviar el mensaje a Telegram.")
 
-                        # Generación de PDF para descarga opcional
+                        # Generación de PDF (Disponible para descarga local)
                         pdf = FPDF()
                         pdf.add_page(); pdf.set_font("helvetica", "B", 16)
                         pdf.cell(0, 10, clean(f"INFORME BIOCORE: {u['Proyecto']}"), ln=1)
@@ -176,12 +176,12 @@ if st.session_state.auth:
                         st.dataframe(df)
 
     elif menu == "🔥 Riesgo Incendio":
-        st.subheader("Focos Activos (NASA FIRMS)")
+        st.subheader("Detección de Focos (NASA FIRMS)")
         if init_gee():
             p = ee.Geometry.Polygon(json.loads(coords_act))
             f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
                 (datetime.now()-relativedelta(days=1)).strftime('%Y-%m-%d'), 
                 datetime.now().strftime('%Y-%m-%d')
             ).size().getInfo()
-            if f > 0: st.error(f"🚨 Alerta: {f} anomalías térmicas."); st.toast("RIESGO")
+            if f > 0: st.error(f"🚨 Alerta: {f} focos detectados."); st.toast("RIESGO")
             else: st.success("✅ Área sin anomalías térmicas recientes.")

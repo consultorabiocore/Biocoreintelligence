@@ -20,7 +20,7 @@ def check_password():
         if st.button("Entrar"):
             if u == st.secrets["auth"]["user"].lower().strip() and p == str(st.secrets["auth"]["password"]).strip():
                 st.session_state["password_correct"] = True
-                st.session_state["usuario_actual"] = u # Guardamos el usuario correctamente
+                st.session_state["usuario_actual"] = u
                 st.rerun()
             else:
                 st.error("Credenciales incorrectas")
@@ -28,19 +28,35 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. INICIALIZACIÓN DE SERVICIOS ---
+    # --- 2. INICIALIZACIÓN DE SERVICIOS (VERSIÓN ROBUSTA) ---
     try:
         creds_info = json.loads(st.secrets["gee"]["json"])
-        if not ee.data._credentials:
-            credentials = ee.ServiceAccountCredentials(creds_info['client_email'], key_data=creds_info['private_key'])
+        
+        # Intentar inicializar con el método oficial de Service Account
+        credentials = ee.ServiceAccountCredentials(
+            creds_info['client_email'], 
+            key_data=creds_info['private_key']
+        )
+        
+        # Inicialización segura
+        if not ee.data.is_initialized():
             ee.Initialize(credentials)
             
-        sheets_creds = service_account.Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        # Credenciales para Google Sheets
+        sheets_creds = service_account.Credentials.from_service_account_info(
+            creds_info, 
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
         sheets = build('sheets', 'v4', credentials=sheets_creds)
+        
     except Exception as e:
-        st.error(f"Error técnico de conexión: {e}")
+        # Si falla el chequeo inicial, intentamos forzar la inicialización
+        try:
+            ee.Initialize(credentials)
+        except:
+            st.error(f"Error técnico de conexión: {e}")
 
-    # --- 3. DICCIONARIO MULTIMODAL ---
+    # --- 3. DICCIONARIO DE PROYECTOS ---
     CLIENTES = {
         "Laguna Señoraza (Laja)": {
             "coords": [[-72.715,-37.275],[-72.715,-37.285],[-72.690,-37.285],[-72.690,-37.270]], 
@@ -54,9 +70,7 @@ if check_password():
 
     # --- 4. INTERFAZ ---
     with st.sidebar:
-        # Usamos .get() para evitar el KeyError si la variable no se cargó a tiempo
-        usuario = st.session_state.get("usuario_actual", "Usuario BioCore")
-        st.success(f"Conectada: {usuario}")
+        st.success(f"Conectada: {st.session_state.get('usuario_actual', 'BioCore')}")
         umbral = st.slider("Umbral Crítico", 0.1, 0.9, 0.4)
         ejecutar = st.button("🚀 INICIAR MONITOREO TOTAL", use_container_width=True)
         if st.button("Salir"):
@@ -65,11 +79,9 @@ if check_password():
 
     st.title("🛰️ BioCore V5: Inteligencia Multimodal")
     
-    # Este contenedor asegura que las pestañas tengan contenido
-    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Histórico Landsat", "🌡️ TerraClimate & Fuego"])
+    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Histórico Landsat", "🌡️ Clima y Fuego"])
 
     with tab1:
-        st.subheader("Ubicación de Proyectos")
         m = folium.Map(location=[-35.0, -71.0], zoom_start=5)
         for n, i in CLIENTES.items():
             p_fol = [[c[1], c[0]] for c in i['coords']]
@@ -81,7 +93,7 @@ if check_password():
                 st.write(f"🔍 Procesando: **{nombre}**")
                 poly = ee.Geometry.Polygon(info['coords'])
                 
-                # Sentinel-2
+                # Sentinel-2 (Multiespectral)
                 s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
                 fecha = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
                 
@@ -89,13 +101,12 @@ if check_password():
                     .addBands(s2.normalizedDifference(['B3','B8']).rename('ndwi'))\
                     .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
-                c1, c2 = st.columns(2)
+                # Sentinel-1 (Radar)
+                s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(poly).sort('system:time_start', False).first()
+                sar_val = s1.reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()['VV']
+
+                c1, c2, c3 = st.columns(3)
                 c1.metric("SAVI (Vigor)", f"{res['savi']:.3f}")
                 c2.metric("NDWI (Agua)", f"{res['ndwi']:.3f}")
+                c3.metric("SAR (Radar)", f"{sar_val:.1f} dB")
             st.balloons()
-
-    with tab2:
-        st.info("Selecciona 'Iniciar Monitoreo' para cargar registros históricos.")
-
-    with tab3:
-        st.info("Datos climáticos y detección de incendios activos.")

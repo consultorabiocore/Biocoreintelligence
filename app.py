@@ -39,84 +39,68 @@ if check_password():
         st.error(f"Error de conexión: {e}")
         st.stop()
 
-    # --- 3. OBTENCIÓN DE DATOS ---
-    @st.cache_data(ttl=600)
-    def get_projects():
-        # Usamos la tabla "usuarios" de tu captura de pantalla
+    # --- 3. PESTAÑAS ---
+    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo y Diagnóstico", "➕ Registro de Clientes", "🌡️ Clima"])
+
+    # --- PESTAÑA 2: REGISTRO DE CLIENTES ---
+    with tab2:
+        st.header("📝 Registro de Nuevo Proyecto BioCore")
+        with st.form("registro_p"):
+            c1, c2 = st.columns(2)
+            n_proy = c1.text_input("Nombre del Proyecto")
+            t_proy = c2.selectbox("Tipo de Proyecto", ["HUMEDAL", "MINERIA"])
+            
+            coords_raw = st.text_area("Coordenadas (JSON)")
+            
+            c3, c4 = st.columns(2)
+            s_id = c3.text_input("Google Sheet ID")
+            t_id = c4.text_input("Telegram Chat ID", value=st.secrets["telegram"]["chat_id"])
+            
+            es_glaciar = st.checkbox("¿Contiene áreas de Glaciar/Nieve?")
+            
+            if st.form_submit_button("💾 Guardar en Base de Datos"):
+                try:
+                    c_list = json.loads(coords_raw)
+                    if c_list[0] != c_list[-1]: c_list.append(c_list[0]) # Auto-cierre
+                    
+                    supabase.table("usuarios").insert({
+                        "Proyecto": n_proy, "Tipo": t_proy, "Coordenadas": json.dumps(c_list),
+                        "glaciar": es_glaciar, "sheet_id": s_id, "telegram_id": t_id
+                    }).execute()
+                    st.success("Proyecto registrado correctamente.")
+                except Exception as e: st.error(f"Error: {e}")
+
+    # --- PESTAÑA 1: PROCESAMIENTO Y REPORTES ---
+    with tab1:
         res = supabase.table("usuarios").select("*").execute()
-        return res.data
+        for proy in res.data:
+            nombre = proy['Proyecto']
+            tipo = proy['Tipo']
+            t_id_dest = proy.get('telegram_id', st.secrets["telegram"]["chat_id"])
+            poly = ee.Geometry.Polygon(json.loads(proy['Coordenadas']))
 
-    proyectos_db = get_projects()
-
-    # --- 4. INTERFAZ ---
-    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Historial", "🌡️ Clima"])
-    with st.sidebar:
-        st.header("🛰️ Panel BioCore")
-        btn_ejecutar = st.button("🚀 PROCESAR Y ENVIAR REPORTE", use_container_width=True)
-
-    # --- 5. BUCLE DE PROCESAMIENTO ---
-    for proy in proyectos_db:
-        nombre = proy.get('Proyecto', 'Sin Nombre')
-        tipo = proy.get('Tipo', 'HUMEDAL').upper()
-        # Aseguramos que el JSON de coordenadas sea válido
-        try:
-            coords = json.loads(proy['Coordenadas'])
-            poly = ee.Geometry.Polygon(coords)
-        except Exception as e:
-            st.error(f"Error en coordenadas de {nombre}: {e}")
-            continue
-
-        # Análisis Sentinel-2 e Índices
-        try:
+            # Sensores e Índices
             s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
             f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
             
-            # Cálculo de índices según tu protocolo BioCore
             idx = s2.expression({
-                'sa': '((B8-B4)/(B8+B4+0.5))*1.5', # SAVI
-                'nd': '(B3-B8)/(B3+B8)',          # NDWI/NDSI
-                'sw': 'B11 / 10000',              # SWIR
-                'clay': 'B11 / B12'               # Clay Ratio
-            }, {
-                'B8': s2.select('B8'), 'B4': s2.select('B4'),
-                'B3': s2.select('B3'), 'B11': s2.select('B11'), 'B12': s2.select('B12')
-            }).reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
-            
-            sa, nd, sw, clay = idx['sa'], idx['nd'], idx['sw'], idx['clay']
-        except Exception as e:
-            st.warning(f"GEE no pudo procesar {nombre}. Verifica que el polígono esté bien cerrado.")
-            continue
+                'sa': '((B8-B4)/(B8+B4+0.5))*1.5', 'nd': '(B3-B8)/(B3+B8)', 'sw': 'B11/10000'
+            }, {'B8':s2.select('B8'),'B4':s2.select('B4'),'B3':s2.select('B3'),'B11':s2.select('B11')}).reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
-        # Diagnóstico BioCore
-        estado = "🟢 BAJO CONTROL"
-        if tipo == "HUMEDAL":
-            diag = "Hidroestabilidad detectada."
-            if nd < 0.1: estado, diag = "🔴 ALERTA", "Estrés hídrico detectado."
-        else:
-            diag = "Sustrato estable."
-            if sw > 0.45: estado, diag = "🔴 ALERTA", "Posible remoción de material."
+            # Lógica BioCore
+            estado = "🟢 CONTROLADO"
+            if tipo == "HUMEDAL":
+                diag = "Hidroestabilidad normal."
+                if idx['nd'] < 0.1: estado, diag = "🔴 ALERTA", "Déficit hídrico en cubeta."
+            else:
+                diag = "Estabilidad de sustrato."
+                if idx['sw'] > 0.45: estado, diag = "🔴 ALERTA", "Remoción de estériles detectada."
 
-        # Visualización
-        with tab1:
             st.subheader(f"📍 {nombre} ({tipo})")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("SAVI (Vigor)", f"{sa:.2f}")
-            c2.metric("Humedad/Nieve", f"{nd:.2f}")
-            c3.metric("Estado", estado)
-            st.info(f"**Diagnóstico:** {diag}")
+            st.metric("Estado", estado, delta=diag)
 
-        # Reporte Telegram
-        if btn_ejecutar:
-            reporte = (f"🛰 **BIOCORE V5: REPORTE TÉCNICO**\n"
-                       f"**{nombre}** ({tipo})\n"
-                       f"📅 Fecha: {f_rep}\n"
-                       f"🌱 SAVI: `{sa:.2f}`\n"
-                       f"💧 NDWI/NDSI: `{nd:.2f}`\n"
-                       f"✅ Estado: {estado}\n"
-                       f"📝 Diagnóstico: {diag}")
-            requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
-                         data={"chat_id": st.secrets['telegram']['chat_id'], "text": reporte, "parse_mode": "Markdown"})
-
-    if btn_ejecutar:
-        st.success("Reportes enviados al celular ✅")
-        st.balloons()
+            if st.button(f"📲 Enviar Reporte: {nombre}"):
+                msg = f"🛰 **BIOCORE V5**\n{nombre}\n📅 {f_rep}\n🌱 SAVI: {idx['sa']:.2f}\n✅ {estado}\n📝 {diag}"
+                requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
+                             data={"chat_id": t_id_dest, "text": msg, "parse_mode": "Markdown"})
+                st.toast(f"Enviado a ID: {t_id_dest}")

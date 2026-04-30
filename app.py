@@ -18,16 +18,23 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Inicializar Google Earth Engine
+# Inicializar Google Earth Engine (Versión Corregida)
 def init_gee():
     try:
-        if not ee.data._credentials:
-            gee_json = json.loads(st.secrets["gee"]["json"])
-            credentials = ee.ServiceAccountCredentials(gee_json['client_email'], key_data=gee_json['private_key'])
-            ee.Initialize(credentials, project=gee_json['project_id'])
+        # Cargamos el JSON desde los secrets
+        gee_json = json.loads(st.secrets["gee"]["json"])
+        
+        # Creamos las credenciales de forma explícita
+        credentials = ee.ServiceAccountCredentials(
+            gee_json['client_email'], 
+            key_data=gee_json['private_key']
+        )
+        
+        # Inicializamos sin chequear atributos internos privados
+        ee.Initialize(credentials, project=gee_json['project_id'])
         return True
     except Exception as e:
-        st.error(f"Error GEE: {e}")
+        st.error(f"Error de Autenticación GEE: {e}")
         return False
 
 # --- 2. FUNCIONES DE SEGURIDAD Y PAGOS ---
@@ -39,26 +46,25 @@ def verificar_estado_pago(fecha_inicio_str, meses_pagados):
     except:
         return "ERROR_FORMATO"
 
-# --- 3. PROCESAMIENTO SATELITAL INTEGRADO ---
+# --- 3. PROCESAMIENTO SATELITAL (Lógica BioCore) ---
 def analizar_indices(poligono_str, tipo_proyecto):
     poligono = json.loads(poligono_str)
     roi = ee.Geometry.Polygon(poligono)
     
-    # Sentinel-2 (Vigor y Agua/Arcilla)
+    # Colecciones con filtros de nubes
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
         .filterBounds(roi).filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))\
         .sort('system:time_start', False).first().clip(roi)
     
-    # Landsat 8 (Temperatura)
     l8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')\
         .filterBounds(roi).sort('system:time_start', False).first().clip(roi)
 
-    # SAVI (Soil Adjusted Vegetation Index)
+    # SAVI: Vigor Vegetal
     savi = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {
         'B8': s2.select('B8'), 'B4': s2.select('B4')
     }).reduceRegion(ee.Reducer.mean(), roi, 30).getInfo().get('constant', 0)
     
-    # Temperatura de Superficie (LST)
+    # LST: Temperatura de Superficie corregida
     temp_img = l8.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15)
     lst = temp_img.reduceRegion(ee.Reducer.mean(), roi, 30).getInfo().get('ST_B10', 0)
 
@@ -75,7 +81,7 @@ def analizar_indices(poligono_str, tipo_proyecto):
         
     return resultado
 
-# --- 4. GENERADOR DE PDF CON BLINDAJE LEGAL ---
+# --- 4. GENERADOR DE PDF ---
 def crear_pdf(user_data, indices):
     pdf = FPDF()
     pdf.add_page()
@@ -86,17 +92,15 @@ def crear_pdf(user_data, indices):
     pdf.set_font("helvetica", "", 12)
     pdf.cell(0, 10, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
     pdf.cell(0, 10, f"Vigor Vegetal (SAVI): {indices['SAVI']}", ln=True)
-    pdf.cell(0, 10, f"Temperatura de Superficie: {indices['TEMP']}°C", ln=True)
-    
+    pdf.cell(0, 10, f"Temperatura: {indices['TEMP']}°C", ln=True)
     if indices["ETIQUETA_EXTRA"]:
         pdf.cell(0, 10, f"{indices['ETIQUETA_EXTRA']}: {indices['EXTRA']}", ln=True)
     
     pdf.ln(20)
     pdf.set_font("helvetica", "I", 8)
-    pdf.set_text_color(120, 120, 120)
-    legal = ("NOTA DE ALCANCE TÉCNICO: Este reporte ha sido generado mediante teledetección satelital. "
-             "La información es referencial y constituye un apoyo a la decisión. BioCore no se hace responsable "
-             "por interpretaciones o acciones de terceros. Se recomienda validación en terreno.")
+    pdf.set_text_color(100, 100, 100)
+    legal = ("Este reporte es confidencial y generado vía teledetección. "
+             "BioCore Intelligence - Consultoría Ambiental.")
     pdf.multi_cell(0, 5, legal, align="C")
     return pdf.output(dest='S').encode('latin-1')
 
@@ -106,18 +110,16 @@ st.title("🌿 BioCore Intelligence")
 if 'auth' not in st.session_state: st.session_state.auth = False
 
 with st.sidebar:
-    st.header("Acceso Clientes")
+    st.header("Acceso")
     if not st.session_state.auth:
         email = st.text_input("Email").lower().strip()
-        password = st.text_input("Password", type="password")
+        pwd = st.text_input("Password", type="password")
         if st.button("Ingresar"):
             res = supabase.table("usuarios").select("*").eq("Email", email).execute()
-            if res.data and str(res.data[0]['Password']) == password:
-                st.session_state.auth = True
-                st.session_state.user = res.data[0]
+            if res.data and str(res.data[0]['Password']) == pwd:
+                st.session_state.auth, st.session_state.user = True, res.data[0]
                 st.rerun()
-            else:
-                st.error("Credenciales incorrectas")
+            else: st.error("Credenciales inválidas")
     else:
         if st.button("Cerrar Sesión"):
             st.session_state.auth = False
@@ -128,12 +130,12 @@ if st.session_state.auth:
     estado = verificar_estado_pago(u["Fecha_Inicio"], u["Meses_Pagados"])
     
     if estado == "DEUDA":
-        st.error(f"⚠️ Suscripción de {u['Proyecto']} vencida. Contacte a soporte.")
+        st.error(f"⚠️ Suscripción de {u['Proyecto']} vencida.")
     else:
-        st.success(f"Consola activa: {u['Proyecto']}")
+        st.success(f"Proyecto: {u['Proyecto']}")
         if st.button("🚀 Ejecutar Escaneo Satelital"):
             if init_gee():
-                with st.spinner("Analizando bandas multiespectrales..."):
+                with st.spinner("Procesando Sentinel-2 y Landsat 8..."):
                     res = analizar_indices(u["Coordenadas"], u["Tipo"])
                     
                     c1, c2, c3 = st.columns(3)
@@ -142,4 +144,4 @@ if st.session_state.auth:
                     c3.metric(res['ETIQUETA_EXTRA'], res['EXTRA'])
                     
                     pdf_bytes = crear_pdf(u, res)
-                    st.download_button("📥 Descargar Reporte PDF", pdf_bytes, f"Reporte_{u['Proyecto']}.pdf", "application/pdf")
+                    st.download_button("📥 Descargar Reporte PDF", pdf_bytes, f"BioCore_{u['Proyecto']}.pdf")

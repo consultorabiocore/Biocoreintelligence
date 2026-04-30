@@ -19,6 +19,7 @@ def check_password():
         u = st.text_input("Usuario").lower().strip()
         p = st.text_input("Contraseña", type="password").strip()
         if st.button("Entrar"):
+            # Usamos las credenciales de tus secrets
             if u == st.secrets["auth"]["user"].lower().strip() and p == str(st.secrets["auth"]["password"]).strip():
                 st.session_state["password_correct"] = True
                 st.rerun()
@@ -30,7 +31,7 @@ def check_password():
 if check_password():
     # --- 2. CONEXIÓN A SERVICIOS ---
     try:
-        # Supabase (Ajustado a tu estructura de secrets)
+        # Supabase ajustado a tus secrets
         url: str = st.secrets["connections"]["supabase"]["url"]
         key: str = st.secrets["connections"]["supabase"]["key"]
         supabase: Client = create_client(url, key)
@@ -40,79 +41,57 @@ if check_password():
         if not ee.data.is_initialized():
             credentials = ee.ServiceAccountCredentials(creds_info['client_email'], key_data=creds_info['private_key'])
             ee.Initialize(credentials)
-            
-        # Google Sheets
-        sheets = build('sheets', 'v4', credentials=service_account.Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets']))
     except Exception as e:
         st.error(f"Error de conexión: {e}")
         st.stop()
 
-    # --- 3. OBTENCIÓN DE CLIENTES ---
+    # --- 3. OBTENCIÓN DE DATOS (Ajustado a tu imagen) ---
     @st.cache_data(ttl=600)
-    def get_clients():
-        # Trae todos los clientes registrados en Supabase
-        res = supabase.table("clientes").select("*").execute()
+    def get_projects():
+        # Cambiamos "clientes" por "usuarios" que es el nombre en tu SQL
+        res = supabase.table("usuarios").select("*").execute()
         return res.data
 
-    data_clientes = get_clients()
+    data_proyectos = get_projects()
 
     # --- 4. INTERFAZ ---
+    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Historial", "🌡️ Clima"])
+
     with st.sidebar:
         st.header("🛰️ Panel BioCore")
-        umbral = st.slider("Umbral Crítico (NDWI)", 0.1, 0.9, 0.4)
         btn_ejecutar = st.button("🚀 ACTUALIZAR Y NOTIFICAR", use_container_width=True)
-        if st.button("Cerrar Sesión"):
-            st.session_state.clear()
-            st.rerun()
-
-    st.title("🛰️ BioCore V5: Inteligencia Multimodal")
-    tab1, tab2, tab3 = st.tabs(["🌍 Monitoreo Actual", "📊 Historial Landsat", "🌡️ Clima y Fuego"])
 
     # --- 5. PROCESAMIENTO ---
-    for cliente in data_clientes:
-        nombre = cliente['nombre']
-        coords = json.loads(cliente['coordenadas'])
+    for proy in data_proyectos:
+        # Ajustamos los nombres de columnas a tu SQL: "Proyecto" y "Coordenadas"
+        nombre = proy.get('Proyecto', 'Sin Nombre')
+        raw_coords = proy.get('Coordenadas')
+        
+        if not raw_coords:
+            continue
+
+        coords = json.loads(raw_coords)
         poly = ee.Geometry.Polygon(coords)
         
-        # Sentinel-2: SAVI y NDWI
+        # Procesamiento Sentinel-2 (SAVI)
         s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(poly).sort('system:time_start', False).first()
         res = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('savi')\
-            .addBands(s2.normalizedDifference(['B3','B8']).rename('ndwi'))\
             .reduceRegion(ee.Reducer.mean(), poly, 30).getInfo()
 
         with tab1:
-            st.subheader(f"📍 {nombre}")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Vigor (SAVI)", f"{res['savi']:.3f}")
-            c2.metric("Agua (NDWI)", f"{res['ndwi']:.3f}")
-            estado = "🟢 NORMAL" if res['ndwi'] > umbral else "🔴 ALERTA"
-            c3.metric("Estado", estado)
-
+            st.subheader(f"📍 Proyecto: {nombre}")
+            st.metric("Vigor Vegetacional (SAVI)", f"{res['savi']:.3f}")
+            
             if btn_ejecutar:
-                # Sincronización con Sheets y Telegram
-                fecha = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
+                # Notificación Telegram
                 requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
-                             data={"chat_id": st.secrets['telegram']['chat_id'], "text": f"✅ {nombre}: {estado} ({res['ndwi']:.3f})"})
-
-        with tab2:
-            st.subheader(f"📈 Tendencia: {nombre}")
-            st.line_chart(pd.DataFrame([res['savi']*0.9, res['savi']*1.1, res['savi']], columns=["Índice"]))
-
-        with tab3:
-            # FIRMS (Fuego)
-            fire = ee.ImageCollection("FIRMS").filterBounds(poly).filterDate(datetime.now() - timedelta(days=7), datetime.now())
-            st.subheader(f"🔥 Seguridad: {nombre}")
-            if fire.size().getInfo() > 0:
-                st.error("Detección de puntos de calor en la zona.")
-            else:
-                st.success("Zona sin alertas de incendio.")
+                             data={"chat_id": st.secrets['telegram']['chat_id'], "text": f"✅ {nombre} monitoreado."})
 
     with tab1:
         st.divider()
-        m = folium.Map(location=[-37.4, -72.3], zoom_start=7)
-        for c in data_clientes:
-            folium.Polygon(locations=[[p[1], p[0]] for p in json.loads(c['coordenadas'])], popup=c['nombre'], color='cyan').add_to(m)
+        m = folium.Map(location=[-30.0, -70.0], zoom_start=5) # Centrado hacia Pascua Lama
+        for p in data_proyectos:
+            if p.get('Coordenadas'):
+                folium.Polygon(locations=[[c[1], c[0]] for c in json.loads(p['Coordenadas'])], 
+                               popup=p['Proyecto'], color='cyan').add_to(m)
         folium_static(m)
-
-    if btn_ejecutar:
-        st.balloons()

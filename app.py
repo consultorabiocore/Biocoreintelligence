@@ -39,17 +39,8 @@ def init_gee():
 # --- 3. MOTORES DE CÁLCULO ---
 def escanear_multimodal(coords_str):
     roi = ee.Geometry.Polygon(json.loads(coords_str))
-    
-    # Sentinel-2 (Óptico - Sensible a nubes)
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(roi).sort('system:time_start', False).first()
-    
-    # Sentinel-1 (RADAR - Atraviesa nubes)
-    s1 = ee.ImageCollection('COPERNICUS/S1_GRD')\
-        .filterBounds(roi)\
-        .filter(ee.Filter.eq('instrumentMode', 'IW'))\
-        .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
-        .sort('system:time_start', False).first()
-    
+    s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(roi).filter(ee.Filter.eq('instrumentMode', 'IW')).sort('system:time_start', False).first()
     clima = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterBounds(roi).sort('system:time_start', False).first()
 
     def get_val(img, band, scale):
@@ -63,7 +54,7 @@ def escanear_multimodal(coords_str):
     
     return {
         "SAVI": get_val(savi_img, 'constant', 30),
-        "Radar_VV": get_val(s1, 'VV', 10), # Dato clave cuando hay nubes
+        "Radar_VV": get_val(s1, 'VV', 10),
         "Precip": get_val(clima, 'pr', 4638),
         "Temp": round(get_val(clima, 'tmmx', 4638) * 0.1, 1)
     }
@@ -74,25 +65,30 @@ def obtener_historia_20_anos(coords_str):
         ahora = datetime.now().year
         datos = []
         
-        # Colección Landsat para el pasado
-        fusion = ee.ImageCollection("LANDSAT/LC09/C02/T1_L2")\
-            .merge(ee.ImageCollection("LANDSAT/LC08/C02/T1_L2"))\
-            .merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))\
-            .merge(ee.ImageCollection("LANDSAT/LT05/C02/T1_L2"))
+        # Procesamos cada colección por separado para evitar el error de homogeneidad
+        l89 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LC09/C02/T1_L2")) \
+                .select(['SR_B5', 'SR_B4'], ['NIR', 'RED'])
+        
+        l57 = ee.ImageCollection("LANDSAT/LE07/C02/T1_L2").merge(ee.ImageCollection("LANDSAT/LT05/C02/T1_L2")) \
+                .select(['SR_B4', 'SR_B3'], ['NIR', 'RED'])
+        
+        # Ahora la unión es segura porque todas tienen las mismas bandas: NIR y RED
+        fusion = l89.merge(l57)
 
         for año in range(ahora - 20, ahora + 1):
             inicio, fin = f"{año}-01-01", f"{año}-12-31"
-            # Reductor de percentil 50 (mediana) para limpiar nubes en el historial
+            # Filtramos nubes usando la mediana anual
             img = fusion.filterBounds(geom).filterDate(inicio, fin).median()
             
-            bandas = img.bandNames().getInfo()
-            b_nir, b_red = (('SR_B5', 'SR_B4') if 'SR_B5' in bandas else ('SR_B4', 'SR_B3')) if bandas else (None, None)
+            # Verificamos si la imagen resultante tiene bandas (si hay datos para ese año)
+            tiene_datos = img.bandNames().size().getInfo() > 0
 
-            if b_nir:
-                savi_val = img.expression('((N-R)/(N+R+0.5))*1.5', {'N':img.select(b_nir),'R':img.select(b_red)})\
+            if tiene_datos:
+                savi_val = img.expression('((N-R)/(N+R+0.5))*1.5', {'N':img.select('NIR'),'R':img.select('RED')}) \
                     .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('constant', 0)
                 val = round(savi_val, 3) if savi_val else 0
-            else: val = 0
+            else:
+                val = 0
                 
             datos.append({'año': str(año), 'savi': val})
         return pd.DataFrame(datos)
@@ -136,59 +132,44 @@ if st.session_state.auth:
             folium_static(m)
 
         with col2:
-            if st.button("🚀 EJECUTAR ANÁLISIS MULTIMODAL"):
+            if st.button("🚀 ANÁLISIS MULTIMODAL"):
                 if init_gee():
-                    with st.spinner("Fusionando Óptico + Radar (Sentinel 1/2)..."):
+                    with st.spinner("Analizando Óptico + Radar..."):
                         data = escanear_multimodal(coords_act)
+                        st.metric("Vigor (SAVI)", data['SAVI'])
+                        st.metric("Radar VV", f"{data['Radar_VV']} dB")
+                        st.metric("Humedad/Lluvia", f"{data['Precip']} mm")
                         
-                        st.metric("Vigor (SAVI)", data['SAVI'], help="Suelo/Vegetación (Óptico)")
-                        st.metric("Estructura (Radar VV)", f"{data['Radar_VV']} dB", help="Independiente de nubes")
-                        st.metric("Humedad/Precip", f"{data['Precip']} mm")
-                        
-                        # Reporte Telegram (Texto Directo)
-                        msg = (f"🛰️ *REPORTE BIOCORE (Radar + Óptico)*\n"
-                               f"📍 *Lugar:* {u['Proyecto']}\n"
-                               f"📅 *Fecha:* {fecha_hoy}\n\n"
-                               f"🌿 *SAVI:* {data['SAVI']}\n"
-                               f"📡 *Radar VV:* {data['Radar_VV']} dB\n"
-                               f"💧 *Lluvia:* {data['Precip']} mm\n"
-                               f"🌡️ *Temp:* {data['Temp']} °C\n\n"
-                               f"✅ _Dato de Radar disponible incluso con nubes._")
+                        msg = (f"🛰️ *REPORTE BIOCORE*\n📍 *Proyecto:* {u['Proyecto']}\n📅 *Fecha:* {fecha_hoy}\n\n"
+                               f"🌿 *SAVI:* {data['SAVI']}\n📡 *Radar VV:* {data['Radar_VV']} dB\n💧 *Lluvia:* {data['Precip']} mm")
                         
                         try:
                             requests.post(f"https://api.telegram.org/bot{T_TOKEN}/sendMessage", 
                                           data={"chat_id": T_ID, "text": msg, "parse_mode": "Markdown"})
-                            st.success("✅ Mensaje enviado a Telegram.")
-                        except: st.warning("⚠️ Fallo en Telegram.")
+                            st.success("✅ Telegram enviado.")
+                        except: st.warning("⚠️ Error Telegram.")
 
-                        # Opción de descarga PDF
                         pdf = FPDF()
                         pdf.add_page(); pdf.set_font("helvetica", "B", 16)
                         pdf.cell(0, 10, clean(f"INFORME BIOCORE: {u['Proyecto']}"), ln=1)
                         pdf.set_font("helvetica", "", 12)
-                        pdf.multi_cell(0, 10, clean(f"Fecha: {fecha_hoy}\nSAVI: {data['SAVI']}\nRadar: {data['Radar_VV']} dB\nLluvia: {data['Precip']}mm"))
-                        
-                        pdf_out = pdf.output(dest='S')
-                        pdf_bytes = bytes(pdf_out) if not isinstance(pdf_out, str) else pdf_out.encode('latin-1')
-                        st.download_button("📥 Descargar Reporte PDF", pdf_bytes, f"BioCore_{u['Proyecto']}.pdf")
+                        pdf.multi_cell(0, 10, clean(f"Fecha: {fecha_hoy}\nSAVI: {data['SAVI']}\nRadar: {data['Radar_VV']} dB"))
+                        st.download_button("📥 Descargar Reporte PDF", pdf.output(dest='S').encode('latin-1'), f"BioCore_{u['Proyecto']}.pdf")
 
     elif menu == "📊 Auditoría 20 Años":
-        st.subheader(f"Evolución Histórica Landsat: {u['Proyecto']}")
+        st.subheader(f"Evolución Histórica: {u['Proyecto']}")
         if st.button("🔍 Cargar Cronología"):
             if init_gee():
-                with st.spinner("Procesando 20 años..."):
+                with st.spinner("Sincronizando 20 años de satélites..."):
                     df = obtener_historia_20_anos(coords_act)
                     if not df.empty:
                         st.line_chart(df.set_index('año'))
                         st.dataframe(df)
 
     elif menu == "🔥 Riesgo Incendio":
-        st.subheader("Anomalías Térmicas (FIRMS)")
+        st.subheader("Anomalías Térmicas FIRMS")
         if init_gee():
             p = ee.Geometry.Polygon(json.loads(coords_act))
-            f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate(
-                (datetime.now()-relativedelta(days=3)).strftime('%Y-%m-%d'), 
-                datetime.now().strftime('%Y-%m-%d')
-            ).size().getInfo()
+            f = ee.ImageCollection('FIRMS').filterBounds(p).filterDate((datetime.now()-relativedelta(days=3)).strftime('%Y-%m-%d'), datetime.now().strftime('%Y-%m-%d')).size().getInfo()
             if f > 0: st.error(f"🚨 {f} focos detectados."); st.toast("RIESGO")
-            else: st.success("✅ Área sin focos activos.")
+            else: st.success("✅ Área segura.")

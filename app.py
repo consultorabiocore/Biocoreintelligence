@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 
 # --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide")
 
 @st.cache_resource
@@ -19,10 +20,19 @@ def init_db():
 supabase = init_db()
 
 def iniciar_gee():
-    if not ee.data.is_initialized():
-        creds = json.loads(st.secrets["gee"]["json"])
-        ee_creds = ee.ServiceAccountCredentials(creds['client_email'], key_data=creds['private_key'])
-        ee.Initialize(ee_creds)
+    try:
+        if not ee.data.is_initialized():
+            creds = json.loads(st.secrets["gee"]["json"])
+            # Se recomienda usar el proyecto de Google Cloud explícitamente en V5
+            ee_creds = ee.ServiceAccountCredentials(creds['client_email'], key_data=creds['private_key'])
+            ee.Initialize(ee_creds, project=creds.get('project_id')) 
+            return True
+    except Exception as e:
+        st.error(f"Error crítico en GEE: {e}")
+        return False
+
+# ¡ESTA LÍNEA ES VITAL! Debe ejecutarse al cargar la app
+gee_status = iniciar_gee()
 
 # --- 2. FUNCIÓN DE MAPA REFORZADA ---
 def dibujar_mapa_biocore(coords_json):

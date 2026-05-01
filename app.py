@@ -258,7 +258,7 @@ def generar_reporte_total(p):
 ──────────────────
 ✅ **ESTADO GLOBAL:** {est_global}
 📝 **CONCLUSIÓN FINAL:** {conclusion_final}
-"""
+    """ # Este cierra el texto_final
 
     return texto_final, s_actual, s_base
 

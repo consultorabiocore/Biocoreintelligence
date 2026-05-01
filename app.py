@@ -54,6 +54,9 @@ def dibujar_mapa_biocore(coords_json):
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
+    # Esto imprimirá en tu terminal las columnas que trae el proyecto
+    print(f"DEBUG: Columnas disponibles en {p.get('Proyecto')}: {p.keys()}")
+
     # 1. Definición de perfiles
     PERFILES = {
         "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},

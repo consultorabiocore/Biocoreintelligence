@@ -77,7 +77,7 @@ def generar_reporte_total(p):
     d = PERFILES.get(tipo, PERFILES["MINERIA"])
 
     # 2. CARGA DE GEOMETRÍA (Ajustado a tu columna 'Coordenadas')
-    try:
+        try:
         raw_coords = p.get('Coordenadas')
         
         if raw_coords is None:
@@ -263,7 +263,7 @@ def generar_reporte_total(p):
     return texto_final, s_actual, s_base
 
     except Exception as e:
-    return f"❌ Error en el procesamiento: {str(e)}", 0, 0
+        return f"❌ Error en el procesamiento: {str(e)}", 0, 0
 
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])

@@ -10,7 +10,6 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 
 # --- 1. CONFIGURACIÓN ---
-# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide")
 
 @st.cache_resource
@@ -55,28 +54,30 @@ def dibujar_mapa_biocore(coords_json):
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
-    # --- FIX: Definir perfiles localmente si no existen en session_state ---
+    # 1. Definir perfiles (lo que vimos antes)
     PERFILES = {
-        "MINERIA": {
-            "cat": "RCA Minería (F-30)",
-            "ve7": "Estabilidad de taludes y control de material particulado.",
-            "clima": "Protocolo de Blindaje ante eventos extremos en faena."
-        },
-        "GLACIAR": {
-            "cat": "RCA Criosfera",
-            "ve7": "Monitoreo de balance de masa y escorrentía nival.",
-            "clima": "Protección legal bajo Ley de Glaciares."
-        },
-        "BOSQUE": {
-            "cat": "Ley 20.283 (Bosque Nativo)",
-            "ve7": "Vigilancia de regeneración y estado fitosanitario.",
-            "clima": "Prevención de incendios y estrés hídrico."
-        }
+        "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},
+        "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Balance de masa.", "clima": "Ley de Glaciares."},
+        "BOSQUE": {"cat": "Ley 20.283", "ve7": "Vigilancia regeneración.", "clima": "Prevención incendios."}
     }
     
     tipo = p.get('Tipo', 'MINERIA')
     d = PERFILES.get(tipo, PERFILES["MINERIA"])
-    
+
+    # 2. CREAR LA GEOMETRÍA (Aquí estaba el error)
+    # Asumiendo que 'p' tiene una columna llamada 'geom' con las coordenadas
+    try:
+        # p['geom'] debe ser una lista de coordenadas tipo [[long, lat], [long, lat]...]
+        geom = ee.Geometry.Polygon(p['geom']) 
+    except Exception as e:
+        # Si p['geom'] no existe o está mal, usamos un punto o fallamos con gracia
+        return f"Error: No se encontró geometría válida para {p['Proyecto']}", 0, 0
+
+    # 3. Ahora sí puedes usar geom en filterBounds
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+           .filterBounds(geom)\
+           .sort('system:time_start', False)\
+           .first()
         # --- A. Datos Satelitales (Óptico, Radar, Clima) ---
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()
     f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')

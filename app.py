@@ -230,41 +230,39 @@ def generar_reporte_total(p):
         exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
 
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (TELEGRAM) ---
-      # --- F. CIERRE Y RETORNO ---
-        
-        # Aseguramos que v_savi y v_clay existan para el mensaje
-        v_savi = s_actual 
-        v_clay = float(idx.get('clay', 0))
-    texto_final = (
-        f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"
-        f"**PROYECTO:** {p['Proyecto']}\n"
-        f"📅 **Análisis:** {f_rep} | **Línea Base:** {anio_base}\n"
-        f"──────────────────\n"
-        f"❄️ **ESTADO DE CRIÓSFERA (NDSI):**\n"
-        f"└ Cobertura Actual: `{v_ndsi:.3f}`\n"
-        f"└ **Análisis:** {exp_snow}\n\n"
-        f"📡 **MONITOREO RADAR (Sentinel-1):**\n"
-        f"└ Retrodispersión VV: `{v_radar:.2f} dB`\n"
-        f"└ **Análisis:** {exp_radar}\n\n"
-        f"🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**\n"
-        f"└ Humedad (SWIR): `{v_swir:.2f}` | Arcillas: `{v_clay:.2f}`\n"
-        f"└ **Análisis:** {exp_swir}\n\n"
-        f"🌱 **SALUD VEGETAL (SAVI):**\n"
-        f"└ Vigor Actual: `{v_savi:.3f}` | Base: `{s_base:.3f}`\n"
-        f"└ Variación: `{variacion:.1f}%` respecto al original.\n"
-        f"└ **Análisis:** {exp_savi}\n\n"
-        f"⚠️ **RIESGO CLIMÁTICO:**\n"
-        f"└ Temperatura: `{temp_val:.1f}°C` | Incendios: {alerta_incendio}\n"
-        f"──────────────────\n"
-        f"✅ **ESTADO GLOBAL:** {est_global}\n"
-        f"📝 **CONCLUSIÓN FINAL:** {conclusion_final}"
-    )
+    # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (Borra lo anterior y pega esto) ---
+    texto_final = f"""
+🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**
+**PROYECTO:** {p['Proyecto']}
+📅 **Análisis:** {f_rep} | **Línea Base:** {anio_base}
+──────────────────
+❄️ **ESTADO DE CRIÓSFERA (NDSI):**
+└ Cobertura Actual: `{v_ndsi:.3f}`
+└ **Análisis:** {exp_snow}
 
-    # El retorno triple que espera tu interfaz (Línea 263 corregida)
+📡 **MONITOREO RADAR (Sentinel-1):**
+└ Retrodispersión VV: `{v_radar:.2f} dB`
+└ **Análisis:** {exp_radar}
+
+🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**
+└ Humedad (SWIR): `{v_swir:.2f}` | Arcillas: `{v_clay:.2f}`
+└ **Análisis:** {exp_swir}
+
+🌱 **SALUD VEGETAL (SAVI):**
+└ Vigor Actual: `{v_savi:.3f}` | Base: `{s_base:.3f}`
+└ Variación: `{variacion:.1f}%` respecto al original.
+└ **Análisis:** {exp_savi}
+
+⚠️ **RIESGO CLIMÁTICO:**
+└ Temperatura: `{temp_val:.1f}°C` | Incendios: {alerta_incendio}
+──────────────────
+✅ **ESTADO GLOBAL:** {est_global}
+📝 **CONCLUSIÓN FINAL:** {conclusion_final}
+"""
+
     return texto_final, s_actual, s_base
 
 except Exception as e:
-    # Este except también debe estar alineado con el try de arriba
     return f"❌ Error en el procesamiento: {str(e)}", 0, 0
 
 # --- 4. INTERFAZ ---

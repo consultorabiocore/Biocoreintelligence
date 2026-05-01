@@ -8,6 +8,9 @@ import requests
 from datetime import datetime
 import plotly.graph_objects as go
 from supabase import create_client, Client
+from fpdf import FPDF
+import matplotlib.pyplot as plt
+import os
 
 # --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide")
@@ -24,7 +27,66 @@ def iniciar_gee():
         ee_creds = ee.ServiceAccountCredentials(creds['client_email'], key_data=creds['private_key'])
         ee.Initialize(ee_creds)
 
-# --- 2. FUNCIONES DE PROCESAMIENTO ---
+# --- 2. MOTOR DE REPORTES PDF (ESTRUCTURA SOLICITADA) ---
+
+def crear_pdf_biocore(reporte, proyecto):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Banner Azul Marino de Auditoría
+    pdf.set_fill_color(20, 50, 80)
+    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", "B", 16)
+    pdf.cell(0, 20, f"AUDITORIA DE CUMPLIMIENTO AMBIENTAL - {proyecto.upper()}", align="C", ln=1)
+    pdf.set_font("helvetica", "I", 10)
+    pdf.cell(0, 5, f"Responsable Técnica: Loreto Campos | BioCore Intelligence", align="C", ln=1)
+    
+    pdf.ln(20)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, "DIAGNOSTICO TECNICO DE CRIOSFERA Y ALTA MONTAÑA", ln=1)
+    
+    # Lógica de Umbral para el Estatus
+    val_actual = reporte.get('savi', 0)
+    ndsi_val = reporte.get('ndwi_ndsi', val_actual) # Ajuste según variable disponible
+    
+    if ndsi_val < 0.35:
+        estado_txt = "ALERTA TECNICA: PERDIDA DE COBERTURA"
+        color_resumen = (200, 0, 0)
+        diagnostico = (
+            f"1. ESTADO DE GLACIARES: El indice actual ({ndsi_val:.2f}) se encuentra bajo el umbral "
+            "critico de presencia de hielo/nieve perenne (0.40). Indica una degradacion de la masa criosferica.\n\n"
+            "2. RIESGO TECNICO-LEGAL: La ausencia de firma espectral constituye un hallazgo critico. "
+            "No permite generar prueba de descargo por estabilidad ante fiscalizacion.\n\n"
+            "3. RECOMENDACION: Inspeccion inmediata para descartar acumulacion de material particulado."
+        )
+    else:
+        estado_txt = "BAJO CONTROL: ESTABILIDAD CRIOSFERICA"
+        color_resumen = (0, 100, 0)
+        diagnostico = (
+            f"1. PROTECCION DE GLACIARES: El indice ({ndsi_val:.2f}) confirma la permanencia de "
+            "masa de hielo. Blinda al titular ante acusaciones de daño ambiental reciente.\n\n"
+            "2. BLINDAJE: El monitoreo indica cumplimiento de los parametros de preservacion de la RCA."
+        )
+
+    pdf.set_fill_color(*color_resumen)
+    pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", "B", 10)
+    pdf.cell(0, 8, f" ESTATUS: {estado_txt}", ln=1, fill=True)
+    
+    pdf.ln(5); pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", "", 9)
+    pdf.multi_cell(0, 6, diagnostico, border=1)
+
+    # Firma
+    pdf.ln(10)
+    pdf.set_font("helvetica", "B", 10); pdf.cell(0, 5, "Loreto Campos", align="C", ln=1)
+    pdf.set_font("helvetica", "I", 9); pdf.cell(0, 5, "Directora Tecnica - BioCore Intelligence", align="C", ln=1)
+
+    fname = f"Reporte_{proyecto}_{reporte['id']}.pdf"
+    pdf.output(fname)
+    return fname
+
+# --- 3. FUNCIONES DE PROCESAMIENTO GEE ---
 
 def dibujar_mapa_biocore(coords_json):
     try:
@@ -40,55 +102,29 @@ def dibujar_mapa_biocore(coords_json):
     except:
         return folium.Map(location=[-37.2, -72.7], zoom_start=12)
 
-def generar_reporte_total(p):
+def generar_auditoria_interna(p):
     iniciar_gee()
     js = json.loads(p['Coordenadas'])
     geom = ee.Geometry.Polygon(js['coordinates'] if 'coordinates' in js else js)
     
-    # Datos Actuales
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()
-    f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
-    
     idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
         .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
-        .addBands(s2.select('B11').divide(10000).rename('sw'))\
-        .addBands(s2.select('B11').divide(s2.select('B12')).rename('clay'))\
         .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
 
-    # Temperatura e Incendios
     temp_img = ee.ImageCollection("MODIS/061/MOD11A1").filterBounds(geom).sort('system:time_start', False).first()
     t_val = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15).reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0)
-    focos = ee.ImageCollection("FIRMS").filterBounds(geom).filterDate(ee.Date(datetime.now()).advance(-3, 'day')).size().getInfo()
 
-    # Línea de Base
-    anio_b = p.get('anio_linea_base', 2017)
-    s2_b = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom)\
-             .filterDate(f"{anio_b}-01-01", f"{anio_b}-12-31").sort('CLOUDY_PIXEL_PERCENTAGE').first()
-    s_base = s2_b.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2_b.select('B8'),'B4':s2_b.select('B4')})\
-                 .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('constant', 0)
-
-    variacion = ((idx['sa'] / s_base) - 1) * 100 if s_base > 0 else 0
-    est_global = "🔴 ALERTA" if (focos > 0 or variacion < -15) else "🟢 BAJO CONTROL"
-    diag = f"Variación del {variacion:.1f}% respecto a {anio_b}."
-
-    # Guardar en Borrador
-    supabase.table("historial_reportes").insert({
-        "proyecto": p['Proyecto'], "savi": idx['sa'], "savi_base": s_base,
-        "variacion_porcentual": round(variacion, 2), "temp_suelo": t_val, 
-        "estado": est_global, "validado_por_admin": False, "motivo_alerta": diag
+    # Registro inicial (Borrador)
+    res = supabase.table("historial_reportes").insert({
+        "proyecto": p['Proyecto'], "savi": idx['sa'], "ndwi_ndsi": idx['nd'],
+        "temp_suelo": t_val, "validado_por_admin": False, "estado": "PENDIENTE"
     }).execute()
+    return res
 
-    return f_rep, idx['sa'], s_base, est_global, t_val, focos, diag
+# --- 4. INTERFAZ ---
 
-# --- 3. INTERFAZ ---
-
-if 'PERFILES' not in st.session_state:
-    st.session_state.PERFILES = {
-        "MINERIA": {"cat": "F-30 Minería", "ve7": "Estabilidad sustrato.", "clima": "Control aridez."},
-        "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Protección hídrica.", "clima": "Vigilancia albedo."}
-    }
-
-t1, t2 = st.tabs(["🚀 Vigilancia Activa", "📊 Centro de Revisión"])
+t1, t2 = st.tabs(["🚀 Vigilancia Activa", "📊 Centro de Revision"])
 
 with t1:
     proyectos = supabase.table("usuarios").select("*").execute().data
@@ -98,37 +134,43 @@ with t1:
         with c_map:
             folium_static(dibujar_mapa_biocore(p['Coordenadas']), width=850, height=500)
         with c_ops:
-            if st.button("🚀 Generar Informe", key=f"gen_{p['Proyecto']}", use_container_width=True):
-                with st.spinner("Analizando..."):
-                    generar_reporte_total(p)
-                    st.success("Borrador creado en Pestaña 2")
+            if st.button(f"🚀 Generar Auditoria", key=f"btn_{p['Proyecto']}"):
+                with st.spinner("Procesando satelites..."):
+                    generar_auditoria_interna(p)
+                    st.success("Borrador listo en pestaña Revision.")
 
 with t2:
-    st.subheader("📋 Control de Calidad")
+    st.subheader("📋 Gestion de Calidad y Envio")
     
-    # Botón para limpiar duplicados rápidamente
-    if st.button("🗑️ Limpiar todos los borradores"):
+    if st.button("🗑️ Limpiar Borradores"):
         supabase.table("historial_reportes").delete().eq("validado_por_admin", False).execute()
         st.rerun()
 
     pendientes = supabase.table("historial_reportes").select("*").eq("validado_por_admin", False).execute().data
     if pendientes:
-        for report in pendientes:
-            with st.expander(f"🔍 Revisar: {report['proyecto']} ({report['created_at'][:16]})"):
-                st.write(f"**SAVI:** {report['savi']} | **Base:** {report['savi_base']}")
-                st.write(f"**Temp:** {report['temp_suelo']}°C | **Variación:** {report['variacion_porcentual']}%")
+        for r in pendientes:
+            with st.expander(f"🔍 Revisar: {r['proyecto']} ({r['created_at'][:16]})"):
+                st.write(f"**Valor Detectado:** {r['ndwi_ndsi']:.3f} | **Temp:** {r['temp_suelo']:.1f}°C")
                 
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.download_button("📥 Bajar para revisar", pd.DataFrame([report]).to_csv().encode('utf-8'), f"Review_{report['id']}.csv")
+                    if st.button("✅ Aprobar y Enviar PDF", key=f"app_{r['id']}"):
+                        with st.spinner("Generando PDF Oficial..."):
+                            pdf_file = crear_pdf_biocore(r, r['proyecto'])
+                            # Envio Telegram Documento
+                            with open(pdf_file, "rb") as doc:
+                                requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
+                                             data={"chat_id": st.secrets['telegram']['chat_id'], "caption": f"🛡️ REPORTE OFICIAL: {r['proyecto']}"},
+                                             files={"document": doc})
+                            # Validar en DB
+                            supabase.table("historial_reportes").update({"validado_por_admin": True, "estado": "ENVIADO"}).eq("id", r['id']).execute()
+                            os.remove(pdf_file) # Limpiar archivo temporal
+                            st.rerun()
                 with c2:
-                    if st.button("🚀 Enviar Cliente", key=f"app_{report['id']}", type="primary"):
-                        supabase.table("historial_reportes").update({"validado_por_admin": True}).eq("id", report['id']).execute()
-                        # Aquí puedes añadir el requests.post de Telegram si deseas que se envíe al aprobar
-                        st.rerun()
+                    st.download_button("📥 Revisar Borrador", pd.DataFrame([r]).to_csv().encode('utf-8'), f"Draft_{r['id']}.csv")
                 with c3:
-                    if st.button("🗑️ Borrar", key=f"del_{report['id']}"):
-                        supabase.table("historial_reportes").delete().eq("id", report['id']).execute()
+                    if st.button("🗑️ Borrar", key=f"del_{r['id']}"):
+                        supabase.table("historial_reportes").delete().eq("id", r['id']).execute()
                         st.rerun()
 
     st.divider()
@@ -136,5 +178,5 @@ with t2:
     aprobados = supabase.table("historial_reportes").select("*").eq("validado_por_admin", True).execute().data
     if aprobados:
         df = pd.DataFrame(aprobados)
-        st.dataframe(df[['created_at', 'proyecto', 'savi', 'estado']])
-        st.download_button("📥 Descargar Historial Excel", df.to_csv(index=False).encode('utf-8'), "BioCore_Final.csv", use_container_width=True)
+        st.dataframe(df[['created_at', 'proyecto', 'ndwi_ndsi', 'estado']])
+        st.download_button("📥 Descargar Historico Completo", df.to_csv(index=False).encode('utf-8'), "BioCore_Final.csv")

@@ -81,6 +81,42 @@ def generar_reporte_total(p):
 
     except Exception as e:
         return f"Error al procesar Coordenadas: {str(e)}", 0, 0
+def dibujar_mapa_biocore(coordenadas):
+    """
+    Crea un mapa centrado en el polígono del proyecto usando Folium.
+    """
+    try:
+        # 1. Procesar coordenadas (por si vienen como texto)
+        if isinstance(coordenadas, str):
+            import json
+            coordenadas = json.loads(coordenadas)
+            
+        # 2. Calcular el centro del mapa (promedio de lat/lon)
+        lons = [c[0] for c in coordenadas]
+        lats = [c[1] for c in coordenadas]
+        centro = [sum(lats)/len(lats), sum(lons)/len(lons)]
+        
+        # 3. Crear el mapa base (Satélite)
+        m = folium.Map(
+            location=centro, 
+            zoom_start=13, 
+            tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            attr='Google Satellite'
+        )
+        
+        # 4. Dibujar el polígono del proyecto
+        folium.Polygon(
+            locations=[[c[1], c[0]] for c in coordenadas], # Folium usa [Lat, Lon]
+            color="cyan",
+            weight=2,
+            fill=True,
+            fill_opacity=0.2
+        ).add_to(m)
+        
+        return m
+    except Exception as e:
+        st.error(f"No se pudo generar el mapa: {e}")
+        return folium.Map(location=[-33.45, -70.66], zoom_start=4) # Mapa de emergencia (Chile)
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
@@ -219,6 +255,7 @@ def generar_reporte_total(p):
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
         f"📝 **CONCLUSIÓN FINAL:** {conclusion_final}"
     )
+    
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])
 

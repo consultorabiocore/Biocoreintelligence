@@ -77,7 +77,7 @@ def generar_reporte_total(p):
     d = PERFILES.get(tipo, PERFILES["MINERIA"])
 
     # 2. CARGA DE GEOMETRÍA (Ajustado a tu columna 'Coordenadas')
-        try:
+    try:
         raw_coords = p.get('Coordenadas')
         
         if raw_coords is None:

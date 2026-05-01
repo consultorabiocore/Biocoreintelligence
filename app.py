@@ -111,7 +111,19 @@ def generar_reporte_total(p):
         detalle = " Los parámetros se mantienen dentro de la varianza histórica permitida."
 
     conclusion_final = f"Tras el análisis, se concluye {nucleo}{detalle} {accion}"
+    # Interpretación Radar (Sentinel-1) - Agrégalo antes de texto_final
+    v_radar = float(idx.get('radar_vv', 0))
+    if v_radar > -12:
+        exp_radar = "La señal sugiere una superficie rugosa o presencia de estructuras, consistente con la actividad operativa."
+    else:
+        exp_radar = "El radar indica una superficie lisa o despejada, ideal para el seguimiento de la estabilidad del terreno."
 
+    # Interpretación Humedad (SWIR) - Asegúrate de tener esta también
+    v_swir = float(idx.get('sw', 0))
+    if v_swir < 0.2:
+        exp_swir = "Niveles de humedad en suelo bajos. Se recomienda monitorear ante posibles riesgos de aridez extrema."
+    else:
+        exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (TELEGRAM) ---
     texto_final = (
         f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"

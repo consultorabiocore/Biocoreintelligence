@@ -259,8 +259,6 @@ def generar_reporte_total(p):
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
         f"📝 **CONCLUSIÓN FINAL:** {conclusion_final}"
     )
-    # ... (viene del f-string del mensaje final)
-    )
 
     # El retorno triple que espera tu interfaz (Línea 263 corregida)
     return texto_final, s_actual, s_base

@@ -68,28 +68,34 @@ def generar_reporte_total(p):
     d = PERFILES.get(tipo, PERFILES["MINERIA"])
 
     # 2. CARGA DE GEOMETRÍA (Ajuste según Supabase)
+    # --- B. CARGA DE GEOMETRÍA (Buscador Universal) ---
     try:
-        # Intentamos obtener la geometría. Revisa si en Supabase se llama 'geom' o 'geojson'
-        geometria_cruda = p.get('geom') 
+        # 1. Buscamos el dato en las columnas más probables
+        raw_geom = p.get('geom') or p.get('geometry') or p.get('geojson') or p.get('coords')
         
-        if geometria_cruda is None:
-            return f"Error: El proyecto {p.get('Proyecto')} no tiene coordenadas definidas en la base de datos.", 0, 0
+        if raw_geom is None:
+            # Si no encuentra nada, te dirá qué columnas SÍ existen para que corrijas el nombre
+            columnas_detectadas = ", ".join(p.keys())
+            return f"Error: No hay datos espaciales. Columnas encontradas: [{columnas_detectadas}]", 0, 0
 
-        # Si la geometría viene como string (a veces pasa en JSON), la convertimos
-        if isinstance(geometria_cruda, str):
+        # 2. Si el dato es un String (texto), lo convertimos a lista/diccionario
+        if isinstance(raw_geom, str):
             import json
-            geometria_cruda = json.loads(geometria_cruda)
+            raw_geom = json.loads(raw_geom)
 
-        # Creamos el polígono de Earth Engine
-        # Si es un FeatureCollection de GeoJSON, usamos .coordinates[0]
-        if 'coordinates' in geometria_cruda:
-            geom = ee.Geometry.Polygon(geometria_cruda['coordinates'][0])
+        # 3. Identificamos el formato (GeoJSON o Lista simple)
+        if isinstance(raw_geom, dict) and 'coordinates' in raw_geom:
+            # Formato GeoJSON estándar
+            coords = raw_geom['coordinates'][0]
+            geom = ee.Geometry.Polygon(coords)
+        elif isinstance(raw_geom, list):
+            # Formato Lista de Listas [[lon, lat], ...]
+            geom = ee.Geometry.Polygon(raw_geom)
         else:
-            # Si es solo una lista de listas [[lon, lat], ...]
-            geom = ee.Geometry.Polygon(geometria_cruda)
+            return f"Error: El formato de geometría en {p['Proyecto']} no es compatible.", 0, 0
 
     except Exception as e:
-        return f"Error al procesar geometría de {p.get('Proyecto')}: {str(e)}", 0, 0
+        return f"Error crítico al procesar coordenadas: {str(e)}", 0, 0
 
     # 3. Llamada a Sentinel-2
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\

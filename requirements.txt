@@ -3,7 +3,6 @@ pandas
 earthengine-api
 fpdf2
 streamlit
-pandas
 matplotlib
 fpdf
 gspread
@@ -12,3 +11,5 @@ st-supabase-connection
 folium
 streamlit-folium
 requests
+supabase
+plotly

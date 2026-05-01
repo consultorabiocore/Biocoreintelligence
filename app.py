@@ -54,7 +54,7 @@ def dibujar_mapa_biocore(coords_json):
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
-    # 1. Definir perfiles (lo que vimos antes)
+    # 1. Definición de perfiles
     PERFILES = {
         "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},
         "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Balance de masa.", "clima": "Ley de Glaciares."},
@@ -64,20 +64,36 @@ def generar_reporte_total(p):
     tipo = p.get('Tipo', 'MINERIA')
     d = PERFILES.get(tipo, PERFILES["MINERIA"])
 
-    # 2. CREAR LA GEOMETRÍA (Aquí estaba el error)
-    # Asumiendo que 'p' tiene una columna llamada 'geom' con las coordenadas
+    # 2. CARGA DE GEOMETRÍA (Ajuste según Supabase)
     try:
-        # p['geom'] debe ser una lista de coordenadas tipo [[long, lat], [long, lat]...]
-        geom = ee.Geometry.Polygon(p['geom']) 
-    except Exception as e:
-        # Si p['geom'] no existe o está mal, usamos un punto o fallamos con gracia
-        return f"Error: No se encontró geometría válida para {p['Proyecto']}", 0, 0
+        # Intentamos obtener la geometría. Revisa si en Supabase se llama 'geom' o 'geojson'
+        geometria_cruda = p.get('geom') 
+        
+        if geometria_cruda is None:
+            return f"Error: El proyecto {p.get('Proyecto')} no tiene coordenadas definidas en la base de datos.", 0, 0
 
-    # 3. Ahora sí puedes usar geom en filterBounds
+        # Si la geometría viene como string (a veces pasa en JSON), la convertimos
+        if isinstance(geometria_cruda, str):
+            import json
+            geometria_cruda = json.loads(geometria_cruda)
+
+        # Creamos el polígono de Earth Engine
+        # Si es un FeatureCollection de GeoJSON, usamos .coordinates[0]
+        if 'coordinates' in geometria_cruda:
+            geom = ee.Geometry.Polygon(geometria_cruda['coordinates'][0])
+        else:
+            # Si es solo una lista de listas [[lon, lat], ...]
+            geom = ee.Geometry.Polygon(geometria_cruda)
+
+    except Exception as e:
+        return f"Error al procesar geometría de {p.get('Proyecto')}: {str(e)}", 0, 0
+
+    # 3. Llamada a Sentinel-2
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
            .filterBounds(geom)\
            .sort('system:time_start', False)\
            .first()
+    
         # --- A. Datos Satelitales (Óptico, Radar, Clima) ---
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()
     f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
@@ -86,9 +102,6 @@ def generar_reporte_total(p):
     s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).sort('system:time_start', False).first()
     radar_val = s1.select('VV')
 
-    # 2. Índices combinados (SAVI, NDWI, SWIR, CLAY y NDSI para nieve)
-        # D. LÓGICA DE INTERPRETACIÓN (Agregada para evitar NameError)
-    
     # 0. Interpretación SAVI (Vigor Vegetal) - ¡ESTA FALTA EN TU CÓDIGO!
     if variacion < -15:
         exp_savi = "Se observa una disminución significativa en el vigor vegetal, indicando posible intervención o estrés."

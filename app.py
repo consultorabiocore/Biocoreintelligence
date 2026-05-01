@@ -134,7 +134,7 @@ with tab1:
             # Layout de alta visibilidad
             col_mapa, col_reporte = st.columns([2.5, 1])
             
-            with col_mapa:
+                        with col_reporte:
                 # El mapa se renderiza directamente, sin expander
                 m_obj = dibujar_mapa_biocore(p['Coordenadas'])
                 folium_static(m_obj, width=850, height=500)

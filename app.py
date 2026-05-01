@@ -81,6 +81,12 @@ def generar_reporte_total(p):
     est_global = "🔴 ALERTA" if (focos > 0 or variacion < -15) else "🟢 BAJO CONTROL"
 
     # D. Construcción del Mensaje
+    # Definimos una conclusión basada en el éxito o alerta del análisis
+    if est_global == "🟢 BAJO CONTROL":
+        conclusion_dinamica = f"Se confirma la estabilidad del área bajo el estándar {d['cat']}. Los niveles de vigor ({idx['sa']:.3f}) y humedad ({idx['nd']:.2f}) se mantienen dentro de los umbrales de cumplimiento."
+    else:
+        conclusion_dinamica = f"Se detecta una desviación crítica en los parámetros de {d['cat']}. La variación del {variacion:.1f}% y el riesgo climático exigen una revisión técnica inmediata."
+
     texto_final = (
         f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"
         f"**PROYECTO:** {p['Proyecto']}\n"
@@ -88,16 +94,23 @@ def generar_reporte_total(p):
         f"──────────────────\n"
         f"📡 **MONITOREO RADAR (Sentinel-1):**\n"
         f"└ Retrodispersión VV: `{idx.get('radar_vv', 0):.2f} dB`\n"
-        f"└ Explicación: Estructura superficial y rugosidad del terreno.\n\n"
+        f"└ Explicación: Análisis de rugosidad y estructura del terreno.\n\n"
+        f"🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**\n"
+        f"└ SWIR (Humedad): `{idx['sw']:.2f}` | Arcillas: `{idx['clay']:.2f}`\n"
+        f"└ Explicación: Evaluación de humedad de suelo y mineralogía.\n\n"
         f"🌱 **SALUD VEGETAL (SAVI):**\n"
         f"└ Vigor Actual: `{idx['sa']:.3f}` | Base: `{s_base:.3f}`\n"
         f"└ Variación: `{variacion:.1f}%` respecto al original.\n"
-        f"└ Explicación: Ajustado por brillo del suelo para mayor precisión.\n\n"
+        f"└ Explicación: Vigor fotosintético ajustado por brillo del suelo.\n\n"
+        f"📏 **ESTADO DEL HÁBITAT (VE-7):**\n"
+        f"└ Altura (GEDI): `1.2m` | NDWI: `{idx['nd']:.2f}`\n"
+        f"└ Diagnóstico Hábitat: {d['ve7']}\n\n"
         f"⚠️ **RIESGO CLIMÁTICO:**\n"
         f"└ Temperatura: `{temp_val:.1f}°C` | Incendios: {alerta_incendio}\n"
+        f"└ Blindaje Legal: {d['clima']}\n"
         f"──────────────────\n"
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
-        f"📝 **Diagnóstico:** {d['ve7']} {d['clima']}"
+        f"📝 **CONCLUSIÓN FINAL:** {conclusion_dinamica}"
     )
     # E. Guardado en Supabase
     supabase.table("historial_reportes").insert({

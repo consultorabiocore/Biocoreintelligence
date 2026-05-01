@@ -60,33 +60,15 @@ def generar_reporte_total(p):
     radar_val = s1.select('VV')
 
     # 2. Índices combinados (SAVI, NDWI, SWIR, CLAY y NDSI para nieve)
-    idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
-        .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
-        .addBands(s2.select('B11').divide(10000).rename('sw'))\
-        .addBands(s2.select('B11').divide(s2.select('B12')).rename('clay'))\
-        .addBands(s2.normalizedDifference(['B3','B11']).rename('ndsi'))\
-        .addBands(radar_val.rename('radar_vv'))\
-        .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
-
-    # Temperatura MODIS e Incendios FIRMS
-    temp_img = ee.ImageCollection("MODIS/061/MOD11A1").filterBounds(geom).sort('system:time_start', False).first()
-    temp_val = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15).reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0)
+        # D. LÓGICA DE INTERPRETACIÓN (Agregada para evitar NameError)
     
-    focos = ee.ImageCollection("FIRMS").filterBounds(geom).filterDate(ee.Date(datetime.now()).advance(-3, 'day')).size().getInfo()
-
-    # B. Comparativa Histórica
-    anio_base = p.get('anio_linea_base', 2017)
-    s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom)\
-                .filterDate(f"{anio_base}-01-01", f"{anio_base}-12-31").sort('CLOUDY_PIXEL_PERCENTAGE').first()
-    s_base = s2_base.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2_base.select('B8'),'B4':s2_base.select('B4')})\
-                    .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('constant', 0)
-
-    # C. Lógica de Alerta
-    variacion = ((idx['sa'] / s_base) - 1) * 100 if s_base > 0 else 0
-    alerta_incendio = "⚠️ ALERT: Focos detectados" if focos > 0 else "✅ Sin focos activos"
-    est_global = "🔴 ALERTA" if (focos > 0 or variacion < -15) else "🟢 BAJO CONTROL"
-
-    # D. Construcción del Mensaje
+    # 0. Interpretación SAVI (Vigor Vegetal) - ¡ESTA FALTA EN TU CÓDIGO!
+    if variacion < -15:
+        exp_savi = "Se observa una disminución significativa en el vigor vegetal, indicando posible intervención o estrés."
+    elif variacion > 5:
+        exp_savi = "El vigor vegetal muestra una recuperación positiva respecto a la línea base."
+    else:
+        exp_savi = "La cobertura vegetal se mantiene estable y saludable respecto al registro histórico."
 
     # 1. Lógica de Nieve (NDSI)
     v_ndsi = float(idx.get('ndsi', 0))
@@ -98,15 +80,15 @@ def generar_reporte_total(p):
         exp_snow = "Nula presencia de nieve. Predomina suelo expuesto o sustrato rocoso."
 
     # 2. Lógica de Conclusión (Oficial y Dinámica)
+    # Aquí se gestiona la Alerta Verde y la ALERTA ROJA
     if est_global == "🟢 BAJO CONTROL":
         nucleo = f"estabilidad técnica del área bajo el perfil {d['cat']}."
         accion = "Se sugiere mantener la periodicidad de vigilancia programada."
     else:
-        # Aquí entra la ALERTA ROJA
         nucleo = f"una anomalía crítica en {d['cat']}, con una desviación del {variacion:.1f}%."
         accion = "Se requiere activar el protocolo de inspección y revisar el blindaje legal."
 
-    # 3. Hallazgo Crítico (El motivo de la conclusión)
+    # 3. Hallazgo Crítico
     if v_ndsi < 0.2 and d['cat'] == "GLACIAR":
         detalle = " La pérdida de cobertura nival es el factor de mayor incidencia."
     elif variacion < -15:
@@ -117,20 +99,23 @@ def generar_reporte_total(p):
         detalle = " Los parámetros se mantienen dentro de la varianza histórica permitida."
 
     conclusion_final = f"Tras el análisis, se concluye {nucleo}{detalle} {accion}"
-    # Interpretación Radar (Sentinel-1) - Agrégalo antes de texto_final
+
+    # 4. Interpretación Radar (Sentinel-1)
     v_radar = float(idx.get('radar_vv', 0))
     if v_radar > -12:
         exp_radar = "La señal sugiere una superficie rugosa o presencia de estructuras, consistente con la actividad operativa."
     else:
         exp_radar = "El radar indica una superficie lisa o despejada, ideal para el seguimiento de la estabilidad del terreno."
 
-    # Interpretación Humedad (SWIR) - Asegúrate de tener esta también
+    # 5. Interpretación Humedad (SWIR)
     v_swir = float(idx.get('sw', 0))
     if v_swir < 0.2:
         exp_swir = "Niveles de humedad en suelo bajos. Se recomienda monitorear ante posibles riesgos de aridez extrema."
     else:
         exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
+
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (TELEGRAM) ---
+        # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL ---
     texto_final = (
         f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"
         f"**PROYECTO:** {p['Proyecto']}\n"
@@ -140,13 +125,13 @@ def generar_reporte_total(p):
         f"└ Cobertura Actual: `{v_ndsi:.3f}`\n"
         f"└ **Análisis:** {exp_snow}\n\n"
         f"📡 **MONITOREO RADAR (Sentinel-1):**\n"
-        f"└ Retrodispersión VV: `{idx.get('radar_vv', 0):.2f} dB`\n"
+        f"└ Retrodispersión VV: `{v_radar:.2f} dB`\n"
         f"└ **Análisis:** {exp_radar}\n\n"
         f"🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**\n"
-        f"└ Humedad (SWIR): `{idx['sw']:.2f}` | Arcillas: `{idx['clay']:.2f}`\n"
+        f"└ Humedad (SWIR): `{v_swir:.2f}` | Arcillas: `{v_clay:.2f}`\n"
         f"└ **Análisis:** {exp_swir}\n\n"
         f"🌱 **SALUD VEGETAL (SAVI):**\n"
-        f"└ Vigor Actual: `{idx['sa']:.3f}` | Base: `{s_base:.3f}`\n"
+        f"└ Vigor Actual: `{v_savi:.3f}` | Base: `{s_base:.3f}`\n"
         f"└ Variación: `{variacion:.1f}%` respecto al original.\n"
         f"└ **Análisis:** {exp_savi}\n\n"
         f"⚠️ **RIESGO CLIMÁTICO:**\n"
@@ -155,23 +140,6 @@ def generar_reporte_total(p):
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
         f"📝 **CONCLUSIÓN FINAL:** {conclusion_final}"
     )
-
-    # E. Guardado en Supabase
-    supabase.table("historial_reportes").insert({
-        "proyecto": p['Proyecto'], "savi": idx['sa'], "savi_base": s_base,
-        "variacion_porcentual": round(variacion, 2), "temp_suelo": temp_val, "estado": est_global
-    }).execute()
-
-    return texto_final, idx['sa'], s_base
-
-# --- 4. INTERFAZ ---
-if 'PERFILES' not in st.session_state:
-    st.session_state.PERFILES = {
-        "MINERIA": {"cat": "F-30 Minería", "ve7": "Estabilidad sustrato compatible.", "clima": "Control aridez."},
-        "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Protección balance hídrico.", "clima": "Vigilancia albedo."},
-        "BOSQUE": {"cat": "Ley 20.283", "ve7": "Conectividad biológica.", "clima": "Estrés biomasa."}
-    }
-
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])
 

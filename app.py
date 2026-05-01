@@ -34,23 +34,37 @@ def iniciar_gee():
 gee_status = iniciar_gee()
 
 # --- 2. FUNCIÓN DE MAPA REFORZADA ---
-def dibujar_mapa_biocore(coords_json):
+    # --- B. CARGA DE GEOMETRÍA (Ajustado a tus columnas) ---
     try:
-        js = json.loads(coords_json) if isinstance(coords_json, str) else coords_json
-        raw = js['coordinates'][0] if 'coordinates' in js else js
-        puntos = [[float(p[1]), float(p[0])] for p in raw]
+        # Usamos el nombre exacto que detectamos: 'Coordenadas'
+        raw_geom = p.get('Coordenadas')
         
-        # Mapa con Satélite Híbrido (Google)
-        m = folium.Map(location=puntos[0], zoom_start=15, 
-                       tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', 
-                       attr='Google Satellite Hybrid')
-        
-        folium.Polygon(locations=puntos, color="#FFFF00", weight=4, fill=True, fill_opacity=0.2).add_to(m)
-        m.fit_bounds(puntos)
-        return m
+        if raw_geom is None:
+            return f"Error: La columna 'Coordenadas' está vacía en Supabase para {p.get('Proyecto')}.", 0, 0
+
+        # 1. Si el dato llega como texto (String), lo convertimos
+        if isinstance(raw_geom, str):
+            import json
+            try:
+                raw_geom = json.loads(raw_geom)
+            except:
+                # Si falla el json.loads, intentamos limpiar si viene con formatos raros
+                raw_geom = eval(raw_geom) 
+
+        # 2. Convertir a Geometría de Earth Engine
+        # Si es una lista de listas [[lon, lat], [lon, lat]...]
+        if isinstance(raw_geom, list):
+            # Verificamos si es una lista simple o anidada
+            if isinstance(raw_geom[0], list):
+                geom = ee.Geometry.Polygon(raw_geom)
+            else:
+                # Si por error solo pusieron un punto [lon, lat], creamos un buffer
+                geom = ee.Geometry.Point(raw_geom).buffer(1000).bounds()
+        else:
+            return "Error: El formato en 'Coordenadas' no es una lista válida.", 0, 0
+
     except Exception as e:
-        st.error(f"Error al cargar coordenadas: {e}")
-        return folium.Map(location=[-37.2, -72.7], zoom_start=12)
+        return f"Error al procesar Coordenadas: {str(e)}", 0, 0
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):

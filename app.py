@@ -26,24 +26,23 @@ def iniciar_gee():
         ee_creds = ee.ServiceAccountCredentials(creds['client_email'], key_data=creds['private_key'])
         ee.Initialize(ee_creds)
 
-# --- 2. MOTOR DE DOCUMENTOS (PDF PROFESIONAL + WORD EDITABLE) ---
+# --- 2. MOTOR DE DOCUMENTOS (PDF + WORD) ---
 
 def generar_documentos(r):
     proyecto = r.get('proyecto', 'Proyecto_BioCore')
-    # Protección total contra valores Nulos (None)
+    # Protección contra Nulos (None)
     v_ndsi = float(r.get('ndwi_ndsi') or 0)
     v_radar = float(r.get('radar_vv') or 0)
     v_temp = float(r.get('temp_suelo') or 0)
     v_savi = float(r.get('savi') or 0)
     
-    # Lógica de Diagnóstico Técnico
+    # Lógica de Diagnóstico
     color = (200, 0, 0) if v_ndsi < 0.35 else (0, 100, 0)
     est = "ALERTA: PERDIDA DE COBERTURA" if v_ndsi < 0.35 else "CONTROL: ESTABILIDAD"
-    diag_txt = (f"El indice detectado ({v_ndsi:.3f}) indica una degradacion de la masa criosferica. "
-                f"Riesgo tecnico-legal detectado." if v_ndsi < 0.35 else 
-                f"El indice ({v_ndsi:.3f}) confirma estabilidad. Cumplimiento de parametros RCA.")
+    diag_txt = (f"Indice NDSI ({v_ndsi:.3f}) bajo umbral critico. Riesgo de degradacion detectado." 
+                if v_ndsi < 0.35 else f"Indice NDSI ({v_ndsi:.3f}) estable. Blindaje RCA vigente.")
 
-    # A. GENERAR PDF (Banner Azul Marino)
+    # A. PDF PROFESIONAL
     pdf = FPDF()
     pdf.add_page()
     pdf.set_fill_color(20, 50, 80)
@@ -61,121 +60,110 @@ def generar_documentos(r):
     pdf.cell(0, 8, f" ESTATUS: {est}", ln=1, fill=True)
     
     pdf.ln(5); pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", "", 10)
-    pdf.multi_cell(0, 7, f"{diag_txt}\n\nAnalisis Satelital:\n- NDSI: {v_ndsi:.3f}\n- Radar VV: {v_radar:.2f} dB\n- SAVI: {v_savi:.3f}", border=1)
+    pdf.multi_cell(0, 7, f"{diag_txt}\n\nDatos:\n- Radar VV: {v_radar:.2f} dB\n- Temp: {v_temp:.1f}C", border=1)
     
-    pdf_path = f"Reporte_{proyecto}.pdf"
-    pdf.output(pdf_path)
+    pdf_p = f"Reporte_{proyecto}.pdf"
+    pdf.output(pdf_p)
 
-    # B. GENERAR WORD (Editable)
+    # B. WORD EDITABLE
     doc = Document()
-    doc.add_heading(f"INFORME DE AUDITORIA: {proyecto}", 0)
-    doc.add_paragraph("BioCore Intelligence - Reporte Tecnico Editable")
-    doc.add_heading("DIAGNOSTICO", level=1)
-    p = doc.add_paragraph(); p.add_run(f"ESTATUS ACTUAL: {est}").bold = True
+    doc.add_heading(f"AUDITORIA: {proyecto}", 0)
+    doc.add_paragraph(f"Responsable Tecnica: Loreto Campos")
+    doc.add_heading("Diagnostico", level=1)
+    p = doc.add_paragraph(); p.add_run(f"ESTADO: {est}").bold = True
     doc.add_paragraph(diag_txt)
-    doc_path = f"Reporte_{proyecto}_Editable.docx"
-    doc.save(doc_path)
+    doc_p = f"Reporte_{proyecto}_Editable.docx"
+    doc.save(doc_p)
     
-    return pdf_path, doc_path
+    return pdf_p, doc_p
 
-def enviar_telegram_pack(pdf_p, doc_p, proyecto):
+def enviar_a_telegram(pdf_p, doc_p, proyecto):
     token = st.secrets['telegram']['token']
     chat_id = st.secrets['telegram']['chat_id']
-    for f_path in [pdf_p, doc_p]:
-        with open(f_path, "rb") as f:
-            requests.post(f"https://api.telegram.org/bot{token}/sendDocument",
-                         data={"chat_id": chat_id, "caption": f"🛡️ BioCore Intelligence: {proyecto}"},
-                         files={"document": f})
+    for path in [pdf_p, doc_p]:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                requests.post(f"https://api.telegram.org/bot{token}/sendDocument",
+                             data={"chat_id": chat_id, "caption": f"🛡️ BioCore: {proyecto}"},
+                             files={"document": f})
 
-# --- 3. ANALISIS ESPACIAL (SENTINEL-1 & SENTINEL-2) ---
+# --- 3. FUNCIONES DE GEOMETRÍA Y ANÁLISIS ---
 
-def dibujar_mapa(coords):
-    js = json.loads(coords)
-    pts = js['coordinates'][0] if 'coordinates' in js else js
-    loc = [[float(p[1]), float(p[0])] for p in pts]
-    m = folium.Map(location=loc[0], zoom_start=15, tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', attr='Google Hybrid')
-    folium.Polygon(loc, color="yellow", weight=2, fill=True, fill_opacity=0.1).add_to(m)
-    return m
+def extraer_geometria(p):
+    """Extrae la geometría de forma segura independientemente del formato JSON"""
+    try:
+        coords_raw = p['Coordenadas']
+        js = json.loads(coords_raw) if isinstance(coords_raw, str) else coords_raw
+        # Maneja formatos GeoJSON {'type': 'Polygon', 'coordinates': [...]} o solo la lista
+        if isinstance(js, dict) and 'coordinates' in js:
+            return ee.Geometry.Polygon(js['coordinates'])
+        return ee.Geometry.Polygon(js)
+    except Exception as e:
+        st.error(f"Error en formato de coordenadas para {p['Proyecto']}: {e}")
+        return None
 
 def ejecutar_auditoria_dual(p):
     iniciar_gee()
-    geom = ee.Geometry.Polygon(json.loads(p['Coordenadas'])['coordinates'])
+    geom = extraer_geometria(p)
+    if not geom: return
+
+    # S2 Óptico
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('CLOUDY_PIXEL_PERCENTAGE').first()
+    ndsi = s2.normalizedDifference(['B3','B11']).reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('nd', 0)
     
-    # Optico S2
-    img_s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('CLOUDY_PIXEL_PERCENTAGE').first()
-    ndsi = img_s2.normalizedDifference(['B3','B11']).reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('nd', 0)
-    savi = img_s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':img_s2.select('B8'),'B4':img_s2.select('B4')}).reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('constant', 0)
+    # S1 Radar
+    s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).first()
+    radar = s1.select('VV').reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('VV', 0)
     
-    # Radar S1 (Atraviesa nubes)
-    img_s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).first()
-    radar = img_s1.select('VV').reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('VV', 0)
-    
-    # Temperatura MODIS
-    t_img = ee.ImageCollection("MODIS/061/MOD11A1").filterBounds(geom).sort('system:time_start', False).first()
-    temp = t_img.select('LST_Day_1km').multiply(0.02).subtract(273.15).reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0)
+    # MODIS Temp
+    temp = ee.ImageCollection("MODIS/061/MOD11A1").filterBounds(geom).sort('system:time_start', False).first()\
+           .select('LST_Day_1km').multiply(0.02).subtract(273.15).reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0)
 
     supabase.table("historial_reportes").insert({
-        "proyecto": p['Proyecto'], "ndwi_ndsi": ndsi, "savi": savi, "radar_vv": radar, 
-        "temp_suelo": temp, "validado_por_admin": False, "estado": "PENDIENTE"
+        "proyecto": p['Proyecto'], "ndwi_ndsi": ndsi, "radar_vv": radar, 
+        "temp_suelo": temp, "validado_por_admin": False, "estado": "BORRADOR"
     }).execute()
 
-# --- 4. INTERFAZ STREAMLIT ---
+# --- 4. INTERFAZ ---
 
-tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Centro de Revision"])
+t1, t2 = st.tabs(["🚀 Vigilancia Activa", "📊 Centro de Revision"])
 
-with tab1:
+with t1:
     proyectos = supabase.table("usuarios").select("*").execute().data
     for p in proyectos:
-        st.markdown(f"### 📍 Proyecto: {p['Proyecto']}")
-        col_map, col_act = st.columns([3, 1])
-        with col_map: folium_static(dibujar_mapa(p['Coordenadas']), width=950, height=450)
-        with col_act:
-            if st.button(f"🚀 Iniciar Auditoria", key=f"btn_{p['Proyecto']}"):
-                with st.spinner("Analizando Optico + Radar..."):
+        st.markdown(f"### 📍 {p['Proyecto']}")
+        c_m, c_o = st.columns([3, 1])
+        with c_o:
+            if st.button(f"Iniciar Auditoria", key=f"g_{p['Proyecto']}"):
+                with st.spinner("Analizando satelites..."):
                     ejecutar_auditoria_dual(p)
-                    st.success("Borrador generado en Pestaña 2")
+                    st.success("Borrador generado.")
 
-with tab2:
-    st.subheader("📋 Control de Calidad y Envios Oficiales")
-    
-    if st.button("🗑️ Limpiar todos los borradores"):
-        supabase.table("historial_reportes").delete().eq("validado_por_admin", False).execute()
-        st.rerun()
-
+with t2:
+    st.subheader("📋 Gestion de Calidad")
     pendientes = supabase.table("historial_reportes").select("*").eq("validado_por_admin", False).execute().data
     if pendientes:
         for r in pendientes:
-            # Proteccion contra Nulos para la visualizacion
             v_ndsi = float(r.get('ndwi_ndsi') or 0)
             v_radar = float(r.get('radar_vv') or 0)
             
-            with st.expander(f"🔍 Revisar: {r['proyecto']} ({r['created_at'][:16]})"):
-                st.write(f"**NDSI:** {v_ndsi:.3f} | **Radar:** {v_radar:.2f} dB")
+            with st.expander(f"Revision: {r['proyecto']} ({r['created_at'][:16]})"):
+                st.write(f"NDSI: {v_ndsi:.3f} | Radar: {v_radar:.2f}")
+                c_env, c_man, c_del = st.columns(3)
                 
-                c1, c2, c3 = st.columns(3)
-                with c1:
+                with c_env:
                     if st.button("🚀 Enviar Pack Oficial", key=f"env_{r['id']}", type="primary"):
-                        with st.spinner("Generando PDF y Word..."):
-                            pdf, doc = generar_documentos(r)
-                            enviar_telegram_pack(pdf, doc, r['proyecto'])
-                            supabase.table("historial_reportes").update({"validado_por_admin": True, "estado": "ENVIADO"}).eq("id", r['id']).execute()
-                            os.remove(pdf); os.remove(doc)
-                            st.success("Pack enviado."); st.rerun()
+                        pdf, doc = generar_documentos(r)
+                        enviar_a_telegram(pdf, doc, r['proyecto'])
+                        supabase.table("historial_reportes").update({"validado_por_admin": True, "estado": "ENVIADO"}).eq("id", r['id']).execute()
+                        st.rerun()
                 
-                with c2:
+                with c_man:
                     if st.button("📩 Reenvio Manual", key=f"man_{r['id']}"):
                         pdf, doc = generar_documentos(r)
-                        enviar_telegram_pack(pdf, doc, r['proyecto'])
-                        os.remove(pdf); os.remove(doc)
-                        st.info("Reenviado a Telegram (Sin validar).")
+                        enviar_a_telegram(pdf, doc, r['proyecto'])
+                        st.info("Reenviado.")
 
-                with c3:
-                    if st.button("🗑️ Eliminar", key=f"del_{r['id']}"):
-                        supabase.table("historial_reportes").delete().eq("id", r['id']).execute()
-                        st.rerun()
-
-    st.divider()
-    st.markdown("#### 📥 Historial de Auditorias Finalizadas")
-    finalizados = supabase.table("historial_reportes").select("*").eq("validado_por_admin", True).execute().data
-    if finalizados:
-        st.dataframe(pd.DataFrame(finalizados)[['created_at', 'proyecto', 'ndwi_ndsi', 'estado']])
+                with c_del:
+                    if st.button("🗑️ Borrar", key=f"del_{r['id']}"):
+                        supabase.table("historial_reportes").delete().eq("id", r['id']).execute(); st.rerun()

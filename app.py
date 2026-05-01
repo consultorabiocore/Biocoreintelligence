@@ -8,90 +8,69 @@ import requests
 from datetime import datetime
 from supabase import create_client, Client
 
-# --- 1. CONFIGURACIÓN Y CONEXIONES ---
+# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide")
 
-# Conexión Supabase
-supabase: Client = create_client(st.secrets["connections"]["supabase"]["url"], st.secrets["connections"]["supabase"]["key"])
+# Intento de conexión a Supabase con validación
+try:
+    url: str = st.secrets["connections"]["supabase"]["url"]
+    key: str = st.secrets["connections"]["supabase"]["key"]
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    st.error(f"❌ Error de conexión a Supabase: {e}")
+    st.stop()
 
-# Perfiles Técnicos y Legales
-if 'PERFILES' not in st.session_state:
-    st.session_state.PERFILES = {
-        "HUMEDAL": {"cat": "Ley 21.202", "ve7": "Refugio fauna silvestre.", "clima": "Balance hídrico.", "sensor": "nd", "u": 0.1, "c": "menor"},
-        "MINERIA": {"cat": "Formulario F-30", "ve7": "Estabilidad sustrato cierre.", "clima": "Control aridez.", "sensor": "sw", "u": 0.45, "c": "mayor"},
-        "GLACIAR": {"cat": "RCA Pascua Lama", "ve7": "Protección criosférica.", "clima": "Vigilancia albedo.", "sensor": "mn", "u": 0.35, "c": "menor"},
-        "BOSQUE": {"cat": "Ley 20.283", "ve7": "Conectividad biológica.", "clima": "Estrés hídrico.", "sensor": "sa", "u": 0.20, "c": "menor"}
-    }
+# --- 2. CARGA DE DATOS ---
+# Forzamos la lectura de la tabla de usuarios
+try:
+    response = supabase.table("usuarios").select("*").execute()
+    proyectos = response.data
+except Exception as e:
+    st.error(f"❌ No se pudo leer la tabla 'usuarios': {e}")
+    proyectos = []
 
-# --- 2. MOTOR DE ANÁLISIS ---
-def conectar_gee():
-    if not ee.data.is_initialized():
-        creds = json.loads(st.secrets["gee"]["json"])
-        ee_creds = ee.ServiceAccountCredentials(creds['client_email'], key_data=creds['private_key'])
-        ee.Initialize(ee_creds)
+# --- 3. INTERFAZ ---
+st.title("🛰️ BioCore Intelligence V5")
 
-def ejecutar_auditoria_completa(p):
-    conectar_gee()
-    js = json.loads(p['Coordenadas'])
-    geom = ee.Geometry.Polygon(js['coordinates'] if 'coordinates' in js else js)
-    tipo = p.get('Tipo', 'MINERIA')
-    d = st.session_state.PERFILES.get(tipo, st.session_state.PERFILES["MINERIA"])
-    
-    # Análisis Multicapa
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()
-    f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
-    
-    # Radar e Índices
-    s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).filter(ee.Filter.eq('transmitterReceiverPolarisation', ['VV'])).sort('system:time_start', False).first()
-    vv = s1.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('VV', -10.14)
-    
-    idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
-        .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
-        .addBands(s2.normalizedDifference(['B3','B11']).rename('mn'))\
-        .addBands(s2.select('B11').divide(10000).rename('sw'))\
-        .addBands(s2.select('B11').divide(s2.select('B12')).rename('clay'))\
-        .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
+t1, t2, t3 = st.tabs(["🚀 VIGILANCIA", "📊 EXCEL/HISTORIAL", "⚙️ CONFIG"])
 
-    # Amenazas y Clima
-    temp_img = ee.ImageCollection("MODIS/061/MOD11A1").filterBounds(geom).sort('system:time_start', False).first()
-    temp = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15).reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0)
-    
-    fuego = ee.ImageCollection("FIRMS").filterBounds(geom).filterDate(ee.Date(datetime.now()).advance(-7, 'day')).size().getInfo()
+with t1:
+    if not proyectos:
+        st.warning("⚠️ La base de datos está vacía o no se detectan proyectos.")
+        if st.button("Simular Proyecto (Pascua Lama)"):
+            # Esto es solo para que veas algo si la base de datos falla
+            proyectos = [{
+                "Proyecto": "Pascua Lama (Test)",
+                "Tipo": "GLACIAR",
+                "telegram_id": "TU_ID_AQUÍ",
+                "Coordenadas": '{"type":"Polygon","coordinates":[[[-70.0, -29.3],[-70.01, -29.3],[-70.01, -29.31],[-70.0, -29.31],[-70.0, -29.3]]]}'
+            }]
+            st.rerun()
+    else:
+        for p in proyectos:
+            with st.expander(f"📍 {p['Proyecto']}", expanded=True):
+                col_map, col_info = st.columns([3, 1])
+                with col_map:
+                    # Aquí va la función de dibujar_mapa que ya tienes
+                    st.info("Mapa cargando...") 
+                with col_info:
+                    st.write(f"**Perfil:** {p.get('Tipo')}")
+                    if st.button("Disparar Auditoría", key=f"btn_{p['Proyecto']}"):
+                        st.write("Procesando...")
 
-    # Estado Alerta
-    falla = (idx[d['sensor']] < d['u']) if d['c'] == "menor" else (idx[d['sensor']] > d['u'])
-    estado = "🔴 ALERTA" if (falla or fuego > 0) else "🟢 BAJO CONTROL"
+with t2:
+    st.subheader("Historial de Reportes")
+    try:
+        hist_res = supabase.table("historial_reportes").select("*").execute()
+        if hist_res.data:
+            df_hist = pd.DataFrame(hist_res.data)
+            st.dataframe(df_hist)
+            st.download_button("Descargar Excel", df_hist.to_csv(), "BioCore_Report.csv")
+        else:
+            st.info("No hay registros en el historial todavía.")
+    except Exception as e:
+        st.error(f"Error al cargar historial: {e}")
 
-    res = {"fecha": f_rep, "vv": vv, "idx": idx, "temp": temp, "fuego": fuego, "estado": estado, "d": d, "tipo": tipo}
-    
-    # GUARDADO EN HISTORIAL (Excel Alimentación)
-    supabase.table("historial_reportes").insert({
-        "proyecto": p['Proyecto'], "savi": idx['sa'], "temp_suelo": temp, "radar_vv": vv, "estado": estado
-    }).execute()
-    
-    return res
-
-# --- 3. AUTOMATIZACIÓN 08:30 AM ---
-if st.query_params.get("run_automation") == "true":
-    proyectos_auto = supabase.table("usuarios").select("*").execute().data
-    for p in proyectos_auto:
-        res = ejecutar_auditoria_completa(p)
-        # Lógica de reporte largo de Telegram aquí...
-        requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
-                     data={"chat_id": p['telegram_id'], "text": f"Reporte Auto: {res['estado']}", "parse_mode": "Markdown"})
-    st.query_params.clear()
-
-# --- 4. INTERFAZ ---
-tab1, tab2, tab3 = st.tabs(["🚀 VIGILANCIA", "📊 EXCEL/HISTORIAL", "⚙️ CONFIG"])
-
-with tab1:
-    # (Interfaz de mapas y botón manual...)
-    pass
-
-with tab2:
-    st.subheader("Historial acumulado para Excel")
-    hist = supabase.table("historial_reportes").select("*").execute().data
-    if hist:
-        df = pd.DataFrame(hist)
-        st.dataframe(df)
-        st.download_button("📥 Descargar Excel (.csv)", data=df.to_csv().encode('utf-8'), file_name="BioCore_Historial.csv")
+with t3:
+    st.subheader("Parámetros del Sistema")
+    st.json(st.session_state.get('PERFILES', {}))

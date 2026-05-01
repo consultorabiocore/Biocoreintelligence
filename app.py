@@ -48,7 +48,6 @@ except Exception as e:
 # --- 4. INTERFAZ PRINCIPAL ---
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 MONITOREO", "📊 HISTORIAL 20 AÑOS", "📄 INFORMES PDF", "➕ REGISTRO"])
 
-# Carga de proyectos (usando .get para evitar KeyErrors)
 res = supabase.table("usuarios").select("*").execute()
 proyectos = res.data
 
@@ -56,13 +55,13 @@ proyectos = res.data
 with tab1:
     st.header("📡 Vigilancia Operativa")
     if st.button("📲 ENVIAR REPORTE DIARIO AL CELULAR (TODOS)"):
-        with st.spinner("Procesando constelación..."):
+        with st.spinner("Procesando..."):
             for p in proyectos:
                 tid = p.get('telegram_id') or st.secrets["telegram"]["chat_id"]
-                msg = f"🛰 **BIOCORE V5 - REPORTE DIARIO**\n📍 Proyecto: {p['Proyecto']}\n📅 {datetime.now().strftime('%d/%m/%Y')}\n✅ Estatus: Operativo\n📝 Diagnóstico: Sin anomalías detectadas."
+                msg = f"🛰 **BIOCORE V5**\n📍 Proyecto: {p['Proyecto']}\n📅 {datetime.now().strftime('%d/%m/%Y')}\n✅ Estatus: Operativo"
                 requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                              data={"chat_id": tid, "text": msg, "parse_mode": "Markdown"})
-        st.success("Reportes diarios enviados.")
+        st.success("Reportes enviados.")
 
     for p in proyectos:
         with st.expander(f"🔍 {p['Proyecto']} ({p.get('Tipo', 'N/A')})"):
@@ -73,31 +72,24 @@ with tab1:
 
 # --- PESTAÑA 2: HISTORIAL 20 AÑOS ---
 with tab2:
-    st.header("📊 Serie de Tiempo Multitemporal (2006-2026)")
+    st.header("📊 Serie de Tiempo (2006-2026)")
     p_hist = st.selectbox("Seleccione Proyecto", [p['Proyecto'] for p in proyectos], key="sel_hist")
-    
-    if st.button("🚀 Reconstruir Tendencia 20 Años"):
+    if st.button("🚀 Reconstruir Tendencia"):
         target = next(i for i in proyectos if i['Proyecto'] == p_hist)
         geom = ee.Geometry.Polygon(json.loads(target['Coordenadas']))
-        
-        def get_annual_index(year):
-            start, end = f"{year}-01-01", f"{year}-12-31"
-            # Landsat 8 (2013-2026)
-            if year >= 2013:
-                coll = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2").filterBounds(geom).filterDate(start, end)
-                val = coll.median().normalizedDifference(['SR_B5', 'SR_B4']).reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('nd', 0)
-            # Landsat 7/5 (2006-2012)
-            else:
-                coll = ee.ImageCollection("LANDSAT/LE07/C02/T1_L2").filterBounds(geom).filterDate(start, end)
-                val = coll.median().normalizedDifference(['SR_B4', 'SR_B3']).reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('nd', 0)
-            return val if val else 0
-
         anios = range(2006, 2027)
-        with st.spinner("Procesando datos históricos..."):
-            datos_h = [get_annual_index(y) for y in anios]
-            st.line_chart(pd.DataFrame({"Año": anios, "Salud Vegetal/Vigor": datos_h}).set_index("Año"))
+        datos_h = []
+        with st.spinner("Buscando en Landsat 5, 7 y 8..."):
+            for y in anios:
+                coll = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2") if y >= 2013 else ee.ImageCollection("LANDSAT/LE07/C02/T1_L2")
+                img = coll.filterBounds(geom).filterDate(f"{y}-01-01", f"{y}-12-31").median()
+                try:
+                    val = img.normalizedDifference(['SR_B5', 'SR_B4'] if y >= 2013 else ['SR_B4', 'SR_B3']).reduceRegion(ee.Reducer.mean(), geom, 30).getInfo().get('nd', 0)
+                except: val = 0
+                datos_h.append(val or 0)
+            st.line_chart(pd.DataFrame({"Año": anios, "Vigor": datos_h}).set_index("Año"))
 
-# --- PESTAÑA 3: INFORMES PDF ---
+# --- PESTAÑA 3: INFORMES PDF (CORREGIDA) ---
 with tab3:
     st.header("📄 Generador de PDF")
     p_pdf = st.selectbox("Proyecto para PDF", [p['Proyecto'] for p in proyectos], key="sel_pdf")
@@ -109,41 +101,39 @@ with tab3:
         pdf.cell(200, 10, f"INFORME TECNICO BIOCORE: {p_pdf}", ln=True, align='C')
         pdf.ln(10)
         pdf.set_font("Arial", '', 12)
-        pdf.cell(200, 10, f"Fecha de Emision: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
+        pdf.cell(200, 10, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
         pdf.cell(200, 10, f"Tipo: {target_pdf.get('Tipo')}", ln=True)
-        pdf.cell(200, 10, f"Email de Contacto: {target_pdf.get('Email')}", ln=True)
         
-        pdf_out = pdf.output(dest='S').encode('latin-1')
-        b64 = base64.b64encode(pdf_out).decode()
-        st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="BioCore_{p_pdf}.pdf">📥 Haz clic aquí para descargar PDF</a>', unsafe_allow_html=True)
+        # EL ARREGLO ESTÁ AQUÍ:
+        pdf_content = pdf.output(dest='S')
+        if isinstance(pdf_content, str): # Si la versión de fpdf devuelve string
+            pdf_bytes = pdf_content.encode('latin-1')
+        else: # Si devuelve bytes directamente (fpdf2)
+            pdf_bytes = pdf_content
+            
+        b64 = base64.b64encode(pdf_bytes).decode()
+        st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="BioCore_{p_pdf}.pdf">📥 Descargar PDF</a>', unsafe_allow_html=True)
 
 # --- PESTAÑA 4: REGISTRO ---
 with tab4:
-    st.header("➕ Registro de Clientes")
-    with st.form("reg_full_v5"):
+    st.header("➕ Registro")
+    with st.form("reg_v5"):
         c1, c2 = st.columns(2)
         f_name = c1.text_input("Nombre Proyecto")
         f_tipo = c2.selectbox("Tipo", ["HUMEDAL", "MINERIA"])
         f_coords = st.text_area("Coordenadas (JSON)")
-        
-        c3, c4 = st.columns(2)
-        f_tid = c3.text_input("Telegram ID (Alertas)")
-        f_sid = c4.text_input("Google Sheet ID")
-        
-        c5, c6 = st.columns(2)
-        f_mail = c5.text_input("Email Cliente")
-        f_pass = c6.text_input("Password Cliente", type="password")
-        
+        f_tid = st.text_input("Telegram ID")
+        f_mail = st.text_input("Email Cliente")
+        f_pass = st.text_input("Password Cliente", type="password")
         f_glaciar = st.checkbox("Monitoreo Glaciar")
         
-        if st.form_submit_button("💾 GUARDAR CLIENTE"):
+        if st.form_submit_button("💾 GUARDAR"):
             try:
                 pts = json.loads(f_coords)
                 if pts[0] != pts[-1]: pts.append(pts[0])
                 supabase.table("usuarios").insert({
                     "Proyecto": f_name, "Tipo": f_tipo, "Coordenadas": json.dumps(pts),
-                    "telegram_id": f_tid, "sheet_id": f_sid, "Email": f_mail, 
-                    "Password": f_pass, "glaciar": f_glaciar
+                    "telegram_id": f_tid, "Email": f_mail, "Password": f_pass, "glaciar": f_glaciar
                 }).execute()
-                st.success("Cliente registrado con éxito.")
+                st.success("Guardado.")
             except Exception as e: st.error(f"Error: {e}")

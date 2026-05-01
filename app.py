@@ -51,15 +51,21 @@ def generar_reporte_total(p):
     tipo = p.get('Tipo', 'MINERIA')
     d = st.session_state.PERFILES.get(tipo, st.session_state.PERFILES["MINERIA"])
     
-    # A. Datos Satelitales (Óptico, Radar, Clima)
+        # --- A. Datos Satelitales (Óptico, Radar, Clima) ---
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()
     f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
     
-    # Índices SAVI y NDWI
+    # 1. Cargar Radar Sentinel-1 (VV) para rugosidad
+    s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).sort('system:time_start', False).first()
+    radar_val = s1.select('VV')
+
+    # 2. Índices combinados (SAVI, NDWI, SWIR, CLAY y NDSI para nieve)
     idx = s2.expression('((B8-B4)/(B8+B4+0.5))*1.5', {'B8':s2.select('B8'),'B4':s2.select('B4')}).rename('sa')\
         .addBands(s2.normalizedDifference(['B3','B8']).rename('nd'))\
         .addBands(s2.select('B11').divide(10000).rename('sw'))\
         .addBands(s2.select('B11').divide(s2.select('B12')).rename('clay'))\
+        .addBands(s2.normalizedDifference(['B3','B11']).rename('ndsi'))\
+        .addBands(radar_val.rename('radar_vv'))\
         .reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
 
     # Temperatura MODIS e Incendios FIRMS

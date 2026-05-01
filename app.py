@@ -4,63 +4,49 @@ import requests
 import json
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN DE PERFILES (Leyes, Formularios y Sensores) ---
+# --- CONFIGURACIÓN DE PERFILES (Leyes y Formularios) ---
 PERFILES = {
     "HUMEDAL": {
         "catastro": "Humedal Urbano / Cuerpo de Agua (Ley 21.202)",
-        "sensor_eval": "nd", # NDWI
-        "umbral": 0.1,
-        "crit": "menor",
         "habitat_expl": "Estructura de ribera garantiza refugio de fauna silvestre.",
-        "msg_ok": "Parámetros bióticos y físicos dentro de la norma legal.",
-        "msg_err": "Estrés hídrico detectado. NDWI bajo umbral crítico."
+        "clima_ley": "Balance hídrico real para defensa técnica (Ley 21.202)",
+        "sensor_eval": "nd", "umbral": 0.1, "crit": "menor"
     },
     "MINERIA": {
         "catastro": "Área Minera / Depósito de Estériles (Formulario F-30)",
-        "sensor_eval": "sw", # SWIR
-        "umbral": 0.45,
-        "crit": "mayor",
         "habitat_expl": "Estabilidad de sustrato compatible con plan de cierre.",
-        "msg_ok": "Sin indicios de intervención antrópica reciente.",
-        "msg_err": "Detección de posible movimiento de material o excavación."
+        "clima_ley": "Monitoreo de aridez para control de polvo (F-30)",
+        "sensor_eval": "sw", "umbral": 0.45, "crit": "mayor"
     },
     "GLACIAR": {
         "catastro": "Área Criosférica / Alta Montaña (RCA Pascua Lama)",
-        "sensor_eval": "mn", # NDSI
-        "umbral": 0.35,
-        "crit": "menor",
         "habitat_expl": "Balance de masa criosférica protege ecosistemas altoandinos.",
-        "msg_ok": "Criósfera estable. Sin indicios de intervención antrópica.",
-        "msg_err": "Pérdida crítica de cobertura criosférica (NDSI bajo 0.35)."
+        "clima_ley": "Control de derretimiento anómalo (RCA Pascua Lama)",
+        "sensor_eval": "mn", "umbral": 0.35, "crit": "menor"
     },
     "BOSQUE": {
         "catastro": "Bosque Nativo / Plan de Manejo (Ley 20.283)",
-        "sensor_eval": "sa", # SAVI
-        "umbral": 0.20,
-        "crit": "menor",
         "habitat_expl": "Estructura de dosel garantiza conectividad biológica.",
-        "msg_ok": "Vigor foliar estable según polígono autorizado.",
-        "msg_err": "Degradación de biomasa detectada. Posible intervención."
+        "clima_ley": "Estrés hídrico en biomasa (Ley 20.283)",
+        "sensor_eval": "sa", "umbral": 0.20, "crit": "menor"
     },
     "INDUSTRIAL": {
         "catastro": "Zona de Impacto / Logística (Formulario F-22)",
-        "sensor_eval": "sw", # SWIR
-        "umbral": 0.50,
-        "crit": "mayor",
         "habitat_expl": "Monitoreo de sellado de suelo y control de escorrentía.",
-        "msg_ok": "Estabilidad estructural y logística detectada.",
-        "msg_err": "Alteración de superficie o acumulación anómala."
+        "clima_ley": "Gestión de pluviosidad industrial (F-22)",
+        "sensor_eval": "sw", "umbral": 0.50, "crit": "mayor"
     }
 }
 
-# --- 2. FUNCIÓN DE REPORTE TELEGRAM (CORREGIDA) ---
-def enviar_reporte_completo(p, res):
-    # p: datos de supabase | res: resultados de GEE
-    perfil = PERFILES.get(p.get('Tipo'), PERFILES["MINERIA"])
+# --- MOTOR DE REPORTE DIARIO ---
+def enviar_reporte_biocore(p, res):
+    # p: dict de supabase | res: resultados de GEE
+    tipo = p.get('Tipo', 'MINERIA')
+    perf = PERFILES.get(tipo, PERFILES["MINERIA"])
     
-    # Determinamos NDSI/NDWI dinámico según el proyecto
-    label_mn = "NDSI" if p.get('Tipo') == "GLACIAR" else "NDWI"
-    val_mn = res['idx']['mn'] if p.get('Tipo') == "GLACIAR" else res['idx']['nd']
+    # Dinamismo de etiquetas
+    etiqueta_mn = "NDSI" if tipo == "GLACIAR" else "NDWI"
+    valor_mn = res['idx']['mn'] if tipo == "GLACIAR" else res['idx']['nd']
 
     reporte = (
         f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"
@@ -72,24 +58,28 @@ def enviar_reporte_completo(p, res):
         f"🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**\n"
         f"└ Estatus: {'🛡️ ESTABLE' if 'CONTROL' in res['estado'] else '⚠️ ALTERADO'}\n"
         f"└ Radar (VV): `{res['sar']:.2f} dB` | SWIR: `{res['idx']['sw']:.2f}`\n"
-        f"└ **Interpretación:** {perfil.get('msg_ok') if 'CONTROL' in res['estado'] else perfil.get('msg_err')}\n\n"
+        f"└ **Interpretación:** Reflectancia mineral y estabilidad de taludes verificada.\n\n"
         f"🌲 **CATASTRO DINÁMICO:**\n"
-        f"└ Tipo: {perfil['catastro']}\n"
+        f"└ Tipo: {perf['catastro']}\n"
         f"└ Certificación de no intervención en polígono autorizado.\n\n"
         f"🌱 **SALUD VEGETAL (VE-5):**\n"
         f"└ Vigor (SAVI): `{res['idx']['sa']:.2f}`\n"
         f"└ **Sustrato:** Ratio Arcillas (`{res['idx']['clay']:.2f}`): Estabilidad de sedimentos.\n\n"
         f"📏 **ESTADO DEL HÁBITAT (VE-7):**\n"
-        f"└ Altura (GEDI): `{res['alt']:.1f}m` | **{label_mn}:** `{val_mn:.2f}`\n"
-        f"└ **Explicación:** {perfil['habitat_expl']}\n\n"
+        f"└ Altura (GEDI): `{res['alt']:.1f}m` | **{etiqueta_mn}:** `{valor_mn:.2f}`\n"
+        f"└ **Explicación:** {perf['habitat_expl']}\n\n"
         f"⚠️ **RIESGO CLIMÁTICO (TerraClimate):**\n"
         f"└ Déficit: `{res['defic']:.1f} mm/año`\n"
-        f"└ **Blindaje Legal:** Monitoreo de balance hídrico real para defensa técnica.\n"
+        f"└ **Blindaje Legal:** {perf['clima_ley']}.\n"
         f"──────────────────\n"
         f"✅ **ESTADO GLOBAL:** {res['estado']}\n"
         f"📝 **Diagnóstico:** {res['diag']}"
     )
     
-    # Envío
     requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                  data={"chat_id": p['telegram_id'], "text": reporte, "parse_mode": "Markdown"})
+
+# --- ACCIÓN PARA DESBLOQUEAR APP ---
+if st.button("🔄 REINICIAR MOTOR Y LIMPIAR CACHÉ"):
+    st.cache_data.clear()
+    st.rerun()

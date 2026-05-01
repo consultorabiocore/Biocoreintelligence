@@ -4,8 +4,7 @@ import requests
 import json
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN DE PERFILES TÉCNICOS (5 TIPOS) ---
-# Aquí están todas las leyes, formularios y sensores críticos por perfil
+# --- 1. CONFIGURACIÓN DE PERFILES (Leyes, Formularios y Sensores) ---
 PERFILES = {
     "HUMEDAL": {
         "catastro": "Humedal Urbano / Cuerpo de Agua (Ley 21.202)",
@@ -13,7 +12,6 @@ PERFILES = {
         "umbral": 0.1,
         "crit": "menor",
         "habitat_expl": "Estructura de ribera garantiza refugio de fauna silvestre.",
-        "interpretacion": "Absorción hídrica óptima. Confirma saturación de sustrato.",
         "msg_ok": "Parámetros bióticos y físicos dentro de la norma legal.",
         "msg_err": "Estrés hídrico detectado. NDWI bajo umbral crítico."
     },
@@ -23,7 +21,6 @@ PERFILES = {
         "umbral": 0.45,
         "crit": "mayor",
         "habitat_expl": "Estabilidad de sustrato compatible con plan de cierre.",
-        "interpretacion": "Reflectancia mineral estable. Descarta acopio de estériles.",
         "msg_ok": "Sin indicios de intervención antrópica reciente.",
         "msg_err": "Detección de posible movimiento de material o excavación."
     },
@@ -33,7 +30,6 @@ PERFILES = {
         "umbral": 0.35,
         "crit": "menor",
         "habitat_expl": "Balance de masa criosférica protege ecosistemas altoandinos.",
-        "interpretacion": "Preservación de masa de hielo y control de albedo.",
         "msg_ok": "Criósfera estable. Sin indicios de intervención antrópica.",
         "msg_err": "Pérdida crítica de cobertura criosférica (NDSI bajo 0.35)."
     },
@@ -43,27 +39,29 @@ PERFILES = {
         "umbral": 0.20,
         "crit": "menor",
         "habitat_expl": "Estructura de dosel garantiza conectividad biológica.",
-        "interpretacion": "Densidad foliar y vigor fotosintético dinámico.",
         "msg_ok": "Vigor foliar estable según polígono autorizado.",
         "msg_err": "Degradación de biomasa detectada. Posible intervención."
     },
     "INDUSTRIAL": {
         "catastro": "Zona de Impacto / Logística (Formulario F-22)",
-        "sensor_eval": "sw", # SWIR para detectar cambios en suelo
+        "sensor_eval": "sw", # SWIR
         "umbral": 0.50,
         "crit": "mayor",
         "habitat_expl": "Monitoreo de sellado de suelo y control de escorrentía.",
-        "interpretacion": "Firma espectral de superficies endurecidas o áridos.",
         "msg_ok": "Estabilidad estructural y logística detectada.",
-        "msg_err": "Alteración de superficie o acumulación anómala de material."
+        "msg_err": "Alteración de superficie o acumulación anómala."
     }
 }
 
-# --- 2. LÓGICA DE REPORTE DINÁMICO ---
-def generar_reporte_telegram(p, res):
-    # 'p' es el dict del proyecto de Supabase, 'res' es el dict con los cálculos de GEE
+# --- 2. FUNCIÓN DE REPORTE TELEGRAM (CORREGIDA) ---
+def enviar_reporte_completo(p, res):
+    # p: datos de supabase | res: resultados de GEE
     perfil = PERFILES.get(p.get('Tipo'), PERFILES["MINERIA"])
     
+    # Determinamos NDSI/NDWI dinámico según el proyecto
+    label_mn = "NDSI" if p.get('Tipo') == "GLACIAR" else "NDWI"
+    val_mn = res['idx']['mn'] if p.get('Tipo') == "GLACIAR" else res['idx']['nd']
+
     reporte = (
         f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"
         f"**PROYECTO:** {p['Proyecto']}\n"
@@ -74,7 +72,7 @@ def generar_reporte_telegram(p, res):
         f"🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**\n"
         f"└ Estatus: {'🛡️ ESTABLE' if 'CONTROL' in res['estado'] else '⚠️ ALTERADO'}\n"
         f"└ Radar (VV): `{res['sar']:.2f} dB` | SWIR: `{res['idx']['sw']:.2f}`\n"
-        f"└ **Interpretación:** {perfil['interpretacion']}\n\n"
+        f"└ **Interpretación:** {perfil.get('msg_ok') if 'CONTROL' in res['estado'] else perfil.get('msg_err')}\n\n"
         f"🌲 **CATASTRO DINÁMICO:**\n"
         f"└ Tipo: {perfil['catastro']}\n"
         f"└ Certificación de no intervención en polígono autorizado.\n\n"
@@ -82,16 +80,16 @@ def generar_reporte_telegram(p, res):
         f"└ Vigor (SAVI): `{res['idx']['sa']:.2f}`\n"
         f"└ **Sustrato:** Ratio Arcillas (`{res['idx']['clay']:.2f}`): Estabilidad de sedimentos.\n\n"
         f"📏 **ESTADO DEL HÁBITAT (VE-7):**\n"
-        f"└ Altura (GEDI): `{res['alt']:.1f}m` | **NDSI/NDWI:** `{res['idx']['nd']:.2f}`\n"
+        f"└ Altura (GEDI): `{res['alt']:.1f}m` | **{label_mn}:** `{val_mn:.2f}`\n"
         f"└ **Explicación:** {perfil['habitat_expl']}\n\n"
         f"⚠️ **RIESGO CLIMÁTICO (TerraClimate):**\n"
         f"└ Déficit: `{res['defic']:.1f} mm/año`\n"
         f"└ **Blindaje Legal:** Monitoreo de balance hídrico real para defensa técnica.\n"
         f"──────────────────\n"
         f"✅ **ESTADO GLOBAL:** {res['estado']}\n"
-        f"📝 **Diagnóstico:** {res['diagnostico']}"
+        f"📝 **Diagnóstico:** {res['diag']}"
     )
     
-    # Envío a Telegram
+    # Envío
     requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                  data={"chat_id": p['telegram_id'], "text": reporte, "parse_mode": "Markdown"})

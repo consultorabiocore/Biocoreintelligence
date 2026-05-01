@@ -262,7 +262,7 @@ def generar_reporte_total(p):
 
     return texto_final, s_actual, s_base
 
-except Exception as e:
+    except Exception as e:
     return f"❌ Error en el procesamiento: {str(e)}", 0, 0
 
 # --- 4. INTERFAZ ---

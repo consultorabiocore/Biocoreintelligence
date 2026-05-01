@@ -8,7 +8,7 @@ from supabase import create_client, Client
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
-# --- 1. CONFIGURACIÓN E INICIO ---
+# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide", page_icon="🛰️")
 
 def check_password():
@@ -36,73 +36,74 @@ if check_password():
         st.error(f"Error de conexión: {e}")
         st.stop()
 
-    # --- 3. PESTAÑAS DE LA APP ---
-    tab1, tab2 = st.tabs(["🌍 Monitoreo en Tiempo Real", "➕ Registro de Nuevos Clientes"])
+    # --- 3. INTERFAZ ---
+    tab1, tab2 = st.tabs(["🌍 Monitoreo de Proyectos", "➕ Registro de Clientes/Usuarios"])
 
-    # --- PESTAÑA DE REGISTRO (GESTIÓN DE USUARIOS) ---
+    # --- PESTAÑA 2: REGISTRO DE USUARIOS (Desde la App) ---
     with tab2:
-        st.header("📝 Ingreso de Clientes al Ecosistema BioCore")
-        st.info("Completa este formulario para que el satélite comience a rastrear el nuevo polígono.")
+        st.header("📝 Gestión de Usuarios y Proyectos")
+        st.markdown("Desde aquí puedes ingresar nuevos clientes sin tocar Supabase.")
         
-        with st.form("form_registro", clear_on_submit=True):
+        with st.form("registro_directo", clear_on_submit=True):
             col1, col2 = st.columns(2)
-            nombre_proy = col1.text_input("Nombre del Proyecto / Cliente")
-            tipo_proy = col2.selectbox("Tipo de Monitoreo", ["HUMEDAL", "MINERIA"])
+            n_proy = col1.text_input("Nombre del Cliente/Proyecto")
+            t_proy = col2.selectbox("Tipo", ["HUMEDAL", "MINERIA"])
             
-            coords_raw = st.text_area("Coordenadas (Pega el JSON de puntos aquí)")
+            coords_raw = st.text_area("Coordenadas (JSON)", help="Pega aquí los puntos del polígono")
             
             col3, col4 = st.columns(2)
-            telegram_id = col3.text_input("ID de Telegram (para alertas al celular)")
-            sheet_id = col4.text_input("ID de Google Sheet (para base de datos)")
+            t_id = col3.text_input("Telegram ID (Alertas)")
+            s_id = col4.text_input("Google Sheet ID (Datos)")
             
-            es_glaciar = st.checkbox("¿Requiere monitoreo de criósfera (Glaciares/Nieve)?")
+            es_glaciar = st.checkbox("Monitoreo de Glaciares activo")
             
-            btn_guardar = st.form_submit_button("💾 REGISTRAR CLIENTE")
-
-            if btn_guardar:
+            if st.form_submit_button("💾 GUARDAR CLIENTE"):
                 try:
-                    # Lógica de auto-cierre de polígono
                     puntos = json.loads(coords_raw)
-                    if puntos[0] != puntos[-1]:
-                        puntos.append(puntos[0])
+                    if puntos[0] != puntos[-1]: puntos.append(puntos[0]) # Auto-cierre
                     
-                    data_nuevo = {
-                        "Proyecto": nombre_proy,
-                        "Tipo": tipo_proy,
-                        "Coordenadas": json.dumps(puntos),
-                        "telegram_id": telegram_id,
-                        "sheet_id": sheet_id,
-                        "glaciar": es_glaciar
+                    data = {
+                        "Proyecto": n_proy, "Tipo": t_proy, "Coordenadas": json.dumps(puntos),
+                        "telegram_id": t_id, "sheet_id": s_id, "glaciar": es_glaciar
                     }
-                    
-                    supabase.table("usuarios").insert(data_nuevo).execute()
-                    st.success(f"¡{nombre_proy} ha sido integrado correctamente!")
+                    supabase.table("usuarios").insert(data).execute()
+                    st.success(f"Proyecto {n_proy} guardado exitosamente.")
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Error al registrar: {e}. Revisa el formato de las coordenadas.")
+                    st.error(f"Error: Verifica que la tabla 'usuarios' esté creada en Supabase. Detalles: {e}")
 
-    # --- PESTAÑA DE MONITOREO (VISUALIZACIÓN Y REPORTES) ---
+    # --- PESTAÑA 1: MONITOREO (Lectura de Datos) ---
     with tab1:
-        st.header("🛰️ Estado Actual de Proyectos")
-        
-        # Leemos los usuarios que acabas de ingresar desde la App
-        res = supabase.table("usuarios").select("*").execute()
-        proyectos_activos = res.data
-        
-        if not proyectos_activos:
-            st.warning("No hay clientes registrados aún. Ve a la pestaña de Registro.")
-        else:
-            for p in proyectos_activos:
-                with st.expander(f"📍 {p['Proyecto']} - {p['Tipo']}"):
-                    # Aquí va toda tu lógica de índices (SAVI, NDWI, etc.)
-                    # El botón de "Enviar Reporte" usará el p['telegram_id'] que ingresaste arriba
-                    st.write(f"ID Alertas: `{p['telegram_id']}`")
-                    st.write(f"Base de Datos: `{p['sheet_id']}`")
-                    
-                    if st.button(f"📲 Procesar y Enviar a {p['Proyecto']}"):
-                        # (Aquí va la lógica de requests.post a Telegram que ya tenemos)
-                        st.success("Reporte enviado al ID de Telegram configurado.")
+        st.header("🛰️ Proyectos Activos")
+        try:
+            # Intentamos leer la tabla
+            res = supabase.table("usuarios").select("*").execute()
+            proyectos = res.data
+            
+            if not proyectos:
+                st.info("No hay proyectos registrados. Usa la pestaña de 'Registro'.")
+            else:
+                for p in proyectos:
+                    with st.expander(f"📍 {p['Proyecto']} ({p['Tipo']})"):
+                        st.write(f"ID Telegram: `{p['telegram_id']}`")
+                        # Aquí sigue tu lógica de Earth Engine...
+        except Exception as e:
+            st.error("⚠️ La tabla 'usuarios' no existe en Supabase o no tienes acceso.")
+            st.info("Para arreglar esto, ve al SQL Editor de Supabase y crea la tabla primero.")
+            with st.expander("Ver código SQL para crear la tabla"):
+                st.code("""
+                CREATE TABLE usuarios (
+                    id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                    "Proyecto" text,
+                    "Tipo" text,
+                    "Coordenadas" text,
+                    "telegram_id" text,
+                    "sheet_id" text,
+                    "glaciar" boolean DEFAULT false
+                );
+                """)
 
     with st.sidebar:
-        st.image("https://via.placeholder.com/150?text=BioCore", width=100) # O tu logo
-        st.write(f"Directora: Loreto Campos")
+        st.write(f"Sesión: Loreto Campos")
+        if st.button("🔄 Refrescar App"):
+            st.rerun()

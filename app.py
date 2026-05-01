@@ -34,69 +34,17 @@ def iniciar_gee():
 gee_status = iniciar_gee()
 
 # --- 2. FUNCIÓN DE MAPA REFORZADA ---
-def generar_reporte_total(p):
-    # 1. Definición de perfiles (4 espacios de sangría)
-    PERFILES = {
-        "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},
-        "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Balance de masa.", "clima": "Ley de Glaciares."},
-        "BOSQUE": {"cat": "Ley 20.283", "ve7": "Vigilancia regeneración.", "clima": "Prevención incendios."}
-    }
-    
-    tipo = p.get('Tipo', 'MINERIA')
-    d = PERFILES.get(tipo, PERFILES["MINERIA"])
-
-    # 2. CARGA DE GEOMETRÍA (Alineado con el código de arriba)
-    try:
-        raw_geom = p.get('Coordenadas')
-        
-        if raw_geom is None:
-            return f"Error: La columna 'Coordenadas' está vacía para {p.get('Proyecto')}.", 0, 0
-
-        if isinstance(raw_geom, str):
-            import json
-            try:
-                raw_geom = json.loads(raw_geom)
-            except:
-                raw_geom = eval(raw_geom) 
-
-        if isinstance(raw_geom, list):
-            geom = ee.Geometry.Polygon(raw_geom)
-        else:
-            return "Error: El formato en 'Coordenadas' no es una lista válida.", 0, 0
-
-    except Exception as e:
-        return f"Error al procesar Coordenadas: {str(e)}", 0, 0
-
-        # 2. Convertir a Geometría de Earth Engine
-        # Si es una lista de listas [[lon, lat], [lon, lat]...]
-        if isinstance(raw_geom, list):
-            # Verificamos si es una lista simple o anidada
-            if isinstance(raw_geom[0], list):
-                geom = ee.Geometry.Polygon(raw_geom)
-            else:
-                # Si por error solo pusieron un punto [lon, lat], creamos un buffer
-                geom = ee.Geometry.Point(raw_geom).buffer(1000).bounds()
-        else:
-            return "Error: El formato en 'Coordenadas' no es una lista válida.", 0, 0
-
-    except Exception as e:
-        return f"Error al procesar Coordenadas: {str(e)}", 0, 0
+# --- 2. FUNCIÓN DE MAPA ---
 def dibujar_mapa_biocore(coordenadas):
-    """
-    Crea un mapa centrado en el polígono del proyecto usando Folium.
-    """
     try:
-        # 1. Procesar coordenadas (por si vienen como texto)
         if isinstance(coordenadas, str):
             import json
             coordenadas = json.loads(coordenadas)
             
-        # 2. Calcular el centro del mapa (promedio de lat/lon)
         lons = [c[0] for c in coordenadas]
         lats = [c[1] for c in coordenadas]
         centro = [sum(lats)/len(lats), sum(lons)/len(lons)]
         
-        # 3. Crear el mapa base (Satélite)
         m = folium.Map(
             location=centro, 
             zoom_start=13, 
@@ -104,9 +52,8 @@ def dibujar_mapa_biocore(coordenadas):
             attr='Google Satellite'
         )
         
-        # 4. Dibujar el polígono del proyecto
         folium.Polygon(
-            locations=[[c[1], c[0]] for c in coordenadas], # Folium usa [Lat, Lon]
+            locations=[[c[1], c[0]] for c in coordenadas],
             color="cyan",
             weight=2,
             fill=True,
@@ -115,17 +62,11 @@ def dibujar_mapa_biocore(coordenadas):
         
         return m
     except Exception as e:
-        st.error(f"No se pudo generar el mapa: {e}")
-        return folium.Map(location=[-33.45, -70.66], zoom_start=4) # Mapa de emergencia (Chile)
+        return folium.Map(location=[-33.45, -70.66], zoom_start=4)
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
-    # 1. Diagnóstico Inicial (Esto va PRIMERO)
-    st.write(f"🔍 Revisando datos de: {p.get('Proyecto')}")
-    st.write("Dato en columna 'Coordenadas':", p.get('Coordenadas'))
-    print(f"DEBUG: Columnas disponibles: {list(p.keys())}")
-
-    # 2. Definición de perfiles
+    # 1. Definición de perfiles
     PERFILES = {
         "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},
         "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Balance de masa.", "clima": "Ley de Glaciares."},
@@ -135,49 +76,106 @@ def generar_reporte_total(p):
     tipo = p.get('Tipo', 'MINERIA')
     d = PERFILES.get(tipo, PERFILES["MINERIA"])
 
-    # 2. CARGA DE GEOMETRÍA (Ajuste según Supabase)
-    # --- B. CARGA DE GEOMETRÍA (Buscador Universal) ---
+    # 2. CARGA DE GEOMETRÍA (Ajustado a tu columna 'Coordenadas')
     try:
-        # 1. Buscamos el dato en las columnas más probables
-        raw_geom = p.get('geom') or p.get('geometry') or p.get('geojson') or p.get('coords')
+        raw_coords = p.get('Coordenadas')
         
-        if raw_geom is None:
-            # Si no encuentra nada, te dirá qué columnas SÍ existen para que corrijas el nombre
-            columnas_detectadas = ", ".join(p.keys())
-            return f"Error: No hay datos espaciales. Columnas encontradas: [{columnas_detectadas}]", 0, 0
+        if raw_coords is None:
+            return f"Error: La columna 'Coordenadas' está vacía para {p.get('Proyecto')}.", 0, 0
 
-        # 2. Si el dato es un String (texto), lo convertimos a lista/diccionario
-        if isinstance(raw_geom, str):
+        if isinstance(raw_coords, str):
             import json
-            raw_geom = json.loads(raw_geom)
+            try:
+                raw_coords = json.loads(raw_coords)
+            except:
+                raw_coords = eval(raw_coords)
 
-        # 3. Identificamos el formato (GeoJSON o Lista simple)
-        if isinstance(raw_geom, dict) and 'coordinates' in raw_geom:
-            # Formato GeoJSON estándar
-            coords = raw_geom['coordinates'][0]
-            geom = ee.Geometry.Polygon(coords)
-        elif isinstance(raw_geom, list):
-            # Formato Lista de Listas [[lon, lat], ...]
-            geom = ee.Geometry.Polygon(raw_geom)
-        else:
-            return f"Error: El formato de geometría en {p['Proyecto']} no es compatible.", 0, 0
-
+        # Crear geometría para Earth Engine
+        geom = ee.Geometry.Polygon(raw_coords)
+        
     except Exception as e:
-        return f"Error crítico al procesar coordenadas: {str(e)}", 0, 0
+        return f"Error crítico en geometría: {str(e)}", 0, 0
 
-    # 3. Llamada a Sentinel-2
+    # 3. PROCESAMIENTO SATELITAL
+    # 1. Óptico: Sentinel-2
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
            .filterBounds(geom)\
            .sort('system:time_start', False)\
            .first()
     
-        # --- A. Datos Satelitales (Óptico, Radar, Clima) ---
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()
     f_rep = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000).strftime('%d/%m/%Y')
     
-    # 1. Cargar Radar Sentinel-1 (VV) para rugosidad
-    s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(geom).filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).sort('system:time_start', False).first()
+    # 2. Radar: Sentinel-1 (Rugosidad/Estructuras)
+    s1 = ee.ImageCollection('COPERNICUS/S1_GRD')\
+           .filterBounds(geom)\
+           .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
+           .sort('system:time_start', False)\
+           .first()
     radar_val = s1.select('VV')
+
+    # 3. Clima: Temperatura MODIS
+    temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
+                 .filterBounds(geom)\
+                 .sort('system:time_start', False)\
+                 .first()
+    
+    # Convertimos Kelvin a Celsius (Cálculo corregido)
+    temp_val = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)\
+                       .reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0)
+    
+    # 4. Emergencias: Focos de Incendio FIRMS (últimos 3 días)
+    focos = ee.ImageCollection("FIRMS")\
+              .filterBounds(geom)\
+              .filterDate(ee.Date(datetime.now()).advance(-3, 'day'))\
+              .size().getInfo()
+
+    alerta_incendio = "⚠️ ALERT: Focos detectados" if focos > 0 else "✅ Sin focos activos"
+
+        # --- B. CÁLCULO DE ÍNDICES Y COMPARATIVA ---
+    
+    # 1. Función para calcular índices en la imagen actual
+    def calcular_idx(img):
+        # SAVI (Suelo Ajustado)
+        savi = img.expression('((NIR - RED) / (NIR + RED + 0.5)) * (1.5)', {
+            'NIR': img.select('B8'), 'RED': img.select('B4')
+        }).rename('sa')
+        # NDSI (Nieve)
+        ndsi = img.normalizedDifference(['B3', 'B11']).rename('ndsi')
+        # SWIR (Humedad)
+        swir = img.select('B11').divide(10000).rename('sw')
+        # CLAY (Arcillas)
+        clay = img.normalizedDifference(['B11', 'B12']).rename('clay')
+        
+        return img.addBands([savi, ndsi, swir, clay])
+
+    # Aplicar a la imagen actual y extraer valores
+    img_now = calcular_idx(s2)
+    idx = img_now.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
+    
+    # 2. COMPARATIVA HISTÓRICA (Usando el año de línea base)
+    anio_base = p.get('anio_linea_base', 2017)
+    s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+                .filterBounds(geom)\
+                .filterDate(f'{anio_base}-01-01', f'{anio_base}-12-31')\
+                .sort('CLOUDY_PIXEL_PERCENTAGE')\
+                .first()
+    
+    img_base = calcular_idx(s2_base)
+    idx_base = img_base.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
+    
+    # 3. CÁLCULO DE VARIACIÓN (KPI Principal)
+    s_actual = float(idx.get('sa', 0))
+    s_base = float(idx_base.get('sa', 0.001)) # Evitar división por cero
+    variacion = ((s_actual - s_base) / s_base) * 100
+    
+    # 4. DETERMINAR ESTADO GLOBAL
+    umbral = -15 if d['cat'] == "GLACIAR" else -10
+    est_global = "🔴 ALERTA CRÍTICA" if variacion < umbral else "🟢 BAJO CONTROL"
+
+    # --- AHORA VIENEN TUS INTERPRETACIONES (El código que ya tienes) ---
+    # if variacion < -15: ...
+    # if v_ndsi > 0.4: ...
+
 
     # 0. Interpretación SAVI (Vigor Vegetal) - ¡ESTA FALTA EN TU CÓDIGO!
     if variacion < -15:
@@ -232,7 +230,11 @@ def generar_reporte_total(p):
         exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
 
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (TELEGRAM) ---
-        # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL ---
+      # --- F. CIERRE Y RETORNO ---
+        
+        # Aseguramos que v_savi y v_clay existan para el mensaje
+        v_savi = s_actual 
+        v_clay = float(idx.get('clay', 0))
     texto_final = (
         f"🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**\n"
         f"**PROYECTO:** {p['Proyecto']}\n"
@@ -257,7 +259,12 @@ def generar_reporte_total(p):
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
         f"📝 **CONCLUSIÓN FINAL:** {conclusion_final}"
     )
-    
+            # El retorno triple que espera tu interfaz en Streamlit
+        return texto_final, s_actual, s_base
+
+    except Exception as e:
+        # Un seguro por si algo falla en el procesamiento numérico
+        return f"❌ Error en el procesamiento de datos: {str(e)}", 0, 0
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])
 

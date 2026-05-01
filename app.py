@@ -45,11 +45,27 @@ def dibujar_mapa_biocore(coords_json):
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
-    iniciar_gee()
-    js = json.loads(p['Coordenadas'])
-    geom = ee.Geometry.Polygon(js['coordinates'] if 'coordinates' in js else js)
+    # --- FIX: Definir perfiles localmente si no existen en session_state ---
+    PERFILES = {
+        "MINERIA": {
+            "cat": "RCA Minería (F-30)",
+            "ve7": "Estabilidad de taludes y control de material particulado.",
+            "clima": "Protocolo de Blindaje ante eventos extremos en faena."
+        },
+        "GLACIAR": {
+            "cat": "RCA Criosfera",
+            "ve7": "Monitoreo de balance de masa y escorrentía nival.",
+            "clima": "Protección legal bajo Ley de Glaciares."
+        },
+        "BOSQUE": {
+            "cat": "Ley 20.283 (Bosque Nativo)",
+            "ve7": "Vigilancia de regeneración y estado fitosanitario.",
+            "clima": "Prevención de incendios y estrés hídrico."
+        }
+    }
+    
     tipo = p.get('Tipo', 'MINERIA')
-    d = st.session_state.PERFILES.get(tipo, st.session_state.PERFILES["MINERIA"])
+    d = PERFILES.get(tipo, PERFILES["MINERIA"])
     
         # --- A. Datos Satelitales (Óptico, Radar, Clima) ---
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(geom).sort('system:time_start', False).first()

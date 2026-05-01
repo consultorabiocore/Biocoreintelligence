@@ -230,7 +230,7 @@ def generar_reporte_total(p):
         exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
 
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (TELEGRAM) ---
-    # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (Borra lo anterior y pega esto) ---
+    # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL ---
     texto_final = f"""
 🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**
 **PROYECTO:** {p['Proyecto']}

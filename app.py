@@ -120,10 +120,12 @@ def dibujar_mapa_biocore(coordenadas):
 
 # --- 3. MOTOR DE REPORTE COMPLETO ---
 def generar_reporte_total(p):
-    # Esto imprimirá en tu terminal las columnas que trae el proyecto
-    print(f"DEBUG: Columnas disponibles en {p.get('Proyecto')}: {p.keys()}")
+    # 1. Diagnóstico Inicial (Esto va PRIMERO)
+    st.write(f"🔍 Revisando datos de: {p.get('Proyecto')}")
+    st.write("Dato en columna 'Coordenadas':", p.get('Coordenadas'))
+    print(f"DEBUG: Columnas disponibles: {list(p.keys())}")
 
-    # 1. Definición de perfiles
+    # 2. Definición de perfiles
     PERFILES = {
         "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},
         "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Balance de masa.", "clima": "Ley de Glaciares."},

@@ -86,24 +86,19 @@ def generar_reporte_total(p):
         f"**PROYECTO:** {p['Proyecto']}\n"
         f"📅 **Análisis:** {f_rep} | **Línea Base:** {anio_base}\n"
         f"──────────────────\n"
-        f"🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**\n"
-        f"└ SWIR (Humedad): `{idx['sw']:.2f}` | Arcillas: `{idx['clay']:.2f}`\n\n"
-        f"🌲 **CATASTRO DINÁMICO:**\n"
-        f"└ Tipo: {d['cat']}\n\n"
-        f"🌱 **SALUD VEGETAL (VE-5):**\n"
+        f"📡 **MONITOREO RADAR (Sentinel-1):**\n"
+        f"└ Retrodispersión VV: `{idx.get('radar_vv', 0):.2f} dB`\n"
+        f"└ Explicación: Estructura superficial y rugosidad del terreno.\n\n"
+        f"🌱 **SALUD VEGETAL (SAVI):**\n"
         f"└ Vigor Actual: `{idx['sa']:.3f}` | Base: `{s_base:.3f}`\n"
-        f"└ Variación: `{variacion:.1f}%` respecto al original.\n\n"
-        f"📏 **ESTADO DEL HÁBITAT (VE-7):**\n"
-        f"└ Altura (GEDI): `1.2m` | NDWI: `{idx['nd']:.2f}`\n"
-        f"└ Explicación: {d['ve7']}\n\n"
+        f"└ Variación: `{variacion:.1f}%` respecto al original.\n"
+        f"└ Explicación: Ajustado por brillo del suelo para mayor precisión.\n\n"
         f"⚠️ **RIESGO CLIMÁTICO:**\n"
-        f"└ Temperatura: `{temp_val:.1f}°C` | Incendios (72h): {alerta_incendio}\n"
-        f"└ Blindaje Legal: {d['clima']}\n"
+        f"└ Temperatura: `{temp_val:.1f}°C` | Incendios: {alerta_incendio}\n"
         f"──────────────────\n"
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
-        f"📝 **Diagnóstico:** Evaluación técnica e histórica finalizada."
+        f"📝 **Diagnóstico:** {d['ve7']} {d['clima']}"
     )
-
     # E. Guardado en Supabase
     supabase.table("historial_reportes").insert({
         "proyecto": p['Proyecto'], "savi": idx['sa'], "savi_base": s_base,

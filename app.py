@@ -259,12 +259,16 @@ def generar_reporte_total(p):
         f"✅ **ESTADO GLOBAL:** {est_global}\n"
         f"📝 **CONCLUSIÓN FINAL:** {conclusion_final}"
     )
-            # El retorno triple que espera tu interfaz en Streamlit
-        return texto_final, s_actual, s_base
+    # ... (viene del f-string del mensaje final)
+    )
 
-    except Exception as e:
-        # Un seguro por si algo falla en el procesamiento numérico
-        return f"❌ Error en el procesamiento de datos: {str(e)}", 0, 0
+    # El retorno triple que espera tu interfaz (Línea 263 corregida)
+    return texto_final, s_actual, s_base
+
+except Exception as e:
+    # Este except también debe estar alineado con el try de arriba
+    return f"❌ Error en el procesamiento: {str(e)}", 0, 0
+
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])
 

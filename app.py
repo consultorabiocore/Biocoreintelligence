@@ -132,20 +132,21 @@ with tab1:
             st.markdown(f"### 📍 Proyecto: {p['Proyecto']}")
             
             # Layout de alta visibilidad
+                        # Layout de alta visibilidad (Asegúrate de que estas líneas no tengan espacios extra al inicio)
             col_mapa, col_reporte = st.columns([2.5, 1])
             
-                        with col_reporte:
-                # El mapa se renderiza directamente, sin expander
+            with col_mapa:
+                # El mapa se renderiza directamente
                 m_obj = dibujar_mapa_biocore(p['Coordenadas'])
                 folium_static(m_obj, width=850, height=500)
             
-            with col_a:
+            with col_reporte:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
                         txt, v_now, v_base = generar_reporte_total(p)
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
-                        st.success("¡Enviado a Telegram y registrado!")
+                        st.success("¡Enviado a Telegram!")
                         # Gráfico comparativo
                         fig = go.Figure(data=[
                             go.Bar(name='Línea Base', x=['Vigor'], y=[v_base]),

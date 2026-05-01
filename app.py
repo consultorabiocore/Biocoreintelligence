@@ -6,7 +6,7 @@ import json
 import pandas as pd
 from supabase import create_client, Client
 
-# --- 1. CONFIGURACIÓN DE PERFILES (Garantiza acceso a datos de leyes) ---
+# --- 1. CONFIGURACIÓN DE PERFILES ---
 if 'PERFILES' not in st.session_state:
     st.session_state.PERFILES = {
         "HUMEDAL": {"cat": "Ley 21.202", "ve7": "Refugio fauna silvestre.", "clima": "Balance hídrico real."},
@@ -25,71 +25,71 @@ except Exception as e:
     st.error(f"Error de base de datos: {e}")
     proyectos = []
 
-# --- 3. FUNCIÓN DE MAPA (Fuerza visibilidad de polígono) ---
-def dibujar_poligono_fijo(dato_coords):
+# --- 3. FUNCIÓN DE MAPA (Corregida para evitar ValueError) ---
+def dibujar_poligono_final(dato_coords):
     try:
-        # Convertir a dict si es necesario
+        # 1. Parsear coordenadas
         js = json.loads(dato_coords) if isinstance(dato_coords, str) else dato_coords
-        
-        # Extraer coordenadas limpias
-        if 'coordinates' in js:
-            raw_coords = js['coordinates'][0]
-        elif isinstance(js, list):
-            raw_coords = js[0] if isinstance(js[0][0], list) else js
-        else:
-            raw_coords = js
-        
-        # INVERSIÓN: GeoJSON [lon, lat] -> Folium [lat, lon]
+        # Extraer lista de puntos [lon, lat]
+        raw_coords = js['coordinates'][0] if 'coordinates' in js else js
+        # Invertir a [lat, lon] para Folium
         puntos = [[float(p[1]), float(p[0])] for p in raw_coords]
         
-        # Crear mapa centrado
-        m = folium.Map(location=puntos[0], zoom_start=15, tiles='CartoDB satellite')
+        # 2. Configurar Mapa con Google Satellite (URL manual para evitar errores de tiles)
+        google_sat = 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
         
-        # Dibujar polígono con borde grueso para que no se pierda
+        m = folium.Map(
+            location=puntos[0], 
+            zoom_start=16, 
+            tiles=google_sat, 
+            attr='Google'
+        )
+        
+        # 3. Dibujar Polígono BioCore
         folium.Polygon(
             locations=puntos,
-            color="#FFFF00", # Amarillo puro
-            weight=5,
+            color="#FFFF00", # Amarillo
+            weight=4,
             fill=True,
-            fill_opacity=0.4
+            fill_opacity=0.3,
+            tooltip="Área de Estudio"
         ).add_to(m)
         
-        # Ajustar el mapa automáticamente a los bordes del polígono
+        # Ajustar vista
         m.fit_bounds(puntos)
         return m
-    except Exception as e:
-        # Mapa por defecto en Chile si falla
-        return folium.Map(location=[-37.2, -72.7], zoom_start=12, tiles='CartoDB satellite')
+    except Exception:
+        # Mapa de respaldo si el JSON está mal
+        return folium.Map(location=[-37.2, -72.7], zoom_start=10)
 
 # --- 4. INTERFAZ ---
 tab1, tab2, tab3 = st.tabs(["🚀 VIGILANCIA", "📊 DATOS DE CLIENTES", "📄 CONFIGURACIÓN"])
 
 with tab1:
-    st.subheader("Vigilancia Satelital")
+    st.subheader("Auditoría Espacial en Tiempo Real")
     if proyectos:
         for p in proyectos:
             tipo = p.get('Tipo', 'MINERIA')
             with st.expander(f"📍 {p['Proyecto']} | Perfil: {tipo}"):
                 c1, c2 = st.columns([2, 1])
                 with c1:
-                    # Aquí DEBE aparecer el mapa con el polígono amarillo
-                    folium_static(dibujar_poligono_fijo(p['Coordenadas']), width=550, height=400)
+                    # RENDER DEL MAPA
+                    folium_static(dibujar_poligono_final(p['Coordenadas']), width=550, height=400)
                 with c2:
-                    st.write(f"**Ley Aplicable:**\n{st.session_state.PERFILES.get(tipo, {}).get('cat', 'N/A')}")
+                    st.write(f"**Ley:** {st.session_state.PERFILES.get(tipo, {}).get('cat')}")
                     if st.button(f"Ejecutar Auditoría", key=f"run_{p['Proyecto']}"):
-                        st.success("Procesando... Reporte enviado al móvil.")
-    else:
-        st.warning("No hay proyectos en Supabase.")
+                        st.info("Calculando índices...")
+                        st.success("Reporte enviado.")
 
 with tab2:
-    st.subheader("Registro de Clientes")
+    st.subheader("Registro de Proyectos y Clientes")
     if proyectos:
-        # Tabla simple con los datos que tú llenas
+        # Mostramos la tabla tal cual viene de Supabase
         df = pd.DataFrame(proyectos)
-        st.table(df[['Proyecto', 'Tipo', 'telegram_id']])
+        st.dataframe(df[['Proyecto', 'Tipo', 'telegram_id']], use_container_width=True)
     else:
-        st.info("No hay datos de clientes registrados.")
+        st.info("No se encontraron registros.")
 
 with tab3:
-    st.subheader("Configuración")
-    st.write("Ajuste de parámetros técnicos.")
+    st.subheader("Parámetros de BioCore")
+    st.write("Ajustes técnicos de sensores y leyes.")

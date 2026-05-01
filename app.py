@@ -34,22 +34,38 @@ def iniciar_gee():
 gee_status = iniciar_gee()
 
 # --- 2. FUNCIÓN DE MAPA REFORZADA ---
-    # --- B. CARGA DE GEOMETRÍA (Ajustado a tus columnas) ---
+def generar_reporte_total(p):
+    # 1. Definición de perfiles (4 espacios de sangría)
+    PERFILES = {
+        "MINERIA": {"cat": "RCA Minería (F-30)", "ve7": "Estabilidad de taludes.", "clima": "Protocolo extremos."},
+        "GLACIAR": {"cat": "RCA Criosfera", "ve7": "Balance de masa.", "clima": "Ley de Glaciares."},
+        "BOSQUE": {"cat": "Ley 20.283", "ve7": "Vigilancia regeneración.", "clima": "Prevención incendios."}
+    }
+    
+    tipo = p.get('Tipo', 'MINERIA')
+    d = PERFILES.get(tipo, PERFILES["MINERIA"])
+
+    # 2. CARGA DE GEOMETRÍA (Alineado con el código de arriba)
     try:
-        # Usamos el nombre exacto que detectamos: 'Coordenadas'
         raw_geom = p.get('Coordenadas')
         
         if raw_geom is None:
-            return f"Error: La columna 'Coordenadas' está vacía en Supabase para {p.get('Proyecto')}.", 0, 0
+            return f"Error: La columna 'Coordenadas' está vacía para {p.get('Proyecto')}.", 0, 0
 
-        # 1. Si el dato llega como texto (String), lo convertimos
         if isinstance(raw_geom, str):
             import json
             try:
                 raw_geom = json.loads(raw_geom)
             except:
-                # Si falla el json.loads, intentamos limpiar si viene con formatos raros
                 raw_geom = eval(raw_geom) 
+
+        if isinstance(raw_geom, list):
+            geom = ee.Geometry.Polygon(raw_geom)
+        else:
+            return "Error: El formato en 'Coordenadas' no es una lista válida.", 0, 0
+
+    except Exception as e:
+        return f"Error al procesar Coordenadas: {str(e)}", 0, 0
 
         # 2. Convertir a Geometría de Earth Engine
         # Si es una lista de listas [[lon, lat], [lon, lat]...]

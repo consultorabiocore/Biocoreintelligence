@@ -3,9 +3,15 @@ import ee
 import requests
 import json
 from datetime import datetime
+from supabase import create_client, Client
 
-# --- 1. DICCIONARIO ESTRATÉGICO (VE-7 y Riesgo Climático) ---
-# Aquí están los 5 tipos con sus leyes y formularios específicos
+# --- 1. CONEXIONES (Aquí se define 'supabase') ---
+# Asegúrate de tener estas credenciales en st.secrets
+url: str = st.secrets["connections"]["supabase"]["url"]
+key: str = st.secrets["connections"]["supabase"]["key"]
+supabase: Client = create_client(url, key)
+
+# --- 2. CONFIGURACIÓN DINÁMICA DE REPORTES ---
 DATA_BIOCORE = {
     "HUMEDAL": {
         "cat": "Humedal Urbano / Cuerpo de Agua (Ley 21.202)",
@@ -39,13 +45,12 @@ DATA_BIOCORE = {
     }
 }
 
-# --- 2. MOTOR DEL REPORTE DIARIO ---
-def enviar_reporte_full(p, res):
-    # p = proyecto de Supabase | res = resultados de GEE
+# --- 3. MOTOR DE REPORTE ---
+def enviar_reporte_biocore(p, res):
     tipo = p.get('Tipo', 'MINERIA')
     d = DATA_BIOCORE.get(tipo, DATA_BIOCORE["MINERIA"])
     
-    # Manejo dinámico de etiquetas NDSI/NDWI
+    # Etiquetas dinámicas según el tipo
     tag_mn = "NDSI" if tipo == "GLACIAR" else "NDWI"
     val_mn = res['idx']['mn'] if tipo == "GLACIAR" else res['idx']['nd']
 
@@ -80,22 +85,18 @@ def enviar_reporte_full(p, res):
     requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                  data={"chat_id": p['telegram_id'], "text": reporte, "parse_mode": "Markdown"})
 
-# --- 3. INTERFAZ DE RESCATE ---
+# --- 4. INTERFAZ ---
 st.title("🛰️ BioCore Intelligence V5")
 
-# Si la pantalla está negra, este bloque fuerza a cargar los datos
 try:
+    # Ahora 'supabase' sí está definido arriba
     proyectos = supabase.table("usuarios").select("*").execute().data
-    if not proyectos:
-        st.warning("No se encontraron proyectos en la base de datos.")
-    else:
+    if proyectos:
         for p in proyectos:
             if st.button(f"⚡ Procesar {p['Proyecto']}"):
-                # Aquí llamas a la función que calcula todo en GEE
-                # y luego a enviar_reporte_full(p, res)
-                st.success(f"Reporte de {p['Proyecto']} en camino...")
+                # Aquí iría el bloque de cálculo de GEE que ya tienes
+                st.info(f"Iniciando auditoría para {p['Proyecto']}...")
+    else:
+        st.warning("No hay proyectos registrados.")
 except Exception as e:
-    st.error(f"Error de conexión: {e}")
-    if st.button("🔄 REINICIAR CONEXIÓN"):
-        st.cache_data.clear()
-        st.rerun()
+    st.error(f"Error crítico: {e}")

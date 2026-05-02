@@ -229,7 +229,9 @@ def generar_reporte_total(p):
     else:
         exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
 
-    # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL (TELEGRAM) ---
+    # --- AGREGA ESTO ---
+    v_clay = float(idx.get('clay', 0)) # Asegúrate que 'clay' esté en tu diccionario idx
+
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL ---
     texto_final = f"""
 🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**

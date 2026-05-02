@@ -301,27 +301,33 @@ with tab1:
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
                         
-                        st.success("¡Reporte generado y enviado!")
+                        st.success("¡Reporte enviado a Telegram!")
 
-                        # --- VELOCÍMETRO DE CUMPLIMIENTO AMBIENTAL ---
+                        # --- VELOCÍMETRO DE CUMPLIMIENTO CON PORCENTAJE ---
                         fig = go.Figure(go.Indicator(
                             mode = "gauge+number+delta",
                             value = v_now,
                             domain = {'x': [0, 1], 'y': [0, 1]},
-                            title = {'text': f"Estado vs. Pre-Proyecto ({p.get('anio_linea_base', 2017)})", 'font': {'size': 16}},
-                            delta = {'reference': v_base, 'increasing': {'color': "#00CC96"}, 'decreasing': {'color': "#EF553B"}},
+                            title = {'text': f"Estado vs. Pre-Proyecto ({p.get('anio_linea_base', 2017)})", 'font': {'size': 18}},
+                            delta = {
+                                'reference': v_base, 
+                                'relative': True, 
+                                'valueformat': '.1%', # Lo convierte en porcentaje (ej: +15.2%)
+                                'increasing': {'color': "#00CC96"}, 
+                                'decreasing': {'color': "#EF553B"}
+                            },
                             gauge = {
-                                'axis': {'range': [0, 0.15], 'tickwidth': 1}, # Rango ajustado a alta montaña
+                                'axis': {'range': [0, 0.15], 'tickwidth': 1},
                                 'bar': {'color': "black"},
                                 'steps': [
-                                    {'range': [0, 0.05], 'color': "#FFDDDD"}, # Alerta Crítica
+                                    {'range': [0, 0.05], 'color': "#FFDDDD"}, # Alerta
                                     {'range': [0.05, 0.10], 'color': "#FFFFDD"}, # Precaución
                                     {'range': [0.10, 0.15], 'color': "#DDFFDD"}  # Óptimo
                                 ],
                                 'threshold': {
                                     'line': {'color': "red", 'width': 5},
                                     'thickness': 0.8,
-                                    'value': v_base # La "meta" es no estar bajo este nivel
+                                    'value': v_base # Marca la Línea Base
                                 }
                             }
                         ))
@@ -329,12 +335,15 @@ with tab1:
                         fig.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # Explicación Técnica para el Titular
+                        # --- EXPLICACIÓN TÉCNICA DETALLADA ---
                         st.info(f"""
-                        **💡 Guía de Interpretación para Titulares:**
-                        * **Línea Roja (🚩):** Representa el estado del área en el año **{p.get('anio_linea_base', 2017)}** (Antes de la intervención actual).
-                        * **Aguja Negra:** Es la salud biológica detectada por satélite **hoy**.
-                        * **Lectura:** Si la aguja está a la derecha de la línea roja, el proyecto cumple con mantener el vigor original. En minería de altura, valores cercanos a 0 son normales (suelo mineral).
+                        **📊 Guía de Lectura del Indicador:**
+                        
+                        * **Número Superior ({v_now:.3f}):** Es el nivel de **Vigor Vegetal Actual**. En esta zona de alta montaña, valores cercanos a 0 son normales y representan suelo mineral o roca.
+                        * **Número Inferior (Δ%):** Indica cuánto ha cambiado el vigor respecto a la **Línea Base de {p.get('anio_linea_base', 2017)}**. 
+                            * Si es **Verde (▲)**: El área está más saludable que antes del proyecto.
+                            * Si es **Rojo (▼)**: Existe una pérdida de vigor que requiere inspección.
+                        * **Línea Roja (🚩):** Es el umbral histórico. La aguja negra siempre debe estar a la derecha de esta marca para cumplir con la RCA.
                         """)
 
 with tab2:

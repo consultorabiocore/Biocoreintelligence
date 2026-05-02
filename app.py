@@ -263,7 +263,7 @@ def generar_reporte_total(p):
     return texto_final, s_actual, s_base
 
 # 3. El except DEBE estar al mismo nivel que el try
-except Exception as e:
+    except Exception as e:
     return f"❌ Error en el procesamiento: {str(e)}", 0, 0
 
 # --- 4. INTERFAZ ---

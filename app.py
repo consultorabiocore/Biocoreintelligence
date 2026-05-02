@@ -168,16 +168,19 @@ def generar_reporte_total(p):
     s_base = float(idx_base.get('sa', 0.001)) 
 
     # --- LÓGICA DINÁMICA BIOCORE ---
-    # Si el vigor es casi nulo (roca/alta montaña), ignoramos variaciones matemáticas locas
-    if abs(s_actual) < 0.05 and abs(s_base) < 0.05:
+    # 1. Extraer valores del satélite
+    v_now = float(idx.get('sa', 0))
+    v_base = float(idx_base.get('sa', 0))
+
+    # --- LÓGICA DINÁMICA BIOCORE ---
+    if abs(v_now) < 0.05 and abs(v_base) < 0.05:
         variacion = 0.0
         est_global = "🟢 BAJO CONTROL"
         exp_savi = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
     else:
-        # Cálculo normal si hay vegetación real
-        variacion = ((s_actual - s_base) / abs(s_base)) * 100
+        # Cálculo usando valor absoluto para evitar errores de signo
+        variacion = ((v_now - v_base) / abs(v_base if v_base != 0 else 0.001)) * 100
         
-        # Umbral dinámico por perfil (Minería es más estricta que Bosque)
         umbral_critico = -15 if d['cat'] == "RCA Minería (F-30)" else -25
         
         if variacion < umbral_critico:

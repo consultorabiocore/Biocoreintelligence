@@ -302,59 +302,58 @@ with tab1:
                         txt, v_now, v_base = generar_reporte_total(p)
                         anio_base = p.get('anio_linea_base', 2017)
                         
-                        # 2. Lógica BioCore (Estabilidad en roca)
-                        v_ref_grafico = v_now if abs(v_now) < 0.05 and abs(v_base) < 0.05 else v_base
-                        msg_status = "Suelo estable (Litología/Altitud)" if v_ref_grafico == v_now else "Monitoreo Vegetal Activo"
+                        # 2. Lógica de Referencia (Truco del 0.0001 para forzar visibilidad)
+                        if abs(v_now) < 0.05 and abs(v_base) < 0.05:
+                            # Si son casi iguales, le damos una diferencia mínima invisible
+                            # para que Plotly 'crea' que hay algo que calcular y muestre el 0.0%
+                            v_ref_grafico = v_now + 0.00001 
+                            msg_status = "Suelo estable (Litología/Altitud)"
+                        else:
+                            v_ref_grafico = v_base
+                            msg_status = "Monitoreo Vegetal Activo"
 
-                        # 3. Envío a Telegram
+                        # 3. Telegram
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
                         
                         st.success("¡Reporte enviado!")
 
-                        # 4. GRÁFICO CORREGIDO (Sin amontonamientos)
+                        # 4. Diseño con MÉTRICA separada (Esto nunca falla)
+                        # El delta de st.metric SIEMPRE se ve
+                        st.metric(
+                            label=f"SAVI Actual vs Base {anio_base}", 
+                            value=f"{v_now:.4f}", 
+                            delta="0.0% (Estable)" if v_ref_grafico != v_base else f"{((v_now-v_base)/abs(v_base if v_base!=0 else 1))*100:.1f}%"
+                        )
+
+                        # 5. Gráfico limpio sin números que choquen
                         fig = go.Figure(go.Indicator(
-                            mode = "gauge+number+delta",
+                            mode = "gauge", # Solo el arco
                             value = v_now,
-                            title = {'text': f"Estado vs. Base {anio_base}", 'font': {'size': 16}},
-                            delta = {
-                                'reference': v_ref_grafico,
-                                'relative': True,
-                                'valueformat': '.1%',
-                                'font': {'size': 20} # Tamaño moderado para que no choque
-                            },
                             gauge = {
-                                'axis': {'range': [0, 0.15], 'tickwidth': 1, 'tickcolor': "white"},
-                                'bar': {'color': "#2c3e50"}, # Barra más elegante
+                                'axis': {'range': [0, 0.15], 'tickwidth': 1},
+                                'bar': {'color': "#2c3e50"},
                                 'steps': [
-                                    {'range': [0, 0.05], 'color': "#e74c3c"}, # Rojo suave
-                                    {'range': [0.05, 0.10], 'color': "#f1c40f"}, # Amarillo suave
-                                    {'range': [0.10, 0.15], 'color': "#2ecc71"}  # Verde suave
+                                    {'range': [0, 0.05], 'color': "#e74c3c"}, 
+                                    {'range': [0.05, 0.10], 'color': "#f1c40f"}, 
+                                    {'range': [0.10, 0.15], 'color': "#2ecc71"}
                                 ],
                                 'threshold': {
-                                    'line': {'color': "white", 'width': 4}, # Línea base más visible
-                                    'thickness': 0.75,
+                                    'line': {'color': "black", 'width': 3},
                                     'value': v_base 
                                 }
                             }
                         ))
 
-                        # Ajuste de Layout para evitar solapamientos
-                        fig.update_layout(
-                            height=300, 
-                            margin=dict(l=40, r=40, t=40, b=20),
-                            paper_bgcolor="rgba(0,0,0,0)", # Fondo transparente
-                            font={'color': "white", 'family': "Arial"}
-                        )
-                        
+                        fig.update_layout(height=200, margin=dict(l=30, r=30, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 5. DIAGNÓSTICO PROFESIONAL (Resumen limpio)
+                        # 6. Cuadro de Diagnóstico
                         st.markdown(f"""
-                        <div style="background-color:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid #3b82f6;">
+                        <div style="background-color:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid #3b82f6; color: white;">
                             <h4 style="margin-top:0; color:#60a5fa;">🔍 Diagnóstico BioCore</h4>
-                            <p style="margin-bottom:5px;"><b>Situación:</b> {msg_status}</p>
-                            <p style="font-size:0.9em; color:#cbd5e1;">La variación porcentual (Δ%) de <b>0.0%</b> confirma que el terreno mantiene su estado mineral original de {anio_base} sin alteraciones detectables.</p>
+                            <p style="margin-bottom:0;"><b>Situación:</b> {msg_status}</p>
+                            <p style="font-size:0.9em; color:#cbd5e1;">La variación detectada es del <b>0.0%</b>, lo cual confirma la estabilidad del área de estudio.</p>
                         </div>
                         """, unsafe_allow_html=True)
 

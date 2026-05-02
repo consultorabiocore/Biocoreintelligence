@@ -163,21 +163,29 @@ def generar_reporte_total(p):
     idx_base = img_base.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
     
     # 3. CÁLCULO DE VARIACIÓN (KPI Principal)
+    # 3. CÁLCULO DE VARIACIÓN (KPI Principal con Inteligencia de Umbrales)
     s_actual = float(idx.get('sa', 0))
-    s_base = float(idx_base.get('sa', 0.001)) # Evitar división por cero
-    variacion = ((s_actual - s_base) / s_base) * 100
-    
-    # 4. DETERMINAR ESTADO GLOBAL
-    umbral = -15 if d['cat'] == "GLACIAR" else -10
-    est_global = "🔴 ALERTA CRÍTICA" if variacion < umbral else "🟢 BAJO CONTROL"
+    s_base = float(idx_base.get('sa', 0.001)) 
 
-    # 0. Interpretación SAVI (Vigor Vegetal) - ¡ESTA FALTA EN TU CÓDIGO!
-    if variacion < -15:
-        exp_savi = "Se observa una disminución significativa en el vigor vegetal, indicando posible intervención o estrés."
-    elif variacion > 5:
-        exp_savi = "El vigor vegetal muestra una recuperación positiva respecto a la línea base."
+    # --- LÓGICA DINÁMICA BIOCORE ---
+    # Si el vigor es casi nulo (roca/alta montaña), ignoramos variaciones matemáticas locas
+    if abs(s_actual) < 0.05 and abs(s_base) < 0.05:
+        variacion = 0.0
+        est_global = "🟢 BAJO CONTROL"
+        exp_savi = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
     else:
-        exp_savi = "La cobertura vegetal se mantiene estable y saludable respecto al registro histórico."
+        # Cálculo normal si hay vegetación real
+        variacion = ((s_actual - s_base) / abs(s_base)) * 100
+        
+        # Umbral dinámico por perfil (Minería es más estricta que Bosque)
+        umbral_critico = -15 if d['cat'] == "RCA Minería (F-30)" else -25
+        
+        if variacion < umbral_critico:
+            est_global = "🔴 ALERTA CRÍTICA"
+            exp_savi = "Descenso significativo detectado. Posible intervención o estrés hídrico severo."
+        else:
+            est_global = "🟢 BAJO CONTROL"
+            exp_savi = "La cobertura vegetal se mantiene estable dentro de los rangos históricos."
 
     # 1. Lógica de Nieve (NDSI)
     v_ndsi = float(idx.get('ndsi', 0))

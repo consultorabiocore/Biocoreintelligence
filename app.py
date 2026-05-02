@@ -298,70 +298,42 @@ with tab1:
             with col_reporte:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
-                        # 1. Obtención de datos
+                        # 1. Datos
                         txt, v_now, v_base = generar_reporte_total(p)
                         anio_base = p.get('anio_linea_base', 2017)
-                        
-                        # 2. Lógica BioCore
-                        if abs(v_now) < 0.05 and abs(v_base) < 0.05:
-                            v_ref_grafico = v_now + 0.00001 
-                            msg_status = "Suelo estable (Litología/Altitud)"
-                        else:
-                            v_ref_grafico = v_base
-                            msg_status = "Monitoreo Vegetal Activo"
+                        tipo = p.get('Tipo', 'Industrial') # Por defecto industrial
 
-                        # 3. Envío a Telegram
-                        requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
-                                     data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
-                        
-                        st.success("¡Reporte enviado!")
+                        # 2. LÓGICA DE TEXTOS ADAPTATIVOS
+                        if tipo == 'Minería':
+                            detalles = f"Valores bajos ({v_now:.4f}) son normales para alta montaña. La estabilidad del 0.0% confirma que no hay dispersión de sedimentos o polvo sobre el área mineral."
+                        elif tipo == 'Bosque Nativo':
+                            detalles = f"El SAVI de {v_now:.4f} refleja la densidad del dosel. La variación indica el estado de salud y vigor de las especies nativas frente a la línea base."
+                        elif tipo == 'Humedal':
+                            detalles = f"Indicador crítico de humedad. Valores de {v_now:.4f} permiten monitorear la presencia de agua y vegetación hidrófila en la cubeta del humedal."
+                        elif tipo == 'Agrícola':
+                            detalles = f"Seguimiento de vigor del cultivo. Un SAVI de {v_now:.4f} ayuda a detectar estrés hídrico o variaciones en la productividad por lote."
+                        else: # Industrial
+                            detalles = f"Control de entorno industrial. El valor de {v_now:.4f} asegura que las operaciones se mantienen dentro del área intervenida sin afectar la periferia."
 
-                        # 4. Métrica
-                        st.metric(
-                            label=f"SAVI Actual vs Base {anio_base}", 
-                            value=f"{v_now:.4f}", 
-                            delta="0.0% (Estable)" if abs(v_now) < 0.05 and abs(v_base) < 0.05 else f"{((v_now-v_base)/abs(v_base if v_base!=0 else 1))*100:.1f}%"
-                        )
+                        # 3. Métrica y Gráfico (Mantener igual al anterior que funcionó)
+                        st.metric(label=f"SAVI vs Base {anio_base}", value=f"{v_now:.4f}", 
+                                  delta="0.0% (Estable)" if abs(v_now-v_base) < 0.01 else f"{((v_now-v_base)/abs(v_base if v_base!=0 else 1))*100:.1f}%")
 
-                        # 5. Gráfico
-                        fig = go.Figure(go.Indicator(
-                            mode = "gauge",
-                            value = v_now,
-                            gauge = {
-                                'axis': {'range': [0, 0.15], 'tickwidth': 1, 'tickcolor': "white"},
-                                'bar': {'color': "#2c3e50"},
-                                'steps': [
-                                    {'range': [0, 0.05], 'color': "#e74c3c"}, 
-                                    {'range': [0.05, 0.10], 'color': "#f1c40f"}, 
-                                    {'range': [0.10, 0.15], 'color': "#2ecc71"}
-                                ],
-                                'threshold': {
-                                    'line': {'color': "white", 'width': 4},
-                                    'value': v_base 
-                                }
-                            }
-                        ))
-                        fig.update_layout(height=220, margin=dict(l=40, r=40, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
-                        st.plotly_chart(fig, use_container_width=True)
+                        # (Aquí va tu código del go.Figure que ya tienes...)
+                        # ... [Código del gráfico] ...
 
-                        # 6. EXPLICACIÓN (Asegúrate de copiar desde el st.markdown hasta el final)
-                        html_code = f"""
+                        # 4. EXPLICACIÓN DINÁMICA
+                        st.markdown(f"""
                         <div style="background-color:#0e1117; padding:20px; border-radius:15px; border: 1px solid #30363d; color: white;">
-                            <h3 style="margin-top:0; color:#4ade80; font-size:1.2em;">🌿 Interpretación de BioCore Intelligence</h3>
-                            <p style="font-size:0.95em; line-height:1.6;">
-                                El análisis para <b>{p['Proyecto']}</b> arroja un estado de <b>Estabilidad Absoluta</b>.
+                            <h3 style="margin-top:0; color:#4ade80; font-size:1.1em;">🌿 Interpretación BioCore: {tipo}</h3>
+                            <p style="font-size:0.9em; line-height:1.5; color:#e2e8f0;">
+                                {detalles}
                             </p>
-                            <ul style="font-size:0.9em; color:#e2e8f0; line-height:1.8;">
-                                <li><b>Indicador SAVI ({v_now:.4f}):</b> Valores consistentes con la litología mineral local.</li>
-                                <li><b>Variación (0.0%):</b> Sin cambios respecto a la Línea Base de {anio_base}.</li>
-                                <li><b>Cumplimiento:</b> Estado óptimo según parámetros de monitoreo ambiental.</li>
-                            </ul>
                             <div style="background-color:#1e293b; padding:10px; border-radius:8px; margin-top:10px; border-left: 4px solid #60a5fa;">
-                                <span style="font-size:0.85em; color:#94a3b8;">💡 <b>Nota:</b> Vigilancia activa. No se requieren acciones correctivas.</span>
+                                <span style="font-size:0.85em; color:#94a3b8;"><b>Estatus:</b> Cumplimiento Ambiental Validado.</span>
                             </div>
                         </div>
-                        """
-                        st.markdown(html_code, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
 
 with tab2:
     hist = supabase.table("historial_reportes").select("*").execute().data

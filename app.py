@@ -263,12 +263,11 @@ def generar_reporte_total(p):
 ✅ **ESTADO GLOBAL:** {est_global}
 📝 **CONCLUSIÓN FINAL:** {conclusion_final}
     """ # Este cierra el texto_final
-    # ... justo después de cerrar el texto_final con """
-    
+    # 1. El return del éxito (dentro del try)
     return texto_final, s_actual, s_base
 
-    except Exception as e:
-    # Si algo falla, devolvemos un mensaje de error y ceros para que no se caiga la app
+# 2. El except (FUERA del bloque del return, pero ALINEADO con el try)
+        except Exception as e:
     return f"❌ Error en el procesamiento: {str(e)}", 0.0, 0.0
 
 # --- 4. INTERFAZ ---

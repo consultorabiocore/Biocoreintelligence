@@ -263,6 +263,13 @@ def generar_reporte_total(p):
 ✅ **ESTADO GLOBAL:** {est_global}
 📝 **CONCLUSIÓN FINAL:** {conclusion_final}
     """ # Este cierra el texto_final
+    # ... justo después de cerrar el texto_final con """
+    
+    return texto_final, s_actual, s_base
+
+except Exception as e:
+    # Si algo falla, devolvemos un mensaje de error y ceros para que no se caiga la app
+    return f"❌ Error en el procesamiento: {str(e)}", 0.0, 0.0
 
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])

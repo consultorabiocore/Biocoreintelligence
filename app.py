@@ -302,8 +302,7 @@ with tab1:
                         txt, v_now, v_base = generar_reporte_total(p)
                         anio_base = p.get('anio_linea_base', 2017)
                         
-                        # 2. Lógica BioCore para estabilidad
-                        # Si es roca, comparamos contra sí mismo para forzar el 0.0%
+                        # 2. Lógica BioCore
                         if abs(v_now) < 0.05 and abs(v_base) < 0.05:
                             v_ref_grafico = v_now
                             msg_interpretacion = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
@@ -317,7 +316,7 @@ with tab1:
                         
                         st.success("¡Reporte enviado a Telegram!")
 
-                        # 4. Generación del Gráfico (Estructura directa para evitar ValueError)
+                        # 4. Generación del Gráfico con "Fuerza Bruta" para el porcentaje
                         fig = go.Figure()
 
                         fig.add_trace(go.Indicator(
@@ -328,11 +327,13 @@ with tab1:
                                 'reference': v_ref_grafico,
                                 'relative': True,
                                 'valueformat': '.1%',
+                                'font': {'size': 24}, # Hacemos el número más grande para que se note
                                 'increasing': {'color': "#00CC96"},
-                                'decreasing': {'color': "#EF553B"}
+                                'decreasing': {'color': "#EF553B"},
+                                'position': "bottom" # Lo movemos abajo para que tenga su propio espacio
                             },
                             gauge = {
-                                'axis': {'range': [0, 0.15], 'tickwidth': 1},
+                                'axis': {'range': [0, 0.15], 'tickwidth': 1, 'tickformat': '.2f'},
                                 'bar': {'color': "black"},
                                 'steps': [
                                     {'range': [0, 0.05], 'color': "#FFDDDD"}, 
@@ -347,17 +348,20 @@ with tab1:
                             }
                         ))
 
-                        fig.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=20))
+                        # Ajuste de diseño para que el delta no se solape
+                        fig.update_layout(
+                            height=400, 
+                            margin=dict(l=30, r=30, t=80, b=50)
+                        )
+                        
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 5. Cuadro informativo
+                        # 5. Diagnóstico Profesional
                         st.info(f"""
-                        **📊 Guía de Lectura del Indicador:**
-                        * **Número Superior ({v_now:.3f}):** Vigor actual. Valores bajos (<0.05) son normales en alta montaña.
-                        * **Número Inferior (Δ%):** Variación respecto a la Línea Base de {anio_base}. Un **0.0%** indica estabilidad.
-                        * **Línea Roja (🚩):** Estado original. La aguja debe estar a la derecha para cumplir.
-                        
                         **🔍 Diagnóstico BioCore:** {msg_interpretacion}
+                        
+                        * **Δ% (Cifra inferior):** Representa la variación porcentual. Un **0.0%** confirma que no hay cambios detectables respecto a la Línea Base.
+                        * **Línea Roja (🚩):** Valor original de {anio_base}.
                         """)
 
 with tab2:

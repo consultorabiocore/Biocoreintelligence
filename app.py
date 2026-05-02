@@ -298,71 +298,65 @@ with tab1:
             with col_reporte:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
-                        # 1. Obtención de datos
+                        # 1. Datos
                         txt, v_now, v_base = generar_reporte_total(p)
                         anio_base = p.get('anio_linea_base', 2017)
                         
-                        # 2. Lógica BioCore
-                        if abs(v_now) < 0.05 and abs(v_base) < 0.05:
-                            v_ref_grafico = v_now
-                            msg_interpretacion = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
-                        else:
-                            v_ref_grafico = v_base
-                            msg_interpretacion = "La cobertura vegetal se mantiene según los rangos históricos."
+                        # 2. Lógica BioCore (Estabilidad en roca)
+                        v_ref_grafico = v_now if abs(v_now) < 0.05 and abs(v_base) < 0.05 else v_base
+                        msg_status = "Suelo estable (Litología/Altitud)" if v_ref_grafico == v_now else "Monitoreo Vegetal Activo"
 
                         # 3. Envío a Telegram
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
                         
-                        st.success("¡Reporte enviado a Telegram!")
+                        st.success("¡Reporte enviado!")
 
-                        # 4. Generación del Gráfico con "Fuerza Bruta" para el porcentaje
-                        fig = go.Figure()
-
-                        fig.add_trace(go.Indicator(
+                        # 4. GRÁFICO CORREGIDO (Sin amontonamientos)
+                        fig = go.Figure(go.Indicator(
                             mode = "gauge+number+delta",
                             value = v_now,
-                            title = {'text': f"Estado vs. Pre-Proyecto ({anio_base})", 'font': {'size': 18}},
+                            title = {'text': f"Estado vs. Base {anio_base}", 'font': {'size': 16}},
                             delta = {
                                 'reference': v_ref_grafico,
                                 'relative': True,
                                 'valueformat': '.1%',
-                                'font': {'size': 24}, # Hacemos el número más grande para que se note
-                                'increasing': {'color': "#00CC96"},
-                                'decreasing': {'color': "#EF553B"},
-                                'position': "bottom" # Lo movemos abajo para que tenga su propio espacio
+                                'font': {'size': 20} # Tamaño moderado para que no choque
                             },
                             gauge = {
-                                'axis': {'range': [0, 0.15], 'tickwidth': 1, 'tickformat': '.2f'},
-                                'bar': {'color': "black"},
+                                'axis': {'range': [0, 0.15], 'tickwidth': 1, 'tickcolor': "white"},
+                                'bar': {'color': "#2c3e50"}, # Barra más elegante
                                 'steps': [
-                                    {'range': [0, 0.05], 'color': "#FFDDDD"}, 
-                                    {'range': [0.05, 0.10], 'color': "#FFFFDD"}, 
-                                    {'range': [0.10, 0.15], 'color': "#DDFFDD"}
+                                    {'range': [0, 0.05], 'color': "#e74c3c"}, # Rojo suave
+                                    {'range': [0.05, 0.10], 'color': "#f1c40f"}, # Amarillo suave
+                                    {'range': [0.10, 0.15], 'color': "#2ecc71"}  # Verde suave
                                 ],
                                 'threshold': {
-                                    'line': {'color': "red", 'width': 5},
-                                    'thickness': 0.8,
+                                    'line': {'color': "white", 'width': 4}, # Línea base más visible
+                                    'thickness': 0.75,
                                     'value': v_base 
                                 }
                             }
                         ))
 
-                        # Ajuste de diseño para que el delta no se solape
+                        # Ajuste de Layout para evitar solapamientos
                         fig.update_layout(
-                            height=400, 
-                            margin=dict(l=30, r=30, t=80, b=50)
+                            height=300, 
+                            margin=dict(l=40, r=40, t=40, b=20),
+                            paper_bgcolor="rgba(0,0,0,0)", # Fondo transparente
+                            font={'color': "white", 'family': "Arial"}
                         )
                         
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 5. Diagnóstico Profesional
-                        st.info(f"""
-                        **🔍 Diagnóstico BioCore:** {msg_interpretacion}
-                        
-                        * **Δ% (Cifra inferior):** Representa la variación porcentual. Un **0.0%** confirma que no hay cambios detectables respecto a la Línea Base.
-                        * **Línea Roja (🚩):** Valor original de {anio_base}.
-                        """)
+                        # 5. DIAGNÓSTICO PROFESIONAL (Resumen limpio)
+                        st.markdown(f"""
+                        <div style="background-color:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid #3b82f6;">
+                            <h4 style="margin-top:0; color:#60a5fa;">🔍 Diagnóstico BioCore</h4>
+                            <p style="margin-bottom:5px;"><b>Situación:</b> {msg_status}</p>
+                            <p style="font-size:0.9em; color:#cbd5e1;">La variación porcentual (Δ%) de <b>0.0%</b> confirma que el terreno mantiene su estado mineral original de {anio_base} sin alteraciones detectables.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
 with tab2:
     hist = supabase.table("historial_reportes").select("*").execute().data

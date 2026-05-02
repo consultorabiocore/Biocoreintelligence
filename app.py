@@ -267,7 +267,7 @@ def generar_reporte_total(p):
     
     return texto_final, s_actual, s_base
 
-except Exception as e:
+    except Exception as e:
     # Si algo falla, devolvemos un mensaje de error y ceros para que no se caiga la app
     return f"❌ Error en el procesamiento: {str(e)}", 0.0, 0.0
 

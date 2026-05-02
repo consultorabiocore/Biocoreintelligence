@@ -298,16 +298,17 @@ with tab1:
             with col_reporte:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
-                        # 1. Obtenemos los datos de la función principal
+                        # 1. Obtener datos de la función principal
                         txt, v_now, v_base = generar_reporte_total(p)
+                        anio_base = p.get('anio_linea_base', 2017)
                         
-                        # 2. LIMPIEZA DE DATOS (Filtro Anti-Error Matemático)
-                        # Si los valores son muy bajos (roca/alta montaña), forzamos estabilidad
+                        # 2. Lógica de Limpieza BioCore (Evita el -169%)
+                        # Si es suelo mineral/roca, forzamos que la referencia sea igual al valor actual
                         if abs(v_now) < 0.05 and abs(v_base) < 0.05:
-                            v_delta_ref = v_now  # Al ser iguales, el delta será 0%
+                            v_ref_grafico = v_now
                             msg_interpretacion = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
                         else:
-                            v_delta_ref = v_base # Usamos la base real si hay vegetación
+                            v_ref_grafico = v_base
                             msg_interpretacion = "La cobertura vegetal se mantiene según los rangos históricos."
 
                         # 3. Envío a Telegram
@@ -316,20 +317,22 @@ with tab1:
                         
                         st.success("¡Reporte enviado a Telegram!")
 
-                        # 4. VELOCÍMETRO DE CUMPLIMIENTO AMBIENTAL
+                        # 4. Configuración del Objeto Delta (Fuera de la figura para evitar errores)
+                        delta_config = {
+                            'reference': v_ref_grafico,
+                            'relative': True,
+                            'valueformat': '.1%',
+                            'increasing': {'color': "#00CC96"},
+                            'decreasing': {'color': "#EF553B"}
+                        }
+
+                        # 5. Generar Velocímetro
                         fig = go.Figure(go.Indicator(
                             mode = "gauge+number+delta",
                             value = v_now,
                             domain = {'x': [0, 1], 'y': [0, 1]},
-                            title = {'text': f"Estado vs. Pre-Proyecto ({p.get('anio_linea_base', 2017)})", 'font': {'size': 18}},
-                                                        delta = {
-                                'reference': v_delta_ref, 
-                                'relative': True, 
-                                'valueformat': '.1%', 
-                                'showarrow': True, # Muestra la flechita siempre
-                                'increasing': {'color': "#00CC96"}, 
-                                'decreasing': {'color': "#EF553B"}
-                            },
+                            title = {'text': f"Estado vs. Pre-Proyecto ({anio_base})", 'font': {'size': 18}},
+                            delta = delta_config,
                             gauge = {
                                 'axis': {'range': [0, 0.15], 'tickwidth': 1},
                                 'bar': {'color': "black"},
@@ -349,16 +352,15 @@ with tab1:
                         fig.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 5. EXPLICACIÓN DETALLADA PARA EL CLIENTE
+                        # 6. Cuadro Informativo para el Titular
                         st.info(f"""
                         **📊 Guía de Lectura del Indicador:**
                         
-                        * **Número Superior ({v_now:.3f}):** Es el nivel de **Vigor Vegetal Actual**. En esta altitud, valores cercanos a 0 representan suelo mineral o roca.
-                        * **Número Inferior (Δ%):** Indica cuánto ha cambiado el vigor respecto a la **Línea Base ({p.get('anio_linea_base', 2017)})**. 
-                            * Un **0.0%** indica que el terreno se mantiene sin cambios biológicos significativos.
-                        * **Línea Roja (🚩):** Es el umbral histórico. Si la aguja está a la derecha de la línea, el proyecto cumple con su compromiso ambiental.
+                        * **Número Superior ({v_now:.3f}):** Nivel de vigor actual. Valores bajos (<0.05) son normales para suelo mineral.
+                        * **Número Inferior (Δ%):** Variación respecto a la Línea Base de {anio_base}. Un 0.0% indica estabilidad total.
+                        * **Línea Roja (🚩):** Representa el estado original pre-proyecto. La aguja debe estar a la derecha para cumplir.
                         
-                        **🔍 Diagnóstico:** {msg_interpretacion}
+                        **🔍 Diagnóstico BioCore:** {msg_interpretacion}
                         """)
 
 with tab2:

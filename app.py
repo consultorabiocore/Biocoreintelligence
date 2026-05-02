@@ -260,7 +260,7 @@ def generar_reporte_total(p):
 📝 **CONCLUSIÓN FINAL:** {conclusion_final}
     """ # Este cierra el texto_final
 
-        return texto_final, s_actual, s_base
+    return texto_final, s_actual, s_base
 
     except Exception as e:
         return f"❌ Error en el procesamiento: {str(e)}", 0, 0

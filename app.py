@@ -350,7 +350,7 @@ with tab1:
                         )
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 6. EXPLICACIÓN TÉCNICA AVANZADA
+                             # 6. EXPLICACIÓN TÉCNICA AVANZADA (CORREGIDA)
                         st.markdown(f"""
                         <div style="background-color:#0e1117; padding:20px; border-radius:15px; border: 1px solid #30363d; color: white;">
                             <h3 style="margin-top:0; color:#4ade80; font-size:1.2em;">🌿 Interpretación de BioCore Intelligence</h3>
@@ -363,14 +363,14 @@ with tab1:
                             <ul style="font-size:0.9em; color:#e2e8f0; line-height:1.8;">
                                 <li><b>Indicador SAVI ({v_now:.4f}):</b> Este valor representa el índice de vegetación ajustado al suelo. En zonas de alta cordillera y litología mineral, valores bajos (< 0.05) confirman la ausencia de biomasa significativa, lo cual es <b>consistente con el ecosistema local</b>.</li>
                                 <li><b>Variación Interanual (0.0%):</b> Al comparar con la Línea Base de <b>{anio_base}</b>, no se detectan anomalías ni cambios en la firma espectral del terreno. Esto certifica la ausencia de impactos antrópicos visibles.</li>
-                                <li><b>Cumplimiento RCA:</b> La aguja se mantiene alineada con el umbral histórico (Línea Blanca), validando el cumplimiento de los compromisos ambientales.</li>
+                                <li><b>Cumplimiento RCA:</b> La aguja se mantiene alineada con el umbral histórico, validando el cumplimiento de los compromisos ambientales.</li>
                             </ul>
 
                             <div style="background-color:#1e293b; padding:10px; border-radius:8px; margin-top:10px; border-left: 4px solid #60a5fa;">
                                 <span style="font-size:0.85em; color:#94a3b8;">💡 <b>Nota para el Titular:</b> El sistema mantiene vigilancia activa. No se requieren acciones correctivas ni inspecciones adicionales para este período.</span>
                             </div>
                         </div>
-                        """, unsafe_allow_html=True)            
+                        """, unsafe_allow_html=True) # <--- ESTA ES LA LÍNEA CLAVE        
 
 with tab2:
     hist = supabase.table("historial_reportes").select("*").execute().data

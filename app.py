@@ -265,10 +265,8 @@ def generar_reporte_total(p):
     """ # Este cierra el texto_final
     # 1. El return del éxito (dentro del try)
     return texto_final, s_actual, s_base
-
-# 2. El except (FUERA del bloque del return, pero ALINEADO con el try)
     except Exception as e:
-        return f"❌ Error en el procesamiento: {str(e)}", 0.0, 0.0
+        return f"❌ Error en el procesamiento: {str(e)}", 0.0, (raw_coords, str):
 
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])

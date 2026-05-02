@@ -172,11 +172,6 @@ def generar_reporte_total(p):
     umbral = -15 if d['cat'] == "GLACIAR" else -10
     est_global = "🔴 ALERTA CRÍTICA" if variacion < umbral else "🟢 BAJO CONTROL"
 
-    # --- AHORA VIENEN TUS INTERPRETACIONES (El código que ya tienes) ---
-    # if variacion < -15: ...
-    # if v_ndsi > 0.4: ...
-
-
     # 0. Interpretación SAVI (Vigor Vegetal) - ¡ESTA FALTA EN TU CÓDIGO!
     if variacion < -15:
         exp_savi = "Se observa una disminución significativa en el vigor vegetal, indicando posible intervención o estrés."
@@ -228,9 +223,16 @@ def generar_reporte_total(p):
         exp_swir = "Niveles de humedad en suelo bajos. Se recomienda monitorear ante posibles riesgos de aridez extrema."
     else:
         exp_swir = "Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato."
-
-    # --- AGREGA ESTO ---
-    v_clay = float(idx.get('clay', 0)) # Asegúrate que 'clay' esté en tu diccionario idx
+    # --- PASO CLAVE: Extraer los valores del diccionario de resultados ---
+    # Asumiendo que 'idx' es el diccionario que obtuviste con .reduceRegion().getInfo()
+    
+    v_savi = float(idx.get('sa', 0))    # Usamos 'sa' porque así lo nombraste en la función
+    v_ndsi = float(idx.get('ndsi', 0))
+    v_swir = float(idx.get('sw', 0))
+    v_clay = float(idx.get('clay', 0))
+    
+    # Esto conecta tus cálculos con las variables que pide el reporte
+    s_actual = v_savi 
 
     # --- E. CONSTRUCCIÓN DEL MENSAJE FINAL ---
     texto_final = f"""

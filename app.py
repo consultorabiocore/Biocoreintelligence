@@ -303,7 +303,7 @@ with tab1:
                         anio_base = p.get('anio_linea_base', 2017)
                         tipo = p.get('Tipo', 'Minería') 
 
-                        # 2. Lógica de Textos Adaptativos (CORREGIDA)
+                        # 2. Lógica de Textos Adaptativos
                         if tipo == 'Minería':
                             detalles = f"Análisis de alta montaña. El valor SAVI de {v_now:.4f} es consistente con la litología mineral del sector. La variación del 0.0% certifica la estabilidad del terreno y la ausencia de sedimentos o polvo sobre la firma espectral original de {anio_base}."
                         elif tipo == 'Bosque Nativo':
@@ -315,14 +315,28 @@ with tab1:
                         else: # Industrial
                             detalles = f"Control de entorno operativo. El valor de {v_now:.4f} asegura que las actividades se mantienen dentro del área intervenida, protegiendo la vegetación periférica de cualquier impacto externo."
 
-                        # 3. Métrica (El porcentaje que ya te funcionó)
+                        # 3. ENVÍO A TELEGRAM CON CONTROL DE ERRORES
+                        try:
+                            response = requests.post(
+                                f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
+                                data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"},
+                                timeout=10
+                            )
+                            if response.status_code == 200:
+                                st.success("✅ ¡Reporte enviado con éxito a Telegram!")
+                            else:
+                                st.error(f"❌ Error de Telegram: {response.status_code} - {response.text}")
+                        except Exception as e:
+                            st.warning(f"⚠️ Error de conexión: {e}")
+
+                        # 4. Métrica
                         st.metric(
                             label=f"SAVI Actual vs Base {anio_base}", 
                             value=f"{v_now:.4f}", 
-                            delta="0.0% (Estable)" if abs(v_now) < 0.05 and abs(v_base) < 0.05 else f"{((v_now-v_base)/abs(v_base if v_base!=0 else 1))*100:.1f}%"
+                            delta="0.0% (Estable)" if abs(v_now - v_base) < 0.01 else f"{((v_now-v_base)/abs(v_base if v_base!=0 else 1))*100:.1f}%"
                         )
 
-                        # 4. Gráfico de Velocímetro (Limpio)
+                        # 5. Gráfico de Velocímetro
                         fig = go.Figure(go.Indicator(
                             mode = "gauge",
                             value = v_now,
@@ -343,7 +357,7 @@ with tab1:
                         fig.update_layout(height=220, margin=dict(l=40, r=40, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 5. EXPLICACIÓN DINÁMICA (Con el parámetro de seguridad HTML)
+                        # 6. EXPLICACIÓN DINÁMICA
                         st.markdown(f"""
                         <div style="background-color:#0e1117; padding:20px; border-radius:15px; border: 1px solid #30363d; color: white;">
                             <h3 style="margin-top:0; color:#4ade80; font-size:1.1em;">🌿 Interpretación BioCore: {tipo.upper()}</h3>

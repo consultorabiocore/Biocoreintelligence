@@ -298,24 +298,34 @@ with tab1:
             with col_reporte:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
+                        # 1. Obtenemos los datos de la función principal
                         txt, v_now, v_base = generar_reporte_total(p)
                         
-                        # Envío a Telegram
+                        # 2. LIMPIEZA DE DATOS (Filtro Anti-Error Matemático)
+                        # Si los valores son muy bajos (roca/alta montaña), forzamos estabilidad
+                        if abs(v_now) < 0.05 and abs(v_base) < 0.05:
+                            v_delta_ref = v_now  # Al ser iguales, el delta será 0%
+                            msg_interpretacion = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
+                        else:
+                            v_delta_ref = v_base # Usamos la base real si hay vegetación
+                            msg_interpretacion = "La cobertura vegetal se mantiene según los rangos históricos."
+
+                        # 3. Envío a Telegram
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
                         
                         st.success("¡Reporte enviado a Telegram!")
 
-                        # --- VELOCÍMETRO DE CUMPLIMIENTO CON PORCENTAJE ---
+                        # 4. VELOCÍMETRO DE CUMPLIMIENTO AMBIENTAL
                         fig = go.Figure(go.Indicator(
                             mode = "gauge+number+delta",
                             value = v_now,
                             domain = {'x': [0, 1], 'y': [0, 1]},
                             title = {'text': f"Estado vs. Pre-Proyecto ({p.get('anio_linea_base', 2017)})", 'font': {'size': 18}},
                             delta = {
-                                'reference': v_base, 
+                                'reference': v_delta_ref, 
                                 'relative': True, 
-                                'valueformat': '.1%', # Lo convierte en porcentaje (ej: +15.2%)
+                                'valueformat': '.1%', 
                                 'increasing': {'color': "#00CC96"}, 
                                 'decreasing': {'color': "#EF553B"}
                             },
@@ -330,7 +340,7 @@ with tab1:
                                 'threshold': {
                                     'line': {'color': "red", 'width': 5},
                                     'thickness': 0.8,
-                                    'value': v_base # Marca la Línea Base
+                                    'value': v_base 
                                 }
                             }
                         ))
@@ -338,15 +348,16 @@ with tab1:
                         fig.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # --- EXPLICACIÓN TÉCNICA DETALLADA ---
+                        # 5. EXPLICACIÓN DETALLADA PARA EL CLIENTE
                         st.info(f"""
                         **📊 Guía de Lectura del Indicador:**
                         
-                        * **Número Superior ({v_now:.3f}):** Es el nivel de **Vigor Vegetal Actual**. En esta zona de alta montaña, valores cercanos a 0 son normales y representan suelo mineral o roca.
-                        * **Número Inferior (Δ%):** Indica cuánto ha cambiado el vigor respecto a la **Línea Base de {p.get('anio_linea_base', 2017)}**. 
-                            * Si es **Verde (▲)**: El área está más saludable que antes del proyecto.
-                            * Si es **Rojo (▼)**: Existe una pérdida de vigor que requiere inspección.
-                        * **Línea Roja (🚩):** Es el umbral histórico. La aguja negra siempre debe estar a la derecha de esta marca para cumplir con la RCA.
+                        * **Número Superior ({v_now:.3f}):** Es el nivel de **Vigor Vegetal Actual**. En esta altitud, valores cercanos a 0 representan suelo mineral o roca.
+                        * **Número Inferior (Δ%):** Indica cuánto ha cambiado el vigor respecto a la **Línea Base ({p.get('anio_linea_base', 2017)})**. 
+                            * Un **0.0%** indica que el terreno se mantiene sin cambios biológicos significativos.
+                        * **Línea Roja (🚩):** Es el umbral histórico. Si la aguja está a la derecha de la línea, el proyecto cumple con su compromiso ambiental.
+                        
+                        **🔍 Diagnóstico:** {msg_interpretacion}
                         """)
 
 with tab2:

@@ -298,12 +298,12 @@ with tab1:
             with col_reporte:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
-                        # 1. Obtener datos de la función principal
+                        # 1. Obtención de datos
                         txt, v_now, v_base = generar_reporte_total(p)
                         anio_base = p.get('anio_linea_base', 2017)
                         
-                        # 2. Lógica de Limpieza BioCore (Evita el -169%)
-                        # Si es suelo mineral/roca, forzamos que la referencia sea igual al valor actual
+                        # 2. Filtro de Estabilidad BioCore
+                        # Si ambos valores son de suelo mineral (<0.05), forzamos Delta 0%
                         if abs(v_now) < 0.05 and abs(v_base) < 0.05:
                             v_ref_grafico = v_now
                             msg_interpretacion = "Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector."
@@ -317,16 +317,17 @@ with tab1:
                         
                         st.success("¡Reporte enviado a Telegram!")
 
-                        # 4. Configuración del Objeto Delta (Fuera de la figura para evitar errores)
+                        # 4. Configuración del Delta (Forzando visibilidad del 0.0%)
                         delta_config = {
                             'reference': v_ref_grafico,
                             'relative': True,
                             'valueformat': '.1%',
-                            'increasing': {'color': "#00CC96"},
+                            'showarrow': True, # Esto asegura que el 0.0% se vea con su flecha/raya
+                            'increasing': {'color': "#00CC96"}, 
                             'decreasing': {'color': "#EF553B"}
                         }
 
-                        # 5. Generar Velocímetro
+                        # 5. Generación del Gráfico
                         fig = go.Figure(go.Indicator(
                             mode = "gauge+number+delta",
                             value = v_now,
@@ -337,9 +338,9 @@ with tab1:
                                 'axis': {'range': [0, 0.15], 'tickwidth': 1},
                                 'bar': {'color': "black"},
                                 'steps': [
-                                    {'range': [0, 0.05], 'color': "#FFDDDD"}, # Alerta
-                                    {'range': [0.05, 0.10], 'color': "#FFFFDD"}, # Precaución
-                                    {'range': [0.10, 0.15], 'color': "#DDFFDD"}  # Óptimo
+                                    {'range': [0, 0.05], 'color': "#FFDDDD"}, 
+                                    {'range': [0.05, 0.10], 'color': "#FFFFDD"}, 
+                                    {'range': [0.10, 0.15], 'color': "#DDFFDD"}
                                 ],
                                 'threshold': {
                                     'line': {'color': "red", 'width': 5},
@@ -352,13 +353,13 @@ with tab1:
                         fig.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
 
-                        # 6. Cuadro Informativo para el Titular
+                        # 6. Leyenda y Explicación para el Titular
                         st.info(f"""
                         **📊 Guía de Lectura del Indicador:**
                         
-                        * **Número Superior ({v_now:.3f}):** Nivel de vigor actual. Valores bajos (<0.05) son normales para suelo mineral.
-                        * **Número Inferior (Δ%):** Variación respecto a la Línea Base de {anio_base}. Un 0.0% indica estabilidad total.
-                        * **Línea Roja (🚩):** Representa el estado original pre-proyecto. La aguja debe estar a la derecha para cumplir.
+                        * **Número Superior ({v_now:.3f}):** Nivel de vigor actual. En alta montaña, valores cercanos a 0 son normales (suelo mineral).
+                        * **Número Inferior (Δ%):** Variación respecto a la Línea Base ({anio_base}). Un **0.0%** indica estabilidad biológica.
+                        * **Línea Roja (🚩):** Estado original del terreno. La aguja negra debe estar a la derecha para cumplir los compromisos ambientales.
                         
                         **🔍 Diagnóstico BioCore:** {msg_interpretacion}
                         """)

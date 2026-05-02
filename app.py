@@ -322,10 +322,11 @@ with tab1:
                             value = v_now,
                             domain = {'x': [0, 1], 'y': [0, 1]},
                             title = {'text': f"Estado vs. Pre-Proyecto ({p.get('anio_linea_base', 2017)})", 'font': {'size': 18}},
-                            delta = {
+                                                        delta = {
                                 'reference': v_delta_ref, 
                                 'relative': True, 
                                 'valueformat': '.1%', 
+                                'showarrow': True, # Muestra la flechita siempre
                                 'increasing': {'color': "#00CC96"}, 
                                 'decreasing': {'color': "#EF553B"}
                             },

@@ -34,7 +34,6 @@ def iniciar_gee():
 gee_status = iniciar_gee()
 
 # --- 2. FUNCIÓN DE MAPA REFORZADA ---
-# --- 2. FUNCIÓN DE MAPA ---
 def dibujar_mapa_biocore(coordenadas):
     try:
         if isinstance(coordenadas, str):
@@ -292,11 +291,31 @@ with tab1:
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
                         st.success("¡Enviado a Telegram!")
-                        # Gráfico comparativo
-                        fig = go.Figure(data=[
-                            go.Bar(name='Línea Base', x=['Vigor'], y=[v_base]),
-                            go.Bar(name='Actual', x=['Vigor'], y=[v_now])
-                        ])
+                        
+                        # --- NUEVO GRÁFICO TIPO VELOCÍMETRO ---
+                        fig = go.Figure(go.Indicator(
+                            mode = "gauge+number+delta",
+                            value = v_now,
+                            domain = {'x': [0, 1], 'y': [0, 1]},
+                            title = {'text': "Vigor Vegetal (SAVI)", 'font': {'size': 18}},
+                            delta = {'reference': v_base, 'increasing': {'color': "#00CC96"}, 'decreasing': {'color': "#EF553B"}},
+                            gauge = {
+                                'axis': {'range': [0, 0.5]},
+                                'bar': {'color': "black"},
+                                'steps': [
+                                    {'range': [0, 0.15], 'color': "#FFDDDD"}, # Alerta
+                                    {'range': [0.15, 0.3], 'color': "#FFFFDD"}, # Precaución
+                                    {'range': [0.3, 0.5], 'color': "#DDFFDD"}  # Óptimo
+                                ],
+                                'threshold': {
+                                    'line': {'color': "red", 'width': 4},
+                                    'thickness': 0.75,
+                                    'value': v_base # Raya roja = Línea Base
+                                }
+                            }
+                        ))
+                        
+                        fig.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:

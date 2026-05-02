@@ -259,11 +259,12 @@ def generar_reporte_total(p):
 ✅ **ESTADO GLOBAL:** {est_global}
 📝 **CONCLUSIÓN FINAL:** {conclusion_final}
     """ # Este cierra el texto_final
-
+    # 2. El return debe estar un nivel ADENTRO del try
     return texto_final, s_actual, s_base
 
-    except Exception as e:
-        return f"❌ Error en el procesamiento: {str(e)}", 0, 0
+# 3. El except DEBE estar al mismo nivel que el try
+except Exception as e:
+    return f"❌ Error en el procesamiento: {str(e)}", 0, 0
 
 # --- 4. INTERFAZ ---
 tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])

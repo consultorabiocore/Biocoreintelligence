@@ -296,42 +296,46 @@ with tab1:
                 if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
                     with st.spinner("Generando análisis dinámico..."):
                         txt, v_now, v_base = generar_reporte_total(p)
+                        
+                        # Envío a Telegram
                         requests.post(f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage", 
                                      data={"chat_id": p['telegram_id'], "text": txt, "parse_mode": "Markdown"})
-                        st.success("¡Enviado a Telegram!")
                         
-                        # --- NUEVO GRÁFICO TIPO VELOCÍMETRO ---
+                        st.success("¡Reporte generado y enviado!")
+
+                        # --- VELOCÍMETRO DE CUMPLIMIENTO AMBIENTAL ---
                         fig = go.Figure(go.Indicator(
                             mode = "gauge+number+delta",
                             value = v_now,
                             domain = {'x': [0, 1], 'y': [0, 1]},
-                            title = {'text': "Vigor Vegetal (SAVI)", 'font': {'size': 18}},
+                            title = {'text': f"Estado vs. Pre-Proyecto ({p.get('anio_linea_base', 2017)})", 'font': {'size': 16}},
                             delta = {'reference': v_base, 'increasing': {'color': "#00CC96"}, 'decreasing': {'color': "#EF553B"}},
                             gauge = {
-                                'axis': {'range': [0, 0.5]},
+                                'axis': {'range': [0, 0.15], 'tickwidth': 1}, # Rango ajustado a alta montaña
                                 'bar': {'color': "black"},
                                 'steps': [
-                                    {'range': [0, 0.15], 'color': "#FFDDDD"}, # Alerta
-                                    {'range': [0.15, 0.3], 'color': "#FFFFDD"}, # Precaución
-                                    {'range': [0.3, 0.5], 'color': "#DDFFDD"}  # Óptimo
+                                    {'range': [0, 0.05], 'color': "#FFDDDD"}, # Alerta Crítica
+                                    {'range': [0.05, 0.10], 'color': "#FFFFDD"}, # Precaución
+                                    {'range': [0.10, 0.15], 'color': "#DDFFDD"}  # Óptimo
                                 ],
                                 'threshold': {
-                                    'line': {'color': "red", 'width': 4},
-                                    'thickness': 0.75,
-                                    'value': v_base # Raya roja = Línea Base
+                                    'line': {'color': "red", 'width': 5},
+                                    'thickness': 0.8,
+                                    'value': v_base # La "meta" es no estar bajo este nivel
                                 }
                             }
                         ))
-                        
-                        fig.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20))
+
+                        fig.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
-# Dentro de tu columna de reporte, justo debajo de st.plotly_chart(fig):
-st.info(f"""
-**🔍 Interpretación BioCore:**
-Este indicador compara la salud actual del terreno contra la **Línea Base de {anio_base}** (marcada con la línea roja 🚩). 
-* Si la aguja está por sobre la marca, el sector mantiene o supera su vigor histórico.
-* Un valor cercano a 0 en esta zona es normal debido a la altitud y escasez de suelo orgánico.
-""")
+
+                        # Explicación Técnica para el Titular
+                        st.info(f"""
+                        **💡 Guía de Interpretación para Titulares:**
+                        * **Línea Roja (🚩):** Representa el estado del área en el año **{p.get('anio_linea_base', 2017)}** (Antes de la intervención actual).
+                        * **Aguja Negra:** Es la salud biológica detectada por satélite **hoy**.
+                        * **Lectura:** Si la aguja está a la derecha de la línea roja, el proyecto cumple con mantener el vigor original. En minería de altura, valores cercanos a 0 son normales (suelo mineral).
+                        """)
 
 with tab2:
     hist = supabase.table("historial_reportes").select("*").execute().data

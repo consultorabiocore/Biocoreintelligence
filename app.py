@@ -325,6 +325,13 @@ with tab1:
                         
                         fig.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20))
                         st.plotly_chart(fig, use_container_width=True)
+# Dentro de tu columna de reporte, justo debajo de st.plotly_chart(fig):
+st.info(f"""
+**🔍 Interpretación BioCore:**
+Este indicador compara la salud actual del terreno contra la **Línea Base de {anio_base}** (marcada con la línea roja 🚩). 
+* Si la aguja está por sobre la marca, el sector mantiene o supera su vigor histórico.
+* Un valor cercano a 0 en esta zona es normal debido a la altitud y escasez de suelo orgánico.
+""")
 
 with tab2:
     hist = supabase.table("historial_reportes").select("*").execute().data

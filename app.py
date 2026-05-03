@@ -493,18 +493,44 @@ with tab1:
                         st.warning(f"No hay datos registrados para {mes_sel} {anio_sel}.")
                 else:
                     st.error("No se pudo conectar con la base de datos de BioCore.")
+                   
+                    with tab_excel:
+        st.subheader("📊 Historial Acumulado de Mediciones")
+        
+        try:
+            # Traemos todos los datos para que BioCore tenga su registro completo
+            res_hist = supabase.table("historial_reportes").select("*").execute()
+            
+            if res_hist and hasattr(res_hist, 'data') and len(res_hist.data) > 0:
+                df_hist = pd.DataFrame(res_hist.data)
+                
+                # Limpieza estética de las fechas
+                if 'created_at' in df_hist.columns:
+                    df_hist['Fecha'] = pd.to_datetime(df_hist['created_at']).dt.date
+                
+                # Reordenar columnas para que se vea profesional
+                columnas = ['proyecto', 'Fecha', 'ndsi', 'ndwi', 'vegetacion_altura']
+                df_mostrar = df_hist[[c for c in columnas if c in df_hist.columns]]
+                
+                st.dataframe(df_mostrar, use_container_width=True)
+                
+                # Botón para descargar el Excel real
+                csv = df_mostrar.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Descargar Base de Datos (CSV)",
+                    data=csv,
+                    file_name="Historial_BioCore.csv",
+                    mime="text/csv",
+                )
+            else:
+                st.info("Aún no hay mediciones registradas en el historial.")
+                
+        except Exception as e:
+            st.error(f"Hubo un problema al cargar los datos: {e}")
 
-# --- PESTAÑA 3: EXCEL (Visualización de la tabla cruda) ---
-with tab_excel:
-    st.subheader("📊 Historial Acumulado de Mediciones")
-    hist = supabase.table("historial_reportes").select("*").execute().data
-    if hist:
-        df_hist = pd.DataFrame(hist)
-        st.dataframe(df_hist, use_container_width=True)
-        csv = df_hist.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Descargar Base de Datos Completa (CSV)", csv, "BioCore_Database.csv", "text/csv")
 
-# --- PESTAÑA 4: ADMIN (Gestión de usuarios y coordenadas) ---
+# --- PESTAÑA3
+
 # --- PESTAÑA 4: ADMIN (TU CÓDIGO DE REGISTRO) ---
 with tab_admin:
     st.title("🛡️ Panel de Control BioCore")

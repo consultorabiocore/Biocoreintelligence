@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 import plotly.graph_objects as go
 from supabase import create_client, Client
-
+import datetime
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide")
 

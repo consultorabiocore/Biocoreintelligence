@@ -541,13 +541,21 @@ pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln
 pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
 pdf.output(pdf_file)
 # --- RESULTADO EN APP ---
-        st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
-        with open(pdf_file, "rb") as f:
-            st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
-        else:
-            st.warning(f"No se encontraron datos históricos suficientes en Supabase para {proyecto_sel} durante {mes_sel} {anio_sel}.")
-else:
-st.error("No se pudo conectar con el historial de Supabase (Pestaña Excel).")
+# --- 8 ESPACIOS (Nivel del IF principal)
+                    st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
+                    
+# --- 8 ESPACIOS (Línea 545)
+                    with open(pdf_file, "rb") as f:
+                        
+# --- 12 ESPACIOS (Línea 546)
+                        st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
+
+# --- 8 ESPACIOS (Línea 547 - El "else" vuelve atrás)
+                else:
+                    st.warning(f"No se encontraron datos históricos...")
+
+                else:
+                    st.error("No se pudo conectar con el historial de Supabase (Pestaña Excel).")
                 # --- EL VELOCÍMETRO VA AQUÍ (Solo se muestra en la App, no en el PDF) ---
 st.plotly_chart(crear_velocimetro(ndsi_val, "Estado Actual NDSI"), use_container_width=True)
 

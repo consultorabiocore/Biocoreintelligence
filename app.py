@@ -279,7 +279,17 @@ def generar_reporte_total(p):
     return texto_final, s_actual, s_base
 # --- 4. INTERFAZ ---
 # Añadimos la pestaña "⚙️ Admin"
-tab1, tab2, tab3 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel", "⚙️ Admin"])
+# Definimos las 4 pestañas en el orden correcto
+tab1, tab_informe, tab_excel, tab_admin = st.tabs([
+    "🚀 Vigilancia Activa", 
+    "📁 Informes de Auditoría", 
+    "📊 Base de Datos (Excel)", 
+    "⚙️ Admin"
+])
+
+# --- PESTAÑA 1: VIGILANCIA (Tu código actual de mapas y botones rápidos) ---
+with tab1:
+    st.image("logo_biocore.png", width=200)
 
 with tab1:
     proyectos = supabase.table("usuarios").select("*").execute().data
@@ -553,26 +563,28 @@ with tab_informe:
                     st.warning(f"No se encontraron datos históricos suficientes en Supabase para {proyecto_sel} durante {mes_sel} {anio_sel}.")
             else:
                 st.error("No se pudo conectar con el historial de Supabase (Pestaña Excel).")
-
-with tab2:
+# --- PESTAÑA 3: EXCEL (Visualización de la tabla cruda) ---
+with tab_excel:
+    st.subheader("📊 Historial Acumulado de Mediciones")
     hist = supabase.table("historial_reportes").select("*").execute().data
     if hist:
-        df = pd.DataFrame(hist)
-        st.dataframe(df)
-        st.download_button("Descargar Excel", df.to_csv(index=False).encode('utf-8'), "BioCore_Audit.csv")
-with tab3:
+        df_hist = pd.DataFrame(hist)
+        st.dataframe(df_hist, use_container_width=True)
+        csv = df_hist.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Descargar Base de Datos Completa (CSV)", csv, "BioCore_Database.csv", "text/csv")
+
+# --- PESTAÑA 4: ADMIN (Gestión de usuarios y coordenadas) ---
+# --- PESTAÑA 4: ADMIN (TU CÓDIGO DE REGISTRO) ---
+with tab_admin:
     st.title("🛡️ Panel de Control BioCore")
     st.markdown("### Registrar o Actualizar Proyecto")
     
-    # Formulario para no entrar más a Supabase manualmente
     with st.form("form_registro_cliente", clear_on_submit=True):
         col1, col2 = st.columns(2)
-        
         with col1:
             titular = st.text_input("👤 Nombre del Titular")
             nombre_proy = st.text_input("🚀 Nombre del Proyecto")
             tipo_proy = st.selectbox("🌿 Tipo", ["Minería", "Bosque Nativo", "Humedal", "Agrícola", "Industrial"])
-        
         with col2:
             telegram_id = st.text_input("📱 ID Telegram")
             coords = st.text_input("📍 Coordenadas (Lat, Lon)")
@@ -581,13 +593,12 @@ with tab3:
         if st.form_submit_button("💾 Guardar en BioCore Cloud"):
             nuevo_p = {
                 "titular": titular,
-                "Proyecto": nombre_proy, # Asegúrate que coincida con la mayúscula de tu tabla
+                "Proyecto": nombre_proy,
                 "Tipo": tipo_proy,
                 "telegram_id": telegram_id,
                 "Coordenadas": coords,
                 "hora_envio": hora_envio.strftime("%H:%M")
             }
-            # Guardamos en Supabase
             supabase.table("usuarios").upsert(nuevo_p).execute()
-            st.success(f"✅ {nombre_proy} guardado y programado a las {nuevo_p['hora_envio']}")
+            st.success(f"✅ {nombre_proy} guardado correctamente.")
             st.balloons()

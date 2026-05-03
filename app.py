@@ -551,8 +551,8 @@ with open(pdf_file, "rb") as f:
     st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
 
 # --- 8 ESPACIOS (Línea 547 - El "else" vuelve atrás)
-else:
-    st.warning(f"No se encontraron datos históricos...")
+    else:
+st.warning(f"No se encontraron datos históricos...")
 
 else:
     st.error("No se pudo conectar con el historial de Supabase (Pestaña Excel).")

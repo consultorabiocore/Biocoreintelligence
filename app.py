@@ -494,8 +494,8 @@ with tab_informe:
                     pdf.set_font("helvetica", "I", 10)
                     pdf.set_xy(60, 25)
                     pdf.cell(0, 5, clean(f"Reporte de Cumplimiento Técnico | Periodo: {mes_sel} {anio_sel}"), align="L", ln=1)
-                                    pdf.set_font("helvetica", "", 10)
-                # 2. Lógica de Alerta y Banner de Estatus
+                    pdf.set_font("helvetica", "", 10)
+                    # 2. Lógica de Alerta y Banner de Estatus
 ndsi_val = df_mes['ndsi'].iloc[-1]
 es_alerta = ndsi_val < 0.35
 color_res = (220, 50, 50) if es_alerta else (40, 150, 80)

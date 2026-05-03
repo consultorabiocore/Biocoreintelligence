@@ -485,6 +485,7 @@ with tab1:
                         pdf.output(pdf_file)
                         
                         st.success(f"✅ Auditoría generada con éxito")
+                        st.plotly_chart(crear_velocimetro(ndsi_val, "Estado Actual NDSI"), use_container_width=True)
                         with open(pdf_file, "rb") as f:
                             st.download_button("📥 Descargar Reporte PDF", f, file_name=pdf_file)
                     
@@ -493,13 +494,6 @@ with tab1:
                 else:
                     st.error("No se pudo conectar con la base de datos de BioCore.")
 
-                # --- EL VELOCÍMETRO VA AQUÍ (Solo se muestra en la App, no en el PDF) ---
-st.plotly_chart(crear_velocimetro(ndsi_val, "Estado Actual NDSI"), use_container_width=True)
-
-st.success(f"✅ Reporte generado y visualización de estatus actualizada.")
-with open(pdf_file, "rb") as f:
-    st.download_button("📥 Descargar PDF para Cliente", f, file_name=pdf_file)
-    
 # --- PESTAÑA 3: EXCEL (Visualización de la tabla cruda) ---
 with tab_excel:
     st.subheader("📊 Historial Acumulado de Mediciones")

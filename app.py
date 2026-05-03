@@ -484,7 +484,7 @@ with tab_informe:
                     pdf.rect(0, 0, 210, 40, 'F')
                     
                     # Insertamos tu logo en el PDF (Esquina superior izquierda)
-                    pdf.image("logo_biocore.png", x=10, y=8, w=45)
+                    pdf.image("logo_biocore.jpg", x=10, y=8, w=45)
                     
                     pdf.set_text_color(255, 255, 255)
                     pdf.set_font("helvetica", "B", 18)
@@ -494,63 +494,52 @@ with tab_informe:
                     pdf.set_font("helvetica", "I", 10)
                     pdf.set_xy(60, 25)
                     pdf.cell(0, 5, clean(f"Reporte de Cumplimiento Técnico | Periodo: {mes_sel} {anio_sel}"), align="L", ln=1)
-                    
-                    # Lógica de Alerta Técnico-Legal (Tu Código)
-                    ndsi_val = df_mes['ndsi'].iloc[-1]
-                    es_alerta = ndsi_val < 0.35
-                    
-                    # Banner de Estatus con colores limpios
-                    if es_alerta:
-                        estado_txt = "ESTATUS: ALERTA TÉCNICA - PÉRDIDA DE COBERTURA"
-                        color_res = (220, 50, 50) # Rojo Alerta
-                    else:
-                        estado_txt = "ESTATUS: CUMPLIMIENTO AMBIENTAL ESTABLE"
-                        color_res = (40, 150, 80) # Verde Cumplimiento
+                                    pdf.set_font("helvetica", "", 10)
+                # 2. Lógica de Alerta y Banner de Estatus
+ndsi_val = df_mes['ndsi'].iloc[-1]
+es_alerta = ndsi_val < 0.35
+color_res = (220, 50, 50) if es_alerta else (40, 150, 80)
+estado_txt = "ALERTA TÉCNICA - PÉRDIDA DE COBERTURA" if es_alerta else "CUMPLIMIENTO AMBIENTAL ESTABLE"
 
-                    # Posicionamos el Banner de Estatus
-                    pdf.set_y(45)
-                    pdf.set_fill_color(color_res[0], color_res[1], color_res[2])
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.set_font("helvetica", "B", 12)
-                    pdf.cell(0, 12, clean(f"  {estado_txt}"), ln=1, fill=True)
+pdf.set_y(45)
+pdf.set_fill_color(color_res[0], color_res[1], color_res[2])
+pdf.set_text_color(255, 255, 255)
+pdf.set_font("helvetica", "B", 12)
+pdf.cell(0, 12, clean(f"  ESTATUS: {estado_txt}"), ln=1, fill=True)
 
-                    # Cuerpo del Reporte (Tu Redactado Técnico)
-                    pdf.ln(5)
-                    pdf.set_text_color(40, 40, 40) # Gris oscuro para el cuerpo (mejor lectura)
-                    pdf.set_font("helvetica", "", 10)
-                    
-                    diagnostico = (
-                        f"1. ESTADO DE ACTIVOS: El índice NDSI actual ({ndsi_val:.2f}) indica degradación severa.\n\n"
-                        "2. RIESGO LEGAL: No permite generar prueba de descargo en RCA.\n\n"
-                        "3. RECOMENDACIÓN: Inspección inmediata."
-                    ) if es_alerta else (
-                        f"1. PROTECCIÓN DE ACTIVOS: El índice NDSI ({ndsi_val:.2f}) confirma permanencia de masa.\n\n"
-                        "2. CUMPLIMIENTO: Parámetros dentro de la norma RCA."
-                    )
-                    
-                    pdf.multi_cell(0, 8, clean(diagnostico), border="B")
+# 3. Diagnóstico con Línea Base (Lo que agregamos recién)
+pdf.ln(5)
+pdf.set_text_color(0, 0, 0)
+pdf.set_font("helvetica", "B", 11)
+pdf.cell(0, 10, clean(f"ANÁLISIS COMPARATIVO (REF: LÍNEA BASE {anio_lb_real})"), ln=1)
 
-                    # Evidencia Visual (Segunda Página - GRÁFICOS GRANDES Y NÍTIDOS)
-                    pdf.add_page()
-                    pdf.set_font("helvetica", "B", 14)
-                    pdf.set_text_color(COLORES_BIOCORE['azul_encabezado'][0], COLORES_BIOCORE['azul_encabezado'][1], COLORES_BIOCORE['azul_encabezado'][2])
-                    pdf.cell(0, 10, clean("EVIDENCIA ESPECTRAL HISTÓRICA (DATOS REALES)"), ln=1, align="C")
-                    
-                    # Insertamos el gráfico guardado en alta res
-                    pdf.image('evidencia_premium.png', x=10, y=25, w=190)
-                    
-                    # Firma Profesional
-                    pdf.set_y(265)
-                    pdf.set_text_color(0, 0, 0)
-                    pdf.set_font("helvetica", "B", 10)
-                    pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
-                    pdf.set_font("helvetica", "I", 9)
-                    pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
+pdf.set_font("helvetica", "", 10)
+diagnostico_lb = (
+    f"Se contrastan los valores actuales del periodo {mes_sel} {anio_sel} con la firma espectral "
+    f"registrada en la LINEA BASE DEL AÑO {anio_lb_real}.\n\n"
+    f"El índice NDSI detectado ({ndsi_val:.2f}) se utiliza para validar la estabilidad criosférica "
+    "frente a la normativa vigente. "
+)
+pdf.multi_cell(0, 8, clean(diagnostico_lb), border="B")
 
-                    # Generación y Salida
-                    pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
-                    pdf.output(pdf_file)
+# --- SEGUNDA PÁGINA: EVIDENCIA GRÁFICA ---
+pdf.add_page()
+pdf.set_font("helvetica", "B", 14)
+pdf.set_text_color(20, 50, 80)
+pdf.cell(0, 10, clean("EVIDENCIA ESPECTRAL HISTÓRICA (DATOS REALES)"), ln=1, align="C")
+pdf.image('evidencia_premium.png', x=10, y=25, w=190)
 
+# 4. Firma Profesional
+pdf.set_y(265)
+pdf.set_text_color(0, 0, 0)
+pdf.set_font("helvetica", "B", 10)
+pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
+pdf.set_font("helvetica", "I", 9)
+pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
+
+# Finalización
+pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
+pdf.output(pdf_file)
                     # --- RESULTADO EN APP ---
                     st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
                     with open(pdf_file, "rb") as f:
@@ -559,6 +548,13 @@ with tab_informe:
                     st.warning(f"No se encontraron datos históricos suficientes en Supabase para {proyecto_sel} durante {mes_sel} {anio_sel}.")
             else:
                 st.error("No se pudo conectar con el historial de Supabase (Pestaña Excel).")
+                # --- EL VELOCÍMETRO VA AQUÍ (Solo se muestra en la App, no en el PDF) ---
+st.plotly_chart(crear_velocimetro(ndsi_val, "Estado Actual NDSI"), use_container_width=True)
+
+st.success(f"✅ Reporte generado y visualización de estatus actualizada.")
+with open(pdf_file, "rb") as f:
+    st.download_button("📥 Descargar PDF para Cliente", f, file_name=pdf_file)
+    
 # --- PESTAÑA 3: EXCEL (Visualización de la tabla cruda) ---
 with tab_excel:
     st.subheader("📊 Historial Acumulado de Mediciones")
@@ -593,7 +589,8 @@ with tab_admin:
                 "Tipo": tipo_proy,
                 "telegram_id": telegram_id,
                 "Coordenadas": coords,
-                "hora_envio": hora_envio.strftime("%H:%M")
+                "hora_envio": hora_envio.strftime("%H:%M"),
+                "anio_linea_base": anio_lb  # SE GUARDA EN SUPABASE
             }
             supabase.table("usuarios").upsert(nuevo_p).execute()
             st.success(f"✅ {nombre_proy} guardado correctamente.")

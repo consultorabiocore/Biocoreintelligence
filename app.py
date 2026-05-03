@@ -409,7 +409,6 @@ def clean(text):
 # Asegúrate de que esta pestaña esté ubicada después de "🚀 Vigilancia Activa"
 with tab_informe:
     # Usamos tu logo como encabezado de la pestaña
-    st.image("logo_biocore.jpg", width=300) 
     st.header("🛡️ Centro de Auditoría Técnico-Legal")
     st.markdown("---")
 

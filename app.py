@@ -541,11 +541,11 @@ pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln
 pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
 pdf.output(pdf_file)
 # --- RESULTADO EN APP ---
-st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
-    with open(pdf_file, "rb") as f:
+        st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
+        with open(pdf_file, "rb") as f:
             st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
-else:
-st.warning(f"No se encontraron datos históricos suficientes en Supabase para {proyecto_sel} durante {mes_sel} {anio_sel}.")
+        else:
+            st.warning(f"No se encontraron datos históricos suficientes en Supabase para {proyecto_sel} durante {mes_sel} {anio_sel}.")
 else:
 st.error("No se pudo conectar con el historial de Supabase (Pestaña Excel).")
                 # --- EL VELOCÍMETRO VA AQUÍ (Solo se muestra en la App, no en el PDF) ---

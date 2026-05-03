@@ -542,8 +542,8 @@ pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
 pdf.output(pdf_file)
 # --- RESULTADO EN APP ---
 st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
-with open(pdf_file, "rb") as f:
-st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
+    with open(pdf_file, "rb") as f:
+            st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
 else:
 st.warning(f"No se encontraron datos históricos suficientes en Supabase para {proyecto_sel} durante {mes_sel} {anio_sel}.")
 else:

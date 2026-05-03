@@ -1,0 +1,23 @@
+name: BioCore Daily Report
+
+on:
+  schedule:
+    # AQUÍ PROGRAMAS LA HORA (Formato UTC)
+    # Si quieres las 09:00 AM en Chile (UTC-4), pones las 13:00
+    - cron: '0 13 * * *' 
+  workflow_dispatch: # Permite ejecutarlo manualmente para probar
+
+jobs:
+  envio_reporte:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v2
+      - name: Configurar Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Instalar dependencias
+        run: pip install pandas requests earthengine-api
+      - name: Ejecutar Script
+        run: python scheduler.py

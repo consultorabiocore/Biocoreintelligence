@@ -289,7 +289,7 @@ tab1, tab_informe, tab_excel, tab_admin = st.tabs([
 
 # --- PESTAÑA 1: VIGILANCIA (Tu código actual de mapas y botones rápidos) ---
 with tab1:
-    st.image("logo_biocore.png", width=200)
+    st.image("logo_biocore.jpg", width=200)
 
 with tab1:
     proyectos = supabase.table("usuarios").select("*").execute().data

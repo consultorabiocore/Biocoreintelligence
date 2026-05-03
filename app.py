@@ -393,162 +393,104 @@ with tab1:
                         """, unsafe_allow_html=True)
 
 # --- CONFIGURACIÓN ESTÉTICA "BIOCORE PREMIUM" ---
-# Usando la paleta de tu logo (Dorado y Verde)
-COLORES_BIOCORE = {
-    'dorado': '#B59410', # Dorado principal
-    'verde_fondo': '#E8F5E9', # Verde muy suave para fondo de gráficos
-    'gris_texto': '#424242', # Gris oscuro para ejes
-    'azul_encabezado': (20, 50, 80) # Mantenemos el azul marino para contraste legal
-}
-
-# Función auxiliar para limpiar texto para FPDF
-def clean(text):
-    return text.encode('latin-1', 'replace').decode('latin-1')
-
-# --- LÓGICA DE LA PESTAÑA EN STREAMLIT ---
-# Asegúrate de que esta pestaña esté ubicada después de "🚀 Vigilancia Activa"
-with tab_informe:
-    # Usamos tu logo como encabezado de la pestaña
-    st.header("🛡️ Centro de Auditoría Técnico-Legal")
-    st.markdown("---")
-
-    # 1. Parámetros de Selección
-    col_p, col_m, col_a = st.columns(3)
-    with col_p:
-        # Traemos la lista de nombres de proyectos de Supabase
-        nombres_proy = [p['Proyecto'] for p in proyectos]
-        proyecto_sel = st.selectbox("Seleccione Proyecto", nombres_proy)
-    with col_m:
-        mes_sel = st.selectbox("Mes de Auditoría", ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
-    with col_a:
-        anio_sel = st.number_input("Año", value=2026)
-
-    # 2. BOTÓN DE GENERACIÓN
-    if st.button(f"📄 Generar Reporte PDF Premium para {proyecto_sel}"):
-        with st.spinner("Compilando datos históricos de Supabase y aplicando paleta corporativa..."):
-            
-            # 3. EXTRACCIÓN DE DATOS REALES (Desde tu tabla de Supabase)
-            # Reutilizamos la lógica que lee de Supabase filtrando por proyecto
-            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_sel).execute()
-            
-            if res.data:
-                df = pd.DataFrame(res.data)
-                df['Fecha'] = pd.to_datetime(df['created_at'])
+        # --- CONFIGURACIÓN ESTÉTICA COMPLETA: PESTAÑA INFORMES ---
+        if st.button(f"📄 Generar Auditoría Premium {proyecto_sel}"):
+            with st.spinner("Procesando datos y gráficos corporativos..."):
+                # 1. Búsqueda de Datos
+                res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_sel).execute()
                 
-                # Filtrar por mes y año seleccionado
-                mes_num = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].index(mes_sel) + 1
-                df_mes = df[(df['Fecha'].dt.month == mes_num) & (df['Fecha'].dt.year == anio_sel)].sort_values('Fecha')
+                if res.data:
+                    df = pd.DataFrame(res.data)
+                    df['Fecha'] = pd.to_datetime(df['created_at'])
+                    mes_num = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].index(mes_sel) + 1
+                    df_mes = df[(df['Fecha'].dt.month == mes_num) & (df['Fecha'].dt.year == anio_sel)].sort_values('Fecha')
 
-                if not df_mes.empty:
-                    # --- LÓGICA DE GRÁFICOS PREMIUM (Tu código integrado con NUEVOS COLORES) ---
-                    # Matplotlib con alta resolución (DPI 300) para nitidez
-                    fig, axes = plt.subplots(4, 1, figsize=(10, 12), dpi=300) 
-                    
-                    # Usamos el Dorado de tu logo para TODAS las líneas, marcando consistencia
-                    color_linea = COLORES_BIOCORE['dorado']
-                    
-                    config = [
-                        ('ndsi', 'ÁREA DE NIEVE/HIELO (NDSI)'),
-                        ('ndwi', 'RECURSOS HÍDRICOS (NDWI)'),
-                        ('swir', 'ESTABILIDAD DE SUSTRATO (SWIR)'),
-                        ('polvo', 'DEPÓSITO DE MATERIAL PARTICULADO')
-                    ]
-                    
-                    for i, (col_data, titulo) in enumerate(config):
-                        # Graficamos la línea real
-                        axes[i].plot(df_mes['Fecha'], df_mes[col_data], color=color_linea, marker='o', linewidth=2.5, markersize=5)
+                    if not df_mes.empty:
+                        # Recuperar Año Línea Base
+                        datos_p = supabase.table("usuarios").select("anio_linea_base").eq("Proyecto", proyecto_sel).single().execute()
+                        anio_lb_real = datos_p.data.get('anio_linea_base', 2017)
+                        ndsi_val = df_mes['ndsi'].iloc[-1]
+
+                        # --- INICIO DE CONSTRUCCIÓN PDF ---
+                        pdf = FPDF()
+                        pdf.add_page()
                         
-                        # Títulos en Dorado y Negrita
-                        axes[i].set_title(titulo, fontweight='bold', fontsize=12, color=COLORES_BIOCORE['dorado'])
+                        # Banner de Encabezado (Azul BioCore)
+                        pdf.set_fill_color(20, 50, 80)
+                        pdf.rect(0, 0, 210, 40, 'F')
                         
-                        # Estética de fondo (Verde Suave) y Grilla
-                        axes[i].set_facecolor(COLORES_BIOCORE['verde_fondo'])
-                        axes[i].grid(True, alpha=0.3, linestyle='--', color='white')
+                        # Logo
+                        try:
+                            pdf.image("logo_biocore.jpg", x=10, y=8, w=45)
+                        except:
+                            pass
                         
-                        # Suavizamos los ejes
-                        for spine in axes[i].spines.values():
-                            spine.set_color('#cccccc')
-                        axes[i].tick_params(colors=COLORES_BIOCORE['gris_texto'], labelsize=9)
+                        # Títulos del Reporte
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.set_font("helvetica", "B", 18)
+                        pdf.set_xy(60, 15)
+                        pdf.cell(0, 10, clean(f"AUDITORÍA AMBIENTAL: {proyecto_sel.upper()}"), align="L", ln=1)
+                        
+                        pdf.set_font("helvetica", "I", 10)
+                        pdf.set_xy(60, 25)
+                        pdf.cell(0, 5, clean(f"Reporte de Cumplimiento Técnico | Periodo: {mes_sel} {anio_sel}"), align="L", ln=1)
+
+                        # Banner de Estatus (Semáforo Técnico)
+                        es_alerta = ndsi_val < 0.35
+                        color_res = (220, 50, 50) if es_alerta else (40, 150, 80)
+                        estado_txt = "ALERTA TÉCNICA - PÉRDIDA DE COBERTURA" if es_alerta else "CUMPLIMIENTO AMBIENTAL ESTABLE"
+
+                        pdf.set_y(45)
+                        pdf.set_fill_color(color_res[0], color_res[1], color_res[2])
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.set_font("helvetica", "B", 12)
+                        pdf.cell(0, 12, clean(f"  ESTATUS: {estado_txt}"), ln=1, fill=True)
+
+                        # Cuerpo Técnico (Página 1)
+                        pdf.ln(10)
+                        pdf.set_text_color(0, 0, 0)
+                        pdf.set_font("helvetica", "B", 12)
+                        pdf.cell(0, 10, clean(f"DIAGNÓSTICO ESPECTRAL (REF: LÍNEA BASE {anio_lb_real})"), ln=1)
+                        
+                        pdf.set_font("helvetica", "", 10)
+                        diagnostico_lb = (
+                            f"Se ha realizado un análisis comparativo de la firma espectral de la zona de estudio "
+                            f"frente a los valores de la Línea Base establecida en el año {anio_lb_real}.\n\n"
+                            f"RESULTADO: El índice NDSI actual de {ndsi_val:.2f} indica un estado de "
+                            f"{'alerta' if es_alerta else 'estabilidad'} según los parámetros de la RCA vigente."
+                        )
+                        pdf.multi_cell(0, 8, clean(diagnostico_lb), border="B")
+
+                        # Evidencia Visual (Página 2)
+                        pdf.add_page()
+                        pdf.set_font("helvetica", "B", 14)
+                        pdf.set_text_color(20, 50, 80)
+                        pdf.cell(0, 15, clean("EVIDENCIA ESPECTRAL HISTÓRICA"), ln=1, align="C")
+                        try:
+                            pdf.image('evidencia_premium.png', x=10, y=30, w=190)
+                        except:
+                            pdf.cell(0, 10, clean("[Error: No se pudo cargar el gráfico de evidencia]"), ln=1)
+
+                        # Firma Profesional (Pie de página 2)
+                        pdf.set_y(260)
+                        pdf.set_text_color(0, 0, 0)
+                        pdf.set_font("helvetica", "B", 10)
+                        pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
+                        pdf.set_font("helvetica", "I", 9)
+                        pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
+
+                        # Salida y Descarga
+                        pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
+                        pdf.output(pdf_file)
+                        
+                        st.success(f"✅ Auditoría generada con éxito")
+                        with open(pdf_file, "rb") as f:
+                            st.download_button("📥 Descargar Reporte PDF", f, file_name=pdf_file)
                     
-                    plt.tight_layout(pad=4.0)
-                    # Guardamos temporalmente en alta resolución
-                    plt.savefig('evidencia_premium.png', dpi=300, bbox_inches='tight')
-                    plt.close()
-
-                    # --- CONSTRUCCIÓN DEL PDF (Tu formato legal con ALTA CALIDAD) ---
-                    pdf = FPDF()
-                    pdf.add_page()
-                    
-                    # Encabezado Azul Marino (Mantenemos el contraste legal)
-                    pdf.set_fill_color(COLORES_BIOCORE['azul_encabezado'][0], COLORES_BIOCORE['azul_encabezado'][1], COLORES_BIOCORE['azul_encabezado'][2])
-                    pdf.rect(0, 0, 210, 40, 'F')
-                    
-                    # Insertamos tu logo en el PDF (Esquina superior izquierda)
-                    pdf.image("logo_biocore.jpg", x=10, y=8, w=45)
-                    
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.set_font("helvetica", "B", 18)
-                    pdf.set_xy(60, 15)
-                    pdf.cell(0, 10, clean(f"AUDITORÍA AMBIENTAL: {proyecto_sel.upper()}"), align="L", ln=1)
-                    
-                    pdf.set_font("helvetica", "I", 10)
-                    pdf.set_xy(60, 25)
-                    pdf.cell(0, 5, clean(f"Reporte de Cumplimiento Técnico | Periodo: {mes_sel} {anio_sel}"), align="L", ln=1)
-                    pdf.set_font("helvetica", "", 10)
-                    # 2. Lógica de Alerta y Banner de Estatus
-ndsi_val = df_mes['ndsi'].iloc[-1]
-es_alerta = ndsi_val < 0.35
-color_res = (220, 50, 50) if es_alerta else (40, 150, 80)
-estado_txt = "ALERTA TÉCNICA - PÉRDIDA DE COBERTURA" if es_alerta else "CUMPLIMIENTO AMBIENTAL ESTABLE"
-
-pdf.set_y(45)
-pdf.set_fill_color(color_res[0], color_res[1], color_res[2])
-pdf.set_text_color(255, 255, 255)
-pdf.set_font("helvetica", "B", 12)
-pdf.cell(0, 12, clean(f"  ESTATUS: {estado_txt}"), ln=1, fill=True)
-
-# 3. Diagnóstico con Línea Base (Lo que agregamos recién)
-pdf.ln(5)
-pdf.set_text_color(0, 0, 0)
-pdf.set_font("helvetica", "B", 11)
-pdf.cell(0, 10, clean(f"ANÁLISIS COMPARATIVO (REF: LÍNEA BASE {anio_lb_real})"), ln=1)
-
-pdf.set_font("helvetica", "", 10)
-diagnostico_lb = (
-    f"Se contrastan los valores actuales del periodo {mes_sel} {anio_sel} con la firma espectral "
-    f"registrada en la LINEA BASE DEL AÑO {anio_lb_real}.\n\n"
-    f"El índice NDSI detectado ({ndsi_val:.2f}) se utiliza para validar la estabilidad criosférica "
-    "frente a la normativa vigente. "
-)
-pdf.multi_cell(0, 8, clean(diagnostico_lb), border="B")
-
-# --- SEGUNDA PÁGINA: EVIDENCIA GRÁFICA ---
-pdf.add_page()
-pdf.set_font("helvetica", "B", 14)
-pdf.set_text_color(20, 50, 80)
-pdf.cell(0, 10, clean("EVIDENCIA ESPECTRAL HISTÓRICA (DATOS REALES)"), ln=1, align="C")
-pdf.image('evidencia_premium.png', x=10, y=25, w=190)
-
-# 4. Firma Profesional
-pdf.set_y(265)
-pdf.set_text_color(0, 0, 0)
-pdf.set_font("helvetica", "B", 10)
-pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
-pdf.set_font("helvetica", "I", 9)
-pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
-
-# Finalización
-pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
-pdf.output(pdf_file)
-# --- RESULTADO EN APP ---
-st.success(f"✅ Auditoría Premium generada para {proyecto_sel}")
-with open(pdf_file, "rb") as f:
-    st.download_button("📥 Descargar PDF de Cumplimiento", f, file_name=pdf_file)
-    else:
-        st.warning(f"No se encontraron datos para {mes_sel} {anio_sel}.")
-    else:
-        st.error("No se pudo conectar con el historial de Supabase.")
-
+                    else:
+                        st.warning(f"No hay datos registrados para {mes_sel} {anio_sel}.")
+                else:
+                    st.error("No se pudo conectar con la base de datos de BioCore.")
 
                 # --- EL VELOCÍMETRO VA AQUÍ (Solo se muestra en la App, no en el PDF) ---
 st.plotly_chart(crear_velocimetro(ndsi_val, "Estado Actual NDSI"), use_container_width=True)

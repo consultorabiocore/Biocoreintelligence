@@ -394,6 +394,7 @@ with tab1:
 
 # --- CONFIGURACIÓN ESTÉTICA "BIOCORE PREMIUM" ---
         # --- CONFIGURACIÓN ESTÉTICA COMPLETA: PESTAÑA INFORMES ---
+        proyecto_sel = st.session_state.get('proyecto_seleccionado', 'General') 
         if st.button(f"📄 Generar Auditoría Premium {proyecto_sel}"):
             with st.spinner("Procesando datos y gráficos corporativos..."):
                 # 1. Búsqueda de Datos

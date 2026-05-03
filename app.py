@@ -392,12 +392,13 @@ with tab1:
                         </div>
                         """, unsafe_allow_html=True)
 
-# --- CONFIGURACIÓN ESTÉTICA "BIOCORE PREMIUM" ---
-        # --- CONFIGURACIÓN ESTÉTICA COMPLETA: PESTAÑA INFORMES ---
+    # --- PESTAÑA 2: INFORMES (AUDITORÍA PREMIUM) ---
+    with tab2:
         proyecto_sel = st.session_state.get('proyecto_seleccionado', 'General') 
+        
         if st.button(f"📄 Generar Auditoría Premium {proyecto_sel}"):
             with st.spinner("Procesando datos y gráficos corporativos..."):
-                # 1. Búsqueda de Datos
+                # 1. Búsqueda de Datos en Supabase
                 res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_sel).execute()
                 
                 if res.data:
@@ -407,26 +408,28 @@ with tab1:
                     df_mes = df[(df['Fecha'].dt.month == mes_num) & (df['Fecha'].dt.year == anio_sel)].sort_values('Fecha')
 
                     if not df_mes.empty:
-                        # Recuperar Año Línea Base
-                        datos_p = supabase.table("usuarios").select("anio_linea_base").eq("Proyecto", proyecto_sel).single().execute()
-                        anio_lb_real = datos_p.data.get('anio_linea_base', 2017)
+                        # Recuperar Año Línea Base del proyecto
+                        try:
+                            datos_p = supabase.table("usuarios").select("anio_linea_base").eq("Proyecto", proyecto_sel).single().execute()
+                            anio_lb_real = datos_p.data.get('anio_linea_base', 2017)
+                        except:
+                            anio_lb_real = 2017
+                            
                         ndsi_val = df_mes['ndsi'].iloc[-1]
 
-                        # --- INICIO DE CONSTRUCCIÓN PDF ---
+                        # --- CONSTRUCCIÓN DEL PDF ---
                         pdf = FPDF()
                         pdf.add_page()
                         
-                        # Banner de Encabezado (Azul BioCore)
+                        # Banner Superior
                         pdf.set_fill_color(20, 50, 80)
                         pdf.rect(0, 0, 210, 40, 'F')
                         
-                        # Logo
                         try:
                             pdf.image("logo_biocore.jpg", x=10, y=8, w=45)
                         except:
                             pass
                         
-                        # Títulos del Reporte
                         pdf.set_text_color(255, 255, 255)
                         pdf.set_font("helvetica", "B", 18)
                         pdf.set_xy(60, 15)
@@ -434,9 +437,9 @@ with tab1:
                         
                         pdf.set_font("helvetica", "I", 10)
                         pdf.set_xy(60, 25)
-                        pdf.cell(0, 5, clean(f"Reporte de Cumplimiento Técnico | Periodo: {mes_sel} {anio_sel}"), align="L", ln=1)
+                        pdf.cell(0, 5, clean(f"Reporte de Cumplimiento Técnico | {mes_sel} {anio_sel}"), align="L", ln=1)
 
-                        # Banner de Estatus (Semáforo Técnico)
+                        # Banner de Estatus (Semáforo)
                         es_alerta = ndsi_val < 0.35
                         color_res = (220, 50, 50) if es_alerta else (40, 150, 80)
                         estado_txt = "ALERTA TÉCNICA - PÉRDIDA DE COBERTURA" if es_alerta else "CUMPLIMIENTO AMBIENTAL ESTABLE"
@@ -447,7 +450,7 @@ with tab1:
                         pdf.set_font("helvetica", "B", 12)
                         pdf.cell(0, 12, clean(f"  ESTATUS: {estado_txt}"), ln=1, fill=True)
 
-                        # Cuerpo Técnico (Página 1)
+                        # Diagnóstico Técnico
                         pdf.ln(10)
                         pdf.set_text_color(0, 0, 0)
                         pdf.set_font("helvetica", "B", 12)
@@ -455,108 +458,80 @@ with tab1:
                         
                         pdf.set_font("helvetica", "", 10)
                         diagnostico_lb = (
-                            f"Se ha realizado un análisis comparativo de la firma espectral de la zona de estudio "
-                            f"frente a los valores de la Línea Base establecida en el año {anio_lb_real}.\n\n"
+                            f"Análisis comparativo de firma espectral frente a la Línea Base {anio_lb_real}.\n\n"
                             f"RESULTADO: El índice NDSI actual de {ndsi_val:.2f} indica un estado de "
-                            f"{'alerta' if es_alerta else 'estabilidad'} según los parámetros de la RCA vigente."
+                            f"{'alerta' if es_alerta else 'estabilidad'} según parámetros RCA."
                         )
                         pdf.multi_cell(0, 8, clean(diagnostico_lb), border="B")
 
-                        # Evidencia Visual (Página 2)
+                        # Evidencia y Firma
                         pdf.add_page()
-                        pdf.set_font("helvetica", "B", 14)
-                        pdf.set_text_color(20, 50, 80)
-                        pdf.cell(0, 15, clean("EVIDENCIA ESPECTRAL HISTÓRICA"), ln=1, align="C")
-                        try:
-                            pdf.image('evidencia_premium.png', x=10, y=30, w=190)
-                        except:
-                            pdf.cell(0, 10, clean("[Error: No se pudo cargar el gráfico de evidencia]"), ln=1)
-
-                        # Firma Profesional (Pie de página 2)
+                        pdf.image('evidencia_premium.png', x=10, y=30, w=190)
                         pdf.set_y(260)
-                        pdf.set_text_color(0, 0, 0)
                         pdf.set_font("helvetica", "B", 10)
                         pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
                         pdf.set_font("helvetica", "I", 9)
                         pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
 
-                        # Salida y Descarga
-                        pdf_file = f"Auditoria_BioCore_{proyecto_sel}_{mes_sel}.pdf"
+                        # Salida
+                        pdf_file = f"Auditoria_BioCore_{proyecto_sel}.pdf"
                         pdf.output(pdf_file)
                         
-                        st.success(f"✅ Auditoría generada con éxito")
+                        st.success(f"✅ Auditoría generada")
                         st.plotly_chart(crear_velocimetro(ndsi_val, "Estado Actual NDSI"), use_container_width=True)
                         with open(pdf_file, "rb") as f:
                             st.download_button("📥 Descargar Reporte PDF", f, file_name=pdf_file)
-                    
                     else:
-                        st.warning(f"No hay datos registrados para {mes_sel} {anio_sel}.")
+                        st.warning(f"No hay datos registrados para {mes_sel}.")
                 else:
-                    st.error("No se pudo conectar con la base de datos de BioCore.")
-                   
-                    with tab_excel:
+                    st.error("No se pudo conectar con la base de datos.")
+
+    # --- PESTAÑA 3: EXCEL (HISTORIAL) ---
+    with tab3:
         st.subheader("📊 Historial Acumulado de Mediciones")
-        
         try:
-            # Traemos todos los datos para que BioCore tenga su registro completo
             res_hist = supabase.table("historial_reportes").select("*").execute()
-            
-            if res_hist and hasattr(res_hist, 'data') and len(res_hist.data) > 0:
+            if res_hist.data:
                 df_hist = pd.DataFrame(res_hist.data)
-                
-                # Limpieza estética de las fechas
                 if 'created_at' in df_hist.columns:
                     df_hist['Fecha'] = pd.to_datetime(df_hist['created_at']).dt.date
                 
-                # Reordenar columnas para que se vea profesional
-                columnas = ['proyecto', 'Fecha', 'ndsi', 'ndwi', 'vegetacion_altura']
-                df_mostrar = df_hist[[c for c in columnas if c in df_hist.columns]]
+                cols = ['proyecto', 'Fecha', 'ndsi', 'ndwi', 'vegetacion_altura']
+                st.dataframe(df_hist[[c for c in cols if c in df_hist.columns]], use_container_width=True)
                 
-                st.dataframe(df_mostrar, use_container_width=True)
-                
-                # Botón para descargar el Excel real
-                csv = df_mostrar.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar Base de Datos (CSV)",
-                    data=csv,
-                    file_name="Historial_BioCore.csv",
-                    mime="text/csv",
-                )
-            else:
-                st.info("Aún no hay mediciones registradas en el historial.")
-                
+                csv = df_hist.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Descargar Base de Datos (CSV)", data=csv, file_name="BioCore_Data.csv", mime="text/csv")
         except Exception as e:
-            st.error(f"Hubo un problema al cargar los datos: {e}")
+            st.error(f"Error al cargar historial: {e}")
 
-
-# --- PESTAÑA3
-
-# --- PESTAÑA 4: ADMIN (TU CÓDIGO DE REGISTRO) ---
-with tab_admin:
-    st.title("🛡️ Panel de Control BioCore")
-    st.markdown("### Registrar o Actualizar Proyecto")
-    
-    with st.form("form_registro_cliente", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            titular = st.text_input("👤 Nombre del Titular")
-            nombre_proy = st.text_input("🚀 Nombre del Proyecto")
-            tipo_proy = st.selectbox("🌿 Tipo", ["Minería", "Bosque Nativo", "Humedal", "Agrícola", "Industrial"])
-        with col2:
-            telegram_id = st.text_input("📱 ID Telegram")
-            coords = st.text_input("📍 Coordenadas (Lat, Lon)")
-            hora_envio = st.time_input("⏰ Hora de Envío Automático", value=datetime.time(8, 0))
+    # --- PESTAÑA 4: ADMIN (REGISTRO) ---
+    with tab4:
+        st.title("🛡️ Panel de Control BioCore")
+        st.markdown("### Registrar o Actualizar Proyecto")
         
-        if st.form_submit_button("💾 Guardar en BioCore Cloud"):
-            nuevo_p = {
-                "titular": titular,
-                "Proyecto": nombre_proy,
-                "Tipo": tipo_proy,
-                "telegram_id": telegram_id,
-                "Coordenadas": coords,
-                "hora_envio": hora_envio.strftime("%H:%M"),
-                "anio_linea_base": anio_lb  # SE GUARDA EN SUPABASE
-            }
-            supabase.table("usuarios").upsert(nuevo_p).execute()
-            st.success(f"✅ {nombre_proy} guardado correctamente.")
-            st.balloons()
+        with st.form("form_registro_cliente", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                titular = st.text_input("👤 Nombre del Titular")
+                nombre_proy = st.text_input("🚀 Nombre del Proyecto")
+                tipo_proy = st.selectbox("🌿 Tipo", ["Minería", "Bosque Nativo", "Humedal", "Agrícola", "Industrial"])
+                # Importante: Definimos anio_lb aquí para que no de error abajo
+                anio_lb_input = st.number_input("📅 Año Línea Base", value=2017)
+            with c2:
+                telegram_id = st.text_input("📱 ID Telegram")
+                coords = st.text_input("📍 Coordenadas (Lat, Lon)")
+                hora_envio = st.time_input("⏰ Hora de Envío", value=datetime.time(8, 0))
+            
+            if st.form_submit_button("💾 Guardar en BioCore Cloud"):
+                nuevo_p = {
+                    "titular": titular,
+                    "Proyecto": nombre_proy,
+                    "Tipo": tipo_proy,
+                    "telegram_id": telegram_id,
+                    "Coordenadas": coords,
+                    "hora_envio": hora_envio.strftime("%H:%M"),
+                    "anio_linea_base": anio_lb_input
+                }
+                supabase.table("usuarios").upsert(nuevo_p).execute()
+                st.success(f"✅ {nombre_proy} guardado correctamente.")
+                st.balloons()

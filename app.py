@@ -276,7 +276,8 @@ def generar_reporte_total(p):
     # Final de la función
     return texto_final, s_actual, s_base
 # --- 4. INTERFAZ ---
-tab1, tab2 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel"])
+# Añadimos la pestaña "⚙️ Admin"
+tab1, tab2, tab3 = st.tabs(["🚀 Vigilancia Activa", "📊 Excel", "⚙️ Admin"])
 
 with tab1:
     proyectos = supabase.table("usuarios").select("*").execute().data
@@ -388,3 +389,34 @@ with tab2:
         df = pd.DataFrame(hist)
         st.dataframe(df)
         st.download_button("Descargar Excel", df.to_csv(index=False).encode('utf-8'), "BioCore_Audit.csv")
+with tab3:
+    st.title("🛡️ Panel de Control BioCore")
+    st.markdown("### Registrar o Actualizar Proyecto")
+    
+    # Formulario para no entrar más a Supabase manualmente
+    with st.form("form_registro_cliente", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            titular = st.text_input("👤 Nombre del Titular")
+            nombre_proy = st.text_input("🚀 Nombre del Proyecto")
+            tipo_proy = st.selectbox("🌿 Tipo", ["Minería", "Bosque Nativo", "Humedal", "Agrícola", "Industrial"])
+        
+        with col2:
+            telegram_id = st.text_input("📱 ID Telegram")
+            coords = st.text_input("📍 Coordenadas (Lat, Lon)")
+            hora_envio = st.time_input("⏰ Hora de Envío Automático", value=datetime.time(8, 0))
+        
+        if st.form_submit_button("💾 Guardar en BioCore Cloud"):
+            nuevo_p = {
+                "titular": titular,
+                "Proyecto": nombre_proy, # Asegúrate que coincida con la mayúscula de tu tabla
+                "Tipo": tipo_proy,
+                "telegram_id": telegram_id,
+                "Coordenadas": coords,
+                "hora_envio": hora_envio.strftime("%H:%M")
+            }
+            # Guardamos en Supabase
+            supabase.table("usuarios").upsert(nuevo_p).execute()
+            st.success(f"✅ {nombre_proy} guardado y programado a las {nuevo_p['hora_envio']}")
+            st.balloons()

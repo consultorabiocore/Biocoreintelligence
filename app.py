@@ -245,7 +245,7 @@ def generar_reporte_total(p):
         color_estado = (200, 100, 0)
 
     texto_telegram = f"""
-╔════════════════════════════════════════╗
+╔══════════════════════════���═════════════╗
 ║  🛰️ REPORTE BIOCORE {tipo.upper():26s}║
 ║  {p['Proyecto']:40s}║
 ╚════════════════════════════════════════╝
@@ -424,8 +424,6 @@ with st.sidebar:
             st.rerun()
 
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
-
-# === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
     st.markdown("""
     <h1 style="text-align: center; margin-top: 30px;">BioCore Intelligence</h1>
@@ -455,6 +453,7 @@ if not st.session_state.get('authenticated'):
     """, unsafe_allow_html=True)
     
     st.stop()
+
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
     tab1, tab_informe, tab_excel, tab_config, tab_soporte, tab_guia = st.tabs([
@@ -826,25 +825,19 @@ with tab_config:
                                 with col_act1:
                                     if st.form_submit_button("💾 Guardar Cambios", key=f"save_{idx}"):
                                         try:
-                                            # Obtener el ID real del cliente para actualizar correctamente
-                                            cliente_id = cliente.get('id')
+                                            proyecto_nombre = cliente.get('Proyecto')
                                             
-                                            if cliente_id:
-                                                # Actualizar usando el ID como clave primaria
-                                                cliente_update = {
-                                                    "id": cliente_id,
-                                                    "Proyecto": cliente.get('Proyecto'),
-                                                    "titular": titular,
-                                                    "Tipo": tipo,
-                                                    "telegram_id": telegram_id,
-                                                    "anio_linea_base": int(anio_lb),
-                                                    "frecuencia_reportes": frecuencia,
-                                                    "hora_envio": hora_envio.strftime("%H:%M")
-                                                }
-                                                supabase.table("usuarios").update(cliente_update).eq("id", cliente_id).execute()
-                                            else:
-                                                st.error("Error: No se encontró el ID del cliente")
-                                                raise Exception("ID no disponible")
+                                            cliente_update = {
+                                                "titular": titular,
+                                                "Tipo": tipo,
+                                                "telegram_id": telegram_id,
+                                                "anio_linea_base": int(anio_lb),
+                                                "frecuencia_reportes": frecuencia,
+                                                "hora_envio": hora_envio.strftime("%H:%M")
+                                            }
+                                            
+                                            # Usar .eq() para actualizar donde Proyecto coincida
+                                            supabase.table("usuarios").update(cliente_update).eq("Proyecto", proyecto_nombre).execute()
                                             
                                             st.success("✅ Cambios guardados")
                                             st.session_state[f"edit_cliente_{idx}"] = False
@@ -863,7 +856,7 @@ with tab_config:
             st.divider()
             st.markdown("### ➕ Nuevo Cliente")
             
-            with st.form("form_nuevo_cliente", clear_on_submit=True):
+            with st.form("form_nuevo_cliente"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -885,33 +878,42 @@ with tab_config:
                 with col_freq2:
                     hora_envio = st.time_input("⏰ Hora de Envío", value=time(8, 0), key="new_hora")
                 
-                if st.form_submit_button("💾 Guardar"):
+                if st.form_submit_button("💾 Guardar", key="btn_save_new_client"):
                     errores = []
                     
                     if not titular or not nombre_proyecto:
                         errores.append("Titular y Proyecto requeridos")
                     if password_cliente != password_confirm:
                         errores.append("Las contraseñas no coinciden")
+                    if not password_cliente:
+                        errores.append("La contraseña no puede estar vacía")
                     
                     if errores:
                         for error in errores:
                             st.error(error)
                     else:
                         try:
-                            nuevo_cliente = {
-                                "titular": titular,
-                                "Proyecto": nombre_proyecto,
-                                "Tipo": tipo,
-                                "anio_linea_base": int(anio_lb),
-                                "telegram_id": telegram_id,
-                                "Coordenadas": coords_json,
-                                "frecuencia_reportes": frecuencia,
-                                "hora_envio": hora_envio.strftime("%H:%M"),
-                                "password_cliente": hash_password(password_cliente) if password_cliente else ""
-                            }
-                            supabase.table("usuarios").upsert(nuevo_cliente).execute()
-                            st.success(f"✅ {nombre_proyecto} guardado")
-                            st.balloons()
+                            # Verificar si el proyecto ya existe
+                            existe = supabase.table("usuarios").select("*").eq("Proyecto", nombre_proyecto).execute()
+                            
+                            if existe.data:
+                                st.error(f"❌ El proyecto '{nombre_proyecto}' ya existe")
+                            else:
+                                nuevo_cliente = {
+                                    "titular": titular,
+                                    "Proyecto": nombre_proyecto,
+                                    "Tipo": tipo,
+                                    "anio_linea_base": int(anio_lb),
+                                    "telegram_id": telegram_id,
+                                    "Coordenadas": coords_json,
+                                    "frecuencia_reportes": frecuencia,
+                                    "hora_envio": hora_envio.strftime("%H:%M"),
+                                    "password_cliente": hash_password(password_cliente) if password_cliente else ""
+                                }
+                                supabase.table("usuarios").insert(nuevo_cliente).execute()
+                                st.success(f"✅ {nombre_proyecto} guardado correctamente")
+                                st.balloons()
+                                st.rerun()
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
         
@@ -948,11 +950,10 @@ with tab_config:
                     try:
                         proyecto = st.session_state.get('proyecto_cliente')
                         update_data = {
-                            "Proyecto": proyecto,
                             "frecuencia_reportes": frecuencia,
                             "hora_envio": hora_envio.strftime("%H:%M")
                         }
-                        supabase.table("usuarios").upsert(update_data).execute()
+                        supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto).execute()
                         st.success("✅ Configuración guardada")
                         st.session_state['cliente_data'] = {**cliente_data, 
                                                            "frecuencia_reportes": frecuencia,

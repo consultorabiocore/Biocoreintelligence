@@ -11,6 +11,8 @@ from supabase import create_client, Client
 import matplotlib.pyplot as plt
 from fpdf import FPDF
 import io
+import os
+import tempfile
 
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence V5", layout="wide")
@@ -83,7 +85,7 @@ def dibujar_mapa_biocore(coordenadas):
 
 # --- 3. GENERADOR DE GRÁFICOS ---
 def generar_graficos(df):
-    """Genera gráficos de análisis y retorna imagen"""
+    """Genera gráficos de análisis y retorna ruta del archivo"""
     fig, axes = plt.subplots(4, 1, figsize=(10, 10))
     fig.patch.set_facecolor('#0e1117')
     
@@ -96,10 +98,13 @@ def generar_graficos(df):
     
     for i, (col, color, titulo) in enumerate(config):
         if col in df.columns:
-            df_clean = df[[col]].apply(pd.to_numeric, errors='coerce').dropna()
-            if not df_clean.empty:
-                axes[i].plot(df.index[-len(df_clean):], df_clean[col], 
-                           color=color, marker='o', linewidth=2, markersize=4)
+            try:
+                df_clean = pd.to_numeric(df[col], errors='coerce').dropna()
+                if not df_clean.empty:
+                    axes[i].plot(df_clean.index, df_clean.values, 
+                               color=color, marker='o', linewidth=2, markersize=4)
+            except:
+                pass
             axes[i].set_title(clean(titulo), fontweight='bold', fontsize=11, color='white')
             axes[i].grid(True, alpha=0.2, color='gray')
             axes[i].set_facecolor('#1e293b')
@@ -107,13 +112,13 @@ def generar_graficos(df):
     
     plt.tight_layout(pad=3.0)
     
-    # Guardar a bytes
-    img_buffer = io.BytesIO()
-    plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight', facecolor='#0e1117')
-    img_buffer.seek(0)
+    # Guardar a archivo temporal
+    temp_dir = tempfile.gettempdir()
+    img_path = os.path.join(temp_dir, 'grafico_biocore.png')
+    plt.savefig(img_path, format='png', dpi=150, bbox_inches='tight', facecolor='#0e1117')
     plt.close()
     
-    return img_buffer
+    return img_path
 
 
 # --- 4. MOTOR DE REPORTES ESPECÍFICOS POR TIPO ---
@@ -121,22 +126,22 @@ def generar_graficos(df):
 def generar_contenido_glaciar(df, proyecto_nombre, ndsi_val):
     """Lógica para proyectos GLACIAR"""
     if ndsi_val < 0.35:
-        estado_txt = "ALERTA TÉCNICA: PÉRDIDA DE COBERTURA"
+        estado_txt = "ALERTA TECNICA: PERDIDA DE COBERTURA"
         color_resumen = (200, 0, 0)
         diagnostico = (
-            f"1. ESTADO DE GLACIARES: El índice NDSI actual ({ndsi_val:.2f}) se encuentra bajo el umbral "
-            "crítico de presencia de hielo/nieve perenne (0.40). Esto indica una exposición del suelo desnudo "
-            "o una degradación severa de la masa criosférica.\n\n"
-            "2. RIESGO TÉCNICO-LEGAL: La ausencia de firma espectral de hielo constituye un hallazgo crítico. "
-            "Ante una fiscalización, esto requiere medidas de mitigación urgentes.\n\n"
-            "3. RECOMENDACIÓN: Inspección inmediata para descartar acumulación de material particulado."
+            f"1. ESTADO DE GLACIARES: El indice NDSI actual ({ndsi_val:.2f}) se encuentra bajo el umbral "
+            "critico de presencia de hielo/nieve perenne (0.40). Esto indica una exposicion del suelo desnudo "
+            "o una degradacion severa de la masa criofserica.\n\n"
+            "2. RIESGO TECNICO-LEGAL: La ausencia de firma espectral de hielo constituye un hallazgo critico. "
+            "Ante una fiscalizacion, esto requiere medidas de mitigacion urgentes.\n\n"
+            "3. RECOMENDACION: Inspeccion inmediata para descartar acumulacion de material particulado."
         )
     else:
-        estado_txt = "BAJO CONTROL: ESTABILIDAD CRIOSFÉRICA"
+        estado_txt = "BAJO CONTROL: ESTABILIDAD CRIOFSERICA"
         color_resumen = (0, 100, 0)
         diagnostico = (
-            f"1. PROTECCIÓN DE GLACIARES: El índice NDSI ({ndsi_val:.2f}) confirma la permanencia de masa de hielo.\n\n"
-            "2. BLINDAJE: El monitoreo indica cumplimiento de los parámetros de preservación de la RCA."
+            f"1. PROTECCION DE GLACIARES: El indice NDSI ({ndsi_val:.2f}) confirma la permanencia de masa de hielo.\n\n"
+            "2. BLINDAJE: El monitoreo indica cumplimiento de los parametros de preservacion de la RCA."
         )
     
     return estado_txt, color_resumen, diagnostico
@@ -147,20 +152,20 @@ def generar_contenido_mineria(df, proyecto_nombre, ndsi_val):
     ndwi_val = float(df['ndwi'].iloc[-1]) if 'ndwi' in df.columns else 0
     
     if ndwi_val < 0.2:
-        estado_txt = "ALERTA: ESTRÉS HÍDRICO DETECTADO"
+        estado_txt = "ALERTA: ESTRES HIDRICO DETECTADO"
         color_resumen = (200, 100, 0)
         diagnostico = (
-            f"1. DISPONIBILIDAD HÍDRICA: El índice NDWI ({ndwi_val:.2f}) indica baja disponibilidad de agua "
+            f"1. DISPONIBILIDAD HIDRICA: El indice NDWI ({ndwi_val:.2f}) indica baja disponibilidad de agua "
             "en el terreno. Esto puede afectar la estabilidad de taludes.\n\n"
-            "2. OPERACIÓN MINERA: Se recomienda revisar sistemas de drenaje y contención.\n\n"
-            "3. RECOMENDACIÓN: Incrementar monitoreo de infiltración."
+            "2. OPERACION MINERA: Se recomienda revisar sistemas de drenaje y contencion.\n\n"
+            "3. RECOMENDACION: Incrementar monitoreo de infiltracion."
         )
     else:
-        estado_txt = "BAJO CONTROL: GESTIÓN HÍDRICA ESTABLE"
+        estado_txt = "BAJO CONTROL: GESTION HIDRICA ESTABLE"
         color_resumen = (0, 150, 0)
         diagnostico = (
-            f"1. RECURSOS HÍDRICOS: NDWI de {ndwi_val:.2f} indica disponibilidad adecuada.\n\n"
-            "2. CUMPLIMIENTO: Los parámetros hídricos se mantienen dentro de norma."
+            f"1. RECURSOS HIDRICOS: NDWI de {ndwi_val:.2f} indica disponibilidad adecuada.\n\n"
+            "2. CUMPLIMIENTO: Los parametros hidricos se mantienen dentro de norma."
         )
     
     return estado_txt, color_resumen, diagnostico
@@ -168,22 +173,22 @@ def generar_contenido_mineria(df, proyecto_nombre, ndsi_val):
 
 def generar_contenido_bosque(df, proyecto_nombre, ndsi_val):
     """Lógica para proyectos BOSQUE"""
-    savi_val = float(df['savi'].iloc[-1]) if 'savi' in df.columns else 0
+    savi_val = float(df.get('savi', pd.Series([0])).iloc[-1]) if 'savi' in df.columns else 0
     
     if savi_val < 0.3:
-        estado_txt = "ALERTA: DEGRADACIÓN DE COBERTURA"
+        estado_txt = "ALERTA: DEGRADACION DE COBERTURA"
         color_resumen = (200, 50, 0)
         diagnostico = (
-            f"1. SALUD FORESTAL: El índice SAVI ({savi_val:.2f}) indica cobertura baja.\n\n"
-            "2. RIESGO ECOLÓGICO: Pérdida de biomasa detectada.\n\n"
-            "3. ACCIÓN: Se requiere plan de reforestación urgente."
+            f"1. SALUD FORESTAL: El indice SAVI ({savi_val:.2f}) indica cobertura baja.\n\n"
+            "2. RIESGO ECOLOGICO: Perdida de biomasa detectada.\n\n"
+            "3. ACCION: Se requiere plan de reforestacion urgente."
         )
     else:
         estado_txt = "BAJO CONTROL: COBERTURA VEGETAL ESTABLE"
         color_resumen = (50, 150, 0)
         diagnostico = (
             f"1. VIGOR FORESTAL: SAVI de {savi_val:.2f} indica cobertura saludable.\n\n"
-            "2. CUMPLIMIENTO: La densidad de dosel se mantiene dentro de parámetros."
+            "2. CUMPLIMIENTO: La densidad de dosel se mantiene dentro de parametros."
         )
     
     return estado_txt, color_resumen, diagnostico
@@ -194,19 +199,19 @@ def generar_contenido_humedal(df, proyecto_nombre, ndsi_val):
     ndwi_val = float(df['ndwi'].iloc[-1]) if 'ndwi' in df.columns else 0
     
     if ndwi_val < 0.3:
-        estado_txt = "ALERTA: DESECACIÓN DE HUMEDAL"
+        estado_txt = "ALERTA: DESECACION DE HUMEDAL"
         color_resumen = (200, 0, 0)
         diagnostico = (
-            f"1. HUMEDAD DEL SUSTRATO: NDWI ({ndwi_val:.2f}) crítico. Indica desecación.\n\n"
-            "2. RIESGO AMBIENTAL: Pérdida de biodiversidad e hábitat.\n\n"
-            "3. ACCIÓN: Restauración hidrológica e inspección inmediata."
+            f"1. HUMEDAD DEL SUSTRATO: NDWI ({ndwi_val:.2f}) critico. Indica desecacion.\n\n"
+            "2. RIESGO AMBIENTAL: Perdida de biodiversidad e habitat.\n\n"
+            "3. ACCION: Restauracion hidrologica e inspeccion inmediata."
         )
     else:
         estado_txt = "BAJO CONTROL: HUMEDAL EN EQUILIBRIO"
         color_resumen = (0, 150, 0)
         diagnostico = (
-            f"1. INTEGRIDAD DEL HUMEDAL: NDWI de {ndwi_val:.2f} confirma hidratación.\n\n"
-            "2. CUMPLIMIENTO: Parámetros de preservación dentro de norma."
+            f"1. INTEGRIDAD DEL HUMEDAL: NDWI de {ndwi_val:.2f} confirma hidratacion.\n\n"
+            "2. CUMPLIMIENTO: Parametros de preservacion dentro de norma."
         )
     
     return estado_txt, color_resumen, diagnostico
@@ -214,29 +219,29 @@ def generar_contenido_humedal(df, proyecto_nombre, ndsi_val):
 
 def generar_contenido_agricola(df, proyecto_nombre, ndsi_val):
     """Lógica para proyectos AGRÍCOLA"""
-    savi_val = float(df['savi'].iloc[-1]) if 'savi' in df.columns else 0
+    savi_val = float(df.get('savi', pd.Series([0])).iloc[-1]) if 'savi' in df.columns else 0
     ndwi_val = float(df['ndwi'].iloc[-1]) if 'ndwi' in df.columns else 0
     
     if savi_val < 0.35 or ndwi_val < 0.25:
-        estado_txt = "ALERTA: ESTRÉS EN CULTIVOS"
+        estado_txt = "ALERTA: ESTRES EN CULTIVOS"
         color_resumen = (200, 100, 0)
         diagnostico = (
-            f"1. VIGOR DE CULTIVO: SAVI ({savi_val:.2f}) indica estrés hídrico.\n\n"
-            "2. PRODUCTIVIDAD: Humedad insuficiente detectada (NDWI: {ndwi_val:.2f}).\n\n"
-            "3. RECOMENDACIÓN: Ajustar riego y acelerar cosecha."
+            f"1. VIGOR DE CULTIVO: SAVI ({savi_val:.2f}) indica estres hidrico.\n\n"
+            f"2. PRODUCTIVIDAD: Humedad insuficiente detectada (NDWI: {ndwi_val:.2f}).\n\n"
+            "3. RECOMENDACION: Ajustar riego y acelerar cosecha."
         )
     else:
-        estado_txt = "BAJO CONTROL: CULTIVOS ÓPTIMOS"
+        estado_txt = "BAJO CONTROL: CULTIVOS OPTIMOS"
         color_resumen = (0, 150, 0)
         diagnostico = (
             f"1. RENDIMIENTO: SAVI de {savi_val:.2f} indica vigor excelente.\n\n"
-            "2. GESTIÓN HÍDRICA: Parámetros de humedad óptimos (NDWI: {ndwi_val:.2f})."
+            f"2. GESTION HIDRICA: Parametros de humedad optimos (NDWI: {ndwi_val:.2f})."
         )
     
     return estado_txt, color_resumen, diagnostico
 
 
-def generar_pdf_profesional(df, proyecto_nombre, tipo_proyecto, img_buffer):
+def generar_pdf_profesional(df, proyecto_nombre, tipo_proyecto, img_path):
     """Genera PDF con contenido específico según tipo de proyecto"""
     
     # Obtener valor principal (NDSI)
@@ -266,7 +271,7 @@ def generar_pdf_profesional(df, proyecto_nombre, tipo_proyecto, img_buffer):
     pdf.rect(0, 0, 210, 40, 'F')
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", "B", 16)
-    pdf.cell(0, 20, clean(f"AUDITORÍA AMBIENTAL - {proyecto_nombre.upper()}"), align="C", ln=1)
+    pdf.cell(0, 20, clean(f"AUDITORIA AMBIENTAL - {proyecto_nombre.upper()}"), align="C", ln=1)
     pdf.set_font("helvetica", "I", 10)
     pdf.cell(0, 5, clean("BioCore Intelligence | Vigilancia Satelital Avanzada"), align="C", ln=1)
     
@@ -291,10 +296,10 @@ def generar_pdf_profesional(df, proyecto_nombre, tipo_proyecto, img_buffer):
     # Gráficos
     pdf.add_page()
     pdf.set_font("helvetica", "B", 12)
-    pdf.cell(0, 10, clean("ANÁLISIS ESPECTRAL - SERIE TEMPORAL"), ln=1)
+    pdf.cell(0, 10, clean("ANALISIS ESPECTRAL - SERIE TEMPORAL"), ln=1)
     
-    img_buffer.seek(0)
-    pdf.image(img_buffer, x=15, y=30, w=180)
+    if os.path.exists(img_path):
+        pdf.image(img_path, x=15, y=30, w=180)
     
     # Firma
     pdf.set_y(260)
@@ -310,7 +315,7 @@ def generar_pdf_profesional(df, proyecto_nombre, tipo_proyecto, img_buffer):
 def generar_reporte_total(p):
     PERFILES = {
         "MINERIA": {
-            "cat": "RCA Minería (F-30)",
+            "cat": "RCA Mineria (F-30)",
             "ve7": "Estabilidad de taludes.",
             "clima": "Protocolo extremos."
         },
@@ -321,18 +326,18 @@ def generar_reporte_total(p):
         },
         "BOSQUE": {
             "cat": "Ley 20.283",
-            "ve7": "Vigilancia regeneración.",
-            "clima": "Prevención incendios."
+            "ve7": "Vigilancia regeneracion.",
+            "clima": "Prevension incendios."
         },
         "HUMEDAL": {
             "cat": "Ramsar",
-            "ve7": "Protección de biodiversidad.",
+            "ve7": "Proteccion de biodiversidad.",
             "clima": "Decreto de Humedales."
         },
         "AGRICOLA": {
             "cat": "Ley de Riego",
-            "ve7": "Gestión hídrica.",
-            "clima": "Protección de cultivos."
+            "ve7": "Gestion hidrica.",
+            "clima": "Proteccion de cultivos."
         }
     }
 
@@ -343,7 +348,7 @@ def generar_reporte_total(p):
         raw_coords = p.get('Coordenadas')
 
         if raw_coords is None:
-            return (f"Error: La columna 'Coordenadas' está vacía para {p.get('Proyecto')}.",
+            return (f"Error: La columna 'Coordenadas' esta vacia para {p.get('Proyecto')}.",
                     0, 0)
 
         if isinstance(raw_coords, str):
@@ -356,7 +361,7 @@ def generar_reporte_total(p):
         geom = ee.Geometry.Polygon(raw_coords)
 
     except Exception as e:
-        return f"Error crítico en geometría: {str(e)}", 0, 0
+        return f"Error critico en geometria: {str(e)}", 0, 0
 
     # PROCESAMIENTO SATELITAL
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
@@ -393,7 +398,7 @@ def generar_reporte_total(p):
         .filterDate(ee.Date(datetime.now()).advance(-3, 'day'))\
         .size().getInfo()
 
-    alerta_incendio = "⚠️ ALERT: Focos detectados" if focos > 0 else "✅ Sin focos activos"
+    alerta_incendio = "ALERT: Focos detectados" if focos > 0 else "Sin focos activos"
 
     def calcular_idx(img):
         savi = img.expression('((NIR - RED) / (NIR + RED + 0.5)) * (1.5)', {
@@ -428,55 +433,55 @@ def generar_reporte_total(p):
 
     if abs(v_now) < 0.05 and abs(v_base) < 0.05:
         variacion = 0.0
-        est_global = "🟢 BAJO CONTROL"
+        est_global = "BAJO CONTROL"
         exp_savi = ("Suelo estable. Los valores bajos son consistentes con la "
-                    "litología y altitud del sector.")
+                    "litologia y altitud del sector.")
     else:
         variacion = ((v_now - v_base) / abs(v_base if v_base != 0 else 0.001)) * 100
 
-        umbral_critico = -15 if d['cat'] == "RCA Minería (F-30)" else -25
+        umbral_critico = -15 if d['cat'] == "RCA Mineria (F-30)" else -25
 
         if variacion < umbral_critico:
-            est_global = "🔴 ALERTA CRÍTICA"
-            exp_savi = ("Descenso significativo detectado. Posible intervención "
-                        "o estrés hídrico severo.")
+            est_global = "ALERTA CRITICA"
+            exp_savi = ("Descenso significativo detectado. Posible intervencion "
+                        "o estres hidrico severo.")
         else:
-            est_global = "🟢 BAJO CONTROL"
+            est_global = "BAJO CONTROL"
             exp_savi = ("La cobertura vegetal se mantiene estable dentro de los "
-                        "rangos históricos.")
+                        "rangos historicos.")
 
     v_ndsi = float(idx.get('ndsi', 0))
     if v_ndsi > 0.4:
         exp_snow = ("Cobertura de nieve/hielo consolidada, esencial para el "
-                    "balance hídrico.")
+                    "balance hidrico.")
     elif v_ndsi > 0.1:
-        exp_snow = "Nieve dispersa o en fusión. Se observa transición en la criósfera."
+        exp_snow = "Nieve dispersa o en fusion. Se observa transicion en la crifera."
     else:
         exp_snow = "Nula presencia de nieve. Predomina suelo expuesto o sustrato rocoso."
 
-    if est_global == "🟢 BAJO CONTROL":
-        nucleo = f"estabilidad técnica del área bajo el perfil {d['cat']}."
+    if est_global == "BAJO CONTROL":
+        nucleo = f"estabilidad tecnica del area bajo el perfil {d['cat']}."
         accion = "Se sugiere mantener la periodicidad de vigilancia programada."
     else:
-        nucleo = (f"una anomalía crítica en {d['cat']}, con una desviación "
+        nucleo = (f"una anomalia critica en {d['cat']}, con una desviacion "
                   f"del {variacion:.1f}%.")
-        accion = "Se requiere activar el protocolo de inspección y revisar el blindaje legal."
+        accion = "Se requiere activar el protocolo de inspeccion y revisar el blindaje legal."
 
     if v_ndsi < 0.2 and d['cat'] == "GLACIAR":
-        detalle = " La pérdida de cobertura nival es el factor de mayor incidencia."
+        detalle = " La perdida de cobertura nival es el factor de mayor incidencia."
     elif variacion < -15:
-        detalle = " El descenso en el vigor fotosintético (SAVI) es el parámetro dominante."
+        detalle = " El descenso en el vigor fotosinterico (SAVI) es el parametro dominante."
     elif temp_val > 28:
-        detalle = " El estrés térmico detectado eleva la vulnerabilidad del sector."
+        detalle = " El estres termico detectado eleva la vulnerabilidad del sector."
     else:
-        detalle = (" Los parámetros se mantienen dentro de la varianza histórica "
+        detalle = (" Los parametros se mantienen dentro de la varianza historica "
                    "permitida.")
 
-    conclusion_final = f"Tras el análisis, se concluye {nucleo}{detalle} {accion}"
+    conclusion_final = f"Tras el analisis, se concluye {nucleo}{detalle} {accion}"
 
     v_radar = float(idx.get('radar_vv', 0))
     if v_radar > -12:
-        exp_radar = ("La señal sugiere una superficie rugosa o presencia de "
+        exp_radar = ("La senal sugiere una superficie rugosa o presencia de "
                      "estructuras, consistente con la actividad operativa.")
     else:
         exp_radar = ("El radar indica una superficie lisa o despejada, ideal para "
@@ -487,7 +492,7 @@ def generar_reporte_total(p):
         exp_swir = ("Niveles de humedad en suelo bajos. Se recomienda monitorear "
                     "ante posibles riesgos de aridez extrema.")
     else:
-        exp_swir = ("Niveles de humedad óptimos detectados, garantizando estabilidad "
+        exp_swir = ("Niveles de humedad optimos detectados, garantizando estabilidad "
                     "en el sustrato.")
 
     v_savi = float(idx.get('sa', 0))
@@ -498,42 +503,42 @@ def generar_reporte_total(p):
     s_actual = v_savi
 
     texto_final = f"""
-🛰 **REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE**
-**PROYECTO:** {p['Proyecto']}
-📅 **Análisis:** {f_rep} | **Línea Base:** {anio_base}
+REPORTE DE VIGILANCIA AMBIENTAL - BIOCORE
+PROYECTO: {p['Proyecto']}
+Analisis: {f_rep} | Linea Base: {anio_base}
 ──────────────────
-❄️ **ESTADO DE CRIÓSFERA (NDSI):**
-└ Cobertura Actual: `{v_ndsi:.3f}`
-└ **Análisis:** {exp_snow}
+ESTADO DE CRIFERA (NDSI):
+└ Cobertura Actual: {v_ndsi:.3f}
+└ Analisis: {exp_snow}
 
-📡 **MONITOREO RADAR (Sentinel-1):**
-└ Retrodispersión VV: `{v_radar:.2f} dB`
-└ **Análisis:** {exp_radar}
+MONITOREO RADAR (Sentinel-1):
+└ Retrodispersion VV: {v_radar:.2f} dB
+└ Analisis: {exp_radar}
 
-🛡️ **INTEGRIDAD DEL TERRENO (SU-6):**
-└ Humedad (SWIR): `{v_swir:.2f}` | Arcillas: `{v_clay:.2f}`
-└ **Análisis:** {exp_swir}
+INTEGRIDAD DEL TERRENO (SU-6):
+└ Humedad (SWIR): {v_swir:.2f} | Arcillas: {v_clay:.2f}
+└ Analisis: {exp_swir}
 
-🌱 **SALUD VEGETAL (SAVI):**
-└ Vigor Actual: `{v_savi:.3f}` | Base: `{s_base:.3f}`
-└ Variación: `{variacion:.1f}%` respecto al original.
-└ **Análisis:** {exp_savi}
+SALUD VEGETAL (SAVI):
+└ Vigor Actual: {v_savi:.3f} | Base: {s_base:.3f}
+└ Variacion: {variacion:.1f}% respecto al original.
+└ Analisis: {exp_savi}
 
-⚠️ **RIESGO CLIMÁTICO:**
-└ Temperatura: `{temp_val:.1f}°C` | Incendios: {alerta_incendio}
+RIESGO CLIMATICO:
+└ Temperatura: {temp_val:.1f}C | Incendios: {alerta_incendio}
 ──────────────────
-✅ **ESTADO GLOBAL:** {est_global}
-📝 **CONCLUSIÓN FINAL:** {conclusion_final}
+ESTADO GLOBAL: {est_global}
+CONCLUSION FINAL: {conclusion_final}
     """
     return texto_final, s_actual, s_base
 
 
 # --- 6. INTERFAZ ---
 tab1, tab_informe, tab_excel, tab_admin = st.tabs([
-    "🚀 Vigilancia Activa",
-    "📁 Informes de Auditoría",
-    "📊 Base de Datos (Excel)",
-    "⚙️ Admin"
+    "Vigilancia Activa",
+    "Informes de Auditoria",
+    "Base de Datos (Excel)",
+    "Admin"
 ])
 
 
@@ -543,7 +548,7 @@ with tab1:
 
     if proyectos:
         for p in proyectos:
-            st.markdown(f"### 📍 Proyecto: {p['Proyecto']}")
+            st.markdown(f"### Proyecto: {p['Proyecto']}")
 
             col_mapa, col_reporte = st.columns([2.5, 1])
 
@@ -552,11 +557,11 @@ with tab1:
                 folium_static(m_obj, width=850, height=500)
 
             with col_reporte:
-                if st.button("🚀 Ejecutar Reporte Completo", key=p['Proyecto']):
-                    with st.spinner("Generando análisis dinámico..."):
+                if st.button("Ejecutar Reporte Completo", key=p['Proyecto']):
+                    with st.spinner("Generando analisis dinamico..."):
                         txt, v_now, v_base = generar_reporte_total(p)
                         anio_base = p.get('anio_linea_base', 2017)
-                        tipo = p.get('Tipo', 'Minería')
+                        tipo = p.get('Tipo', 'Mineria')
 
                         es_estable = abs(v_now) < 0.05 and abs(v_base) < 0.05
 
@@ -564,9 +569,9 @@ with tab1:
                             v_ref_grafico = v_now + 0.00001
                             delta_texto = "0.0% (Estable)"
                             detalles = (
-                                f"Análisis de alta montaña. El valor SAVI de {v_now:.4f} "
-                                f"es consistente con la litología mineral del sector. "
-                                f"La variación del 0.0% certifica la estabilidad del terreno "
+                                f"Analisis de alta montaña. El valor SAVI de {v_now:.4f} "
+                                f"es consistente con la litologia mineral del sector. "
+                                f"La variacion del 0.0% certifica la estabilidad del terreno "
                                 f"y la ausencia de sedimentos o polvo sobre la firma espectral "
                                 f"original de {anio_base}."
                             )
@@ -582,10 +587,10 @@ with tab1:
                                 )
                             elif tipo == 'Humedal':
                                 detalles = (
-                                    f"Control de ecosistema hídrico. Valores de {v_now:.4f} "
-                                    f"permiten vigilar la salud de la vegetación hidrófila."
+                                    f"Control de ecosistema hidrico. Valores de {v_now:.4f} "
+                                    f"permiten vigilar la salud de la vegetacion hidrófila."
                                 )
-                            elif tipo == 'Agrícola':
+                            elif tipo == 'Agricola':
                                 detalles = (
                                     f"Seguimiento de vigor de cultivo. El SAVI de {v_now:.4f} "
                                     f"valida la estabilidad de la productividad por lote."
@@ -593,7 +598,7 @@ with tab1:
                             else:
                                 detalles = (
                                     f"Control de entorno operativo. El valor de {v_now:.4f} "
-                                    f"asegura la protección de la vegetación periférica."
+                                    f"asegura la proteccion de la vegetacion perifica."
                                 )
 
                         try:
@@ -607,11 +612,11 @@ with tab1:
                                 timeout=10
                             )
                             if response.status_code == 200:
-                                st.success("✅ ¡Reporte enviado!")
+                                st.success("Reporte enviado!")
                             else:
-                                st.error(f"❌ Error Telegram: {response.status_code}")
+                                st.error(f"Error Telegram: {response.status_code}")
                         except Exception as e:
-                            st.warning(f"⚠️ Error conexión: {e}")
+                            st.warning(f"Error conexion: {e}")
 
                         st.metric(
                             label=f"SAVI Actual vs Base {anio_base}",
@@ -648,28 +653,10 @@ with tab1:
                         )
                         st.plotly_chart(fig, use_container_width=True)
 
-                        st.markdown(f"""
-                        <div style="background-color:#0e1117; padding:20px; border-radius:15px; 
-                                    border: 1px solid #30363d; color: white;">
-                            <h3 style="margin-top:0; color:#4ade80; font-size:1.1em;">
-                                🌿 Interpretación BioCore: {tipo.upper()}
-                            </h3>
-                            <p style="font-size:0.95em; line-height:1.6; color:#e2e8f0;">
-                                {detalles}
-                            </p>
-                            <div style="background-color:#1e293b; padding:10px; border-radius:8px; 
-                                        margin-top:10px; border-left: 4px solid #60a5fa;">
-                                <span style="font-size:0.85em; color:#94a3b8;">
-                                    <b>Estatus:</b> Cumplimiento Ambiental Validado.
-                                </span>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
 
 # --- PESTAÑA 2: INFORMES (AUDITORÍA PREMIUM) ---
 with tab_informe:
-    st.subheader("📁 Informes de Auditoría Profesionales")
+    st.subheader("Informes de Auditoria Profesionales")
     
     try:
         proyectos_list = supabase.table("usuarios").select("Proyecto,Tipo").execute().data
@@ -682,17 +669,17 @@ with tab_informe:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        proyecto_sel = st.selectbox("📍 Seleccionar Proyecto", proyectos_nombres)
+        proyecto_sel = st.selectbox("Seleccionar Proyecto", proyectos_nombres)
     
     with col2:
-        mes_sel = st.selectbox("📅 Mes", 
+        mes_sel = st.selectbox("Mes", 
             ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
              "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
     
     with col3:
-        anio_sel = st.number_input("📆 Año", value=2026, min_value=2020, max_value=2030)
+        anio_sel = st.number_input("Ano", value=2026, min_value=2020, max_value=2030)
     
-    if st.button(f"📄 Generar Auditoría Premium {proyecto_sel}"):
+    if st.button(f"Generar Auditoria Premium {proyecto_sel}"):
         with st.spinner("Procesando datos y generando PDF profesional..."):
             try:
                 res = supabase.table("historial_reportes")\
@@ -715,17 +702,17 @@ with tab_informe:
                         tipo_proyecto = proyectos_dict.get(proyecto_sel, 'MINERIA')
                         
                         # Generar gráficos
-                        img_buffer = generar_graficos(df_mes)
+                        img_path = generar_graficos(df_mes)
                         
                         # Generar PDF
-                        pdf = generar_pdf_profesional(df_mes, proyecto_sel, tipo_proyecto, img_buffer)
+                        pdf = generar_pdf_profesional(df_mes, proyecto_sel, tipo_proyecto, img_path)
                         
                         # Guardar PDF
                         pdf_filename = f"Auditoria_{proyecto_sel}_{mes_sel}_{anio_sel}.pdf"
                         pdf.output(pdf_filename)
                         
-                        st.success(f"✅ Auditoría PDF generada para {mes_sel}/{anio_sel}")
-                        st.info(f"📊 Registros procesados: {len(df_mes)}")
+                        st.success(f"Auditoria PDF generada para {mes_sel}/{anio_sel}")
+                        st.info(f"Registros procesados: {len(df_mes)}")
                         
                         # Mostrar preview de datos
                         st.subheader("Vista previa de datos")
@@ -736,34 +723,26 @@ with tab_informe:
                         # Descarga
                         with open(pdf_filename, "rb") as f:
                             st.download_button(
-                                label="📥 Descargar PDF Auditoría",
+                                label="Descargar PDF Auditoria",
                                 data=f.read(),
                                 file_name=pdf_filename,
                                 mime="application/pdf"
                             )
                         
-                        # Enviar a Telegram si existe token
-                        try:
-                            with open(pdf_filename, "rb") as f:
-                                requests.post(
-                                    f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
-                                    data={"chat_id": st.secrets.get('telegram_chat_id', ''), 
-                                          "caption": f"🛡️ AUDITORÍA: {proyecto_sel} - {mes_sel}/{anio_sel}"},
-                                    files={"document": f}
-                                )
-                        except:
-                            pass
+                        # Limpiar archivo temporal
+                        if os.path.exists(img_path):
+                            os.remove(img_path)
                     else:
-                        st.warning(f"❌ No hay datos para {mes_sel}/{anio_sel}")
+                        st.warning(f"No hay datos para {mes_sel}/{anio_sel}")
                 else:
-                    st.error("❌ No se encontraron reportes en la base de datos.")
+                    st.error("No se encontraron reportes en la base de datos.")
             except Exception as e:
-                st.error(f"❌ Error al generar auditoría: {str(e)}")
+                st.error(f"Error al generar auditoria: {str(e)}")
 
 
 # --- PESTAÑA 3: EXCEL (HISTORIAL) ---
 with tab_excel:
-    st.subheader("📊 Historial Acumulado de Mediciones")
+    st.subheader("Historial Acumulado de Mediciones")
     try:
         res_hist = supabase.table("historial_reportes").select("*").execute()
         if res_hist.data:
@@ -779,21 +758,21 @@ with tab_excel:
 
 # --- PESTAÑA 4: ADMIN (REGISTRO) ---
 with tab_admin:
-    st.title("🛡️ Panel de Control BioCore")
+    st.title("Panel de Control BioCore")
     with st.form("form_registro_cliente", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
-            titular = st.text_input("👤 Nombre del Titular")
-            nombre_proy = st.text_input("🚀 Nombre del Proyecto")
-            tipo_proy = st.selectbox("🏷️ Tipo de Proyecto", 
+            titular = st.text_input("Nombre del Titular")
+            nombre_proy = st.text_input("Nombre del Proyecto")
+            tipo_proy = st.selectbox("Tipo de Proyecto", 
                                      ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
-            anio_lb_input = st.number_input("📅 Año Línea Base", value=2017)
+            anio_lb_input = st.number_input("Ano Linea Base", value=2017)
         with c2:
-            telegram_id = st.text_input("📱 ID Telegram")
-            coords = st.text_input("📍 Coordenadas")
-            hora_envio = st.time_input("⏰ Hora de Envío", value=time(8, 0))
+            telegram_id = st.text_input("ID Telegram")
+            coords = st.text_input("Coordenadas")
+            hora_envio = st.time_input("Hora de Envio", value=time(8, 0))
 
-        if st.form_submit_button("💾 Guardar en BioCore Cloud"):
+        if st.form_submit_button("Guardar en BioCore Cloud"):
             nuevo_p = {
                 "titular": titular,
                 "Proyecto": nombre_proy,
@@ -804,5 +783,5 @@ with tab_admin:
                 "hora_envio": hora_envio.strftime("%H:%M")
             }
             supabase.table("usuarios").upsert(nuevo_p).execute()
-            st.success(f"✅ {nombre_proy} ({tipo_proy}) guardado correctamente.")
+            st.success(f"{nombre_proy} ({tipo_proy}) guardado correctamente.")
             st.balloons()

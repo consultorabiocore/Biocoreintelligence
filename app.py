@@ -690,7 +690,7 @@ if 'authenticated' not in st.session_state:
     st.session_state['proyecto_cliente'] = None
 
 
-# --- 8. SIDEBAR CON LOGO Y AUTENTICACIÓN ---
+# --- 8. SIDEBAR CON LOGO Y AUTENTICACIÓN (CORREGIDO) ---
 
 with st.sidebar:
     # Logo
@@ -702,43 +702,61 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Sistema de autenticación
-    with st.expander("🔐 Iniciar Sesión", expanded=True):
-        proyecto_login = st.text_input("Proyecto", key="login_proyecto")
-        password_login = st.text_input("Contraseña", type="password", key="login_pwd")
-        admin_mode = st.checkbox("Modo Admin", key="admin_check")
+    # Sistema de autenticación CORREGIDO
+    st.markdown('<p class="sidebar-title">🔐 Iniciar Sesión</p>', unsafe_allow_html=True)
+    
+    # Primero el checkbox para seleccionar modo admin
+    admin_mode = st.checkbox("🔑 Modo Admin", key="admin_check")
+    
+    st.markdown("---")
+    
+    # Ahora mostrar los campos correspondientes según el modo
+    if admin_mode:
+        # Modo Admin: solo pedir contraseña
+        st.info("Ingresa la contraseña de administrador")
+        password_login = st.text_input("Contraseña Admin", type="password", key="login_pwd_admin")
         
-        if st.button("Entrar", key="btn_login"):
-            if admin_mode:
-                if es_admin(password_login):
-                    st.session_state['admin_mode'] = True
-                    st.session_state['authenticated'] = True
-                    st.success("✅ Modo Admin activado")
-                else:
-                    st.error("❌ Contraseña de admin incorrecta")
+        if st.button("✅ Entrar como Admin", key="btn_login_admin", use_container_width=True):
+            if es_admin(password_login):
+                st.session_state['admin_mode'] = True
+                st.session_state['authenticated'] = True
+                st.success("✅ Modo Admin activado")
+                st.rerun()
             else:
+                st.error("❌ Contraseña de admin incorrecta")
+    else:
+        # Modo Cliente: pedir proyecto y contraseña
+        st.info("Ingresa tus credenciales de cliente")
+        proyecto_login = st.text_input("Proyecto", key="login_proyecto")
+        password_login = st.text_input("Contraseña", type="password", key="login_pwd_cliente")
+        
+        if st.button("✅ Entrar como Cliente", key="btn_login_cliente", use_container_width=True):
+            if proyecto_login:
                 is_valid, cliente = verificar_credenciales_usuario(proyecto_login, password_login)
                 if is_valid:
                     st.session_state['authenticated'] = True
                     st.session_state['proyecto_cliente'] = proyecto_login
                     st.session_state['cliente_data'] = cliente
                     st.success(f"✅ Bienvenido {proyecto_login}")
+                    st.rerun()
                 else:
                     st.error("❌ Proyecto o contraseña inválidos")
+            else:
+                st.error("❌ Ingresa el nombre del proyecto")
     
     st.markdown("---")
     
     # Info usuario
     if st.session_state.get('authenticated'):
         if st.session_state.get('admin_mode'):
-            st.info("🔑 **Sesión Admin Activa**")
+            st.success("🔑 **Sesión Admin Activa**")
         else:
             proyecto = st.session_state.get('proyecto_cliente', 'N/A')
-            st.info(f"👤 **Usuario**: {proyecto}")
+            st.success(f"👤 **Usuario**: {proyecto}")
     
     # Botón logout
     if st.session_state.get('authenticated'):
-        if st.button("🚪 Cerrar Sesión"):
+        if st.button("🚪 Cerrar Sesión", key="btn_logout", use_container_width=True):
             st.session_state['authenticated'] = False
             st.session_state['admin_mode'] = False
             st.session_state['proyecto_cliente'] = None

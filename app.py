@@ -5,10 +5,9 @@ from streamlit_folium import folium_static
 import json
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, time
 import plotly.graph_objects as go
 from supabase import create_client, Client
-import datetime
 import matplotlib.pyplot as plt
 from fpdf import FPDF
 
@@ -130,9 +129,14 @@ def generar_reporte_total(p):
         .sort('system:time_start', False)\
         .first()
 
-    f_rep = datetime.fromtimestamp(
-        s2.get('system:time_start').getInfo()/1000
-    ).strftime('%d/%m/%Y')
+    try:
+        timestamp_ms = s2.get('system:time_start').getInfo()
+        if timestamp_ms:
+            f_rep = datetime.fromtimestamp(timestamp_ms/1000).strftime('%d/%m/%Y')
+        else:
+            f_rep = "Fecha no disponible"
+    except:
+        f_rep = "Fecha no disponible"
 
     # 2. Radar: Sentinel-1 (Rugosidad/Estructuras)
     s1 = ee.ImageCollection('COPERNICUS/S1_GRD')\
@@ -559,7 +563,7 @@ with tab_admin:
         with c2:
             telegram_id = st.text_input("📱 ID Telegram")
             coords = st.text_input("📍 Coordenadas")
-            hora_envio = st.time_input("⏰ Hora de Envío", value=datetime.time(8, 0))
+            hora_envio = st.time_input("⏰ Hora de Envío", value=time(8, 0))
 
         if st.form_submit_button("💾 Guardar en BioCore Cloud"):
             nuevo_p = {

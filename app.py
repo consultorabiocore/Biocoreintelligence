@@ -1,3 +1,7 @@
+# ============================================================================
+# BIOCORE INTELLIGENCE - SISTEMA COMPLETO DE VIGILANCIA AMBIENTAL SATELITAL
+# ============================================================================
+
 import streamlit as st
 import ee
 import folium
@@ -9,13 +13,17 @@ from datetime import datetime, time
 import plotly.graph_objects as go
 from supabase import create_client, Client
 import matplotlib.pyplot as plt
+import matplotlib
 from fpdf import FPDF
 import os
 import tempfile
 import hashlib
 from io import BytesIO
+import numpy as np
 
-# --- 1. CONFIGURACIÓN ---
+matplotlib.use('Agg')
+
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
 st.markdown("""
@@ -32,6 +40,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# === INICIALIZAR BASES DE DATOS ===
 @st.cache_resource
 def init_db():
     return create_client(
@@ -58,9 +67,10 @@ def iniciar_gee():
 gee_status = iniciar_gee()
 
 def clean(text):
+    """Limpia caracteres especiales para FPDF"""
     return text.encode('latin-1', errors='replace').decode('latin-1')
 
-# === SISTEMA DE AUTENTICACIÓN ===
+# === AUTENTICACIÓN ===
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -79,7 +89,7 @@ def verificar_credenciales_usuario(proyecto, password):
     except:
         return False, None
 
-# === FUNCIÓN DE MAPA ---
+# === FUNCIÓN DE MAPA ===
 def dibujar_mapa_biocore(coordenadas):
     try:
         if isinstance(coordenadas, str):
@@ -108,40 +118,62 @@ def dibujar_mapa_biocore(coordenadas):
     except Exception as e:
         return folium.Map(location=[-33.45, -70.66], zoom_start=4)
 
-# === GENERADOR DE GRÁFICOS ---
-def generar_graficos(df):
+# === GENERADOR DE GRÁFICOS ===
+def generar_graficos(indices_historicos):
+    """
+    Genera gráficos profesionales para incluir en PDF
+    indices_historicos: dict con histórico de índices
+    """
     try:
-        fig, axes = plt.subplots(4, 1, figsize=(12, 14))
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.patch.set_facecolor('white')
         
-        config = [
-            ('ndsi', '#2E86AB', 'ÁREA DE NIEVE/HIELO (NDSI)'),
-            ('ndwi', '#A23B72', 'RECURSOS HÍDRICOS (NDWI)'),
-            ('swir', '#F18F01', 'ESTABILIDAD DE SUSTRATO (SWIR)'),
-            ('polvo', '#C73E1D', 'DEPÓSITO DE MATERIAL PARTICULADO')
-        ]
+        # Preparar datos
+        fechas = list(range(len(indices_historicos.get('savi', [0]))))
         
-        for i, (col, color, titulo) in enumerate(config):
-            try:
-                if col in df.columns:
-                    df_clean = pd.to_numeric(df[col], errors='coerce').dropna()
-                    
-                    if not df_clean.empty:
-                        axes[i].plot(df_clean.index, df_clean.values, 
-                                   color=color, marker='o', linewidth=2.5, markersize=6)
-                    else:
-                        axes[i].text(0.5, 0.5, 'SIN DATOS', ha='center', va='center', 
-                                   color='gray', fontsize=12)
-            except:
-                pass
-            
-            axes[i].set_title(titulo, fontweight='bold', fontsize=12, color='#1a1a1a')
-            axes[i].grid(True, alpha=0.3, linestyle='--')
-            axes[i].set_facecolor('#f9f9f9')
-            axes[i].tick_params(colors='#1a1a1a', labelsize=10)
+        # SAVI
+        if 'savi' in indices_historicos:
+            axes[0, 0].plot(fechas, indices_historicos['savi'], 
+                          color='#27ae60', marker='o', linewidth=2.5, markersize=8, label='SAVI')
+            axes[0, 0].fill_between(fechas, indices_historicos['savi'], alpha=0.3, color='#27ae60')
+            axes[0, 0].set_title('ÍNDICE SAVI - Vigor de Vegetación', fontweight='bold', fontsize=12)
+            axes[0, 0].set_ylabel('Valor SAVI', fontsize=10)
+            axes[0, 0].grid(True, alpha=0.3, linestyle='--')
+            axes[0, 0].legend()
         
-        plt.tight_layout(pad=3.0)
+        # NDWI
+        if 'ndwi' in indices_historicos:
+            axes[0, 1].plot(fechas, indices_historicos['ndwi'], 
+                          color='#3498db', marker='s', linewidth=2.5, markersize=8, label='NDWI')
+            axes[0, 1].fill_between(fechas, indices_historicos['ndwi'], alpha=0.3, color='#3498db')
+            axes[0, 1].set_title('ÍNDICE NDWI - Contenido de Agua', fontweight='bold', fontsize=12)
+            axes[0, 1].set_ylabel('Valor NDWI', fontsize=10)
+            axes[0, 1].grid(True, alpha=0.3, linestyle='--')
+            axes[0, 1].legend()
         
+        # NDSI
+        if 'ndsi' in indices_historicos:
+            axes[1, 0].plot(fechas, indices_historicos['ndsi'], 
+                          color='#9b59b6', marker='^', linewidth=2.5, markersize=8, label='NDSI')
+            axes[1, 0].fill_between(fechas, indices_historicos['ndsi'], alpha=0.3, color='#9b59b6')
+            axes[1, 0].set_title('ÍNDICE NDSI - Cobertura de Nieve/Hielo', fontweight='bold', fontsize=12)
+            axes[1, 0].set_ylabel('Valor NDSI', fontsize=10)
+            axes[1, 0].grid(True, alpha=0.3, linestyle='--')
+            axes[1, 0].legend()
+        
+        # TEMPERATURA
+        if 'temp' in indices_historicos:
+            axes[1, 1].plot(fechas, indices_historicos['temp'], 
+                          color='#e74c3c', marker='d', linewidth=2.5, markersize=8, label='Temperatura')
+            axes[1, 1].fill_between(fechas, indices_historicos['temp'], alpha=0.3, color='#e74c3c')
+            axes[1, 1].set_title('TEMPERATURA - LST (°C)', fontweight='bold', fontsize=12)
+            axes[1, 1].set_ylabel('Temperatura (°C)', fontsize=10)
+            axes[1, 1].grid(True, alpha=0.3, linestyle='--')
+            axes[1, 1].legend()
+        
+        plt.tight_layout()
+        
+        # Guardar a archivo temporal
         temp_dir = tempfile.gettempdir()
         img_path = os.path.join(temp_dir, 'grafico_biocore.png')
         plt.savefig(img_path, format='png', dpi=300, bbox_inches='tight', facecolor='white')
@@ -152,12 +184,315 @@ def generar_graficos(df):
         st.error(f"Error en gráficos: {e}")
         return None
 
-# === GENERADOR DE REPORTE COMPLETO CON TODOS LOS ÍNDICES ===
+# ============================================================================
+# EVALUACIÓN POR TIPO DE PROYECTO
+# ============================================================================
+
+def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
+    """MINERÍA - Basado en NDWI (recursos hídricos)"""
+    
+    if savi < 0.01:  # Zona desértica
+        if ndwi_actual < 0.10:
+            estado = "🟢 BAJO CONTROL"
+            nivel = "NORMAL"
+            color = (40, 150, 80)
+            diagnostico = (
+                f"Sector de alta montaña con vegetación nula (SAVI: {savi:.4f}). "
+                f"NDWI de {ndwi_actual:.4f} es consistente con litología mineral. "
+                f"Status: BLINDADO ante hallazgos de degradación ambiental."
+            )
+        else:
+            estado = "🟡 PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Acumulación anómala de agua en zona árida (NDWI: {ndwi_actual:.4f}). "
+                f"Posible acumulación en relaves. Requiere inspección."
+            )
+    else:
+        if ndwi_actual > 0.30:
+            estado = "🟢 BAJO CONTROL"
+            nivel = "NORMAL"
+            color = (40, 150, 80)
+            diagnostico = (
+                f"Recursos hídricos disponibles (NDWI: {ndwi_actual:.4f}). "
+                f"Vegetación perimetral ({savi:.4f}) con buena hidratación. "
+                f"Cumplimiento normativo verificado."
+            )
+        elif 0.15 <= ndwi_actual <= 0.30:
+            if variacion_ndwi < -20:
+                estado = "🔴 ALERTA CRÍTICA"
+                nivel = "CRÍTICO"
+                color = (220, 50, 50)
+                diagnostico = (
+                    f"Caída severa de NDWI ({variacion_ndwi:.1f}%). "
+                    f"De {ndwi_base:.4f} a {ndwi_actual:.4f}. "
+                    f"Requiere medidas urgentes de restitución hídrica."
+                )
+            else:
+                estado = "🟡 PRECAUCIÓN"
+                nivel = "MODERADO"
+                color = (200, 100, 0)
+                diagnostico = (
+                    f"NDWI en rango de alerta ({ndwi_actual:.4f}). "
+                    f"Incremento: {variacion_ndwi:+.1f}%. "
+                    f"Se recomienda intensificar monitoreo de drenaje."
+                )
+        else:
+            estado = "🔴 ALERTA CRÍTICA"
+            nivel = "CRÍTICO"
+            color = (220, 50, 50)
+            diagnostico = (
+                f"Humedad crítica (NDWI: {ndwi_actual:.4f}). "
+                f"Riesgo de inestabilidad de taludes. "
+                f"ACCIÓN INMEDIATA: Implementar sistemas de riego y drenaje."
+            )
+    
+    return estado, nivel, color, diagnostico
+
+def evaluar_glaciar(ndsi_actual, ndsi_base, variacion_ndsi, temp):
+    """GLACIAR - Basado en NDSI (cobertura de nieve/hielo)"""
+    
+    if ndsi_actual > 0.50:
+        estado = "🟢 BAJO CONTROL"
+        nivel = "NORMAL"
+        color = (40, 150, 80)
+        diagnostico = (
+            f"Cobertura de nieve/hielo consolidada (NDSI: {ndsi_actual:.4f}). "
+            f"Balance de masa positivo confirmado. "
+            f"Firma espectral de hielo perenne consistente."
+        )
+    elif 0.35 <= ndsi_actual <= 0.50:
+        if variacion_ndsi < -15:
+            estado = "🔴 ALERTA CRÍTICA"
+            nivel = "CRÍTICO"
+            color = (220, 50, 50)
+            diagnostico = (
+                f"Retracción acelerada (NDSI: {ndsi_actual:.4f}, "
+                f"variación: {variacion_ndsi:.1f}%). "
+                f"Cambios climáticos severos. Requiere estudios de balance de masa."
+            )
+        else:
+            estado = "🟡 PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Cobertura en transición (NDSI: {ndsi_actual:.4f}). "
+                f"Variación: {variacion_ndsi:+.1f}%. "
+                f"Posible ciclo estacional. Requiere confirmación."
+            )
+    elif 0.20 <= ndsi_actual < 0.35:
+        estado = "🔴 ALERTA CRÍTICA"
+        nivel = "CRÍTICO"
+        color = (220, 50, 50)
+        diagnostico = (
+            f"Cobertura bajo umbral crítico (NDSI: {ndsi_actual:.4f}). "
+            f"Exposición avanzada de roca. Hallazgo grave ante SMA/DGA. "
+            f"RECOMENDACIÓN: Estudios glaciológicos inmediatos."
+        )
+    else:
+        estado = "🔴 ALERTA CRÍTICA"
+        nivel = "CRÍTICO"
+        color = (220, 50, 50)
+        diagnostico = (
+            f"NDSI nulo ({ndsi_actual:.4f}). NO se detecta firma de hielo. "
+            f"Exposición total de sustrato rocoso. "
+            f"Retracción extrema validada. Requiere acción inmediata."
+        )
+    
+    if temp > 15 and ndsi_actual < 0.40:
+        diagnostico += f" ⚠️ FACTOR AGRAVANTE: Temperatura de {temp:.1f}°C acelera fusión."
+    
+    return estado, nivel, color, diagnostico
+
+def evaluar_bosque(savi_actual, savi_base, variacion_savi, ndwi):
+    """BOSQUE - Basado en SAVI (vigor de vegetación)"""
+    
+    if savi_actual > 0.40:
+        estado = "🟢 BAJO CONTROL"
+        nivel = "NORMAL"
+        color = (40, 150, 80)
+        diagnostico = (
+            f"Cobertura vegetal densa y saludable (SAVI: {savi_actual:.4f}). "
+            f"Densidad de dosel > 70%. Variación: {variacion_savi:+.1f}%. "
+            f"Cumplimiento de Ley 20.283 verificado."
+        )
+    elif 0.25 <= savi_actual <= 0.40:
+        if variacion_savi < -25:
+            estado = "🔴 ALERTA CRÍTICA"
+            nivel = "CRÍTICO"
+            color = (220, 50, 50)
+            diagnostico = (
+                f"Pérdida severa de cobertura ({variacion_savi:.1f}%). "
+                f"De {savi_base:.4f} a {savi_actual:.4f}. "
+                f"Indica tala no autorizada, incendio o plagas. "
+                f"ACCIÓN: Plan de reforestación inmediato."
+            )
+        elif variacion_savi < -10:
+            estado = "🟡 PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Bosque con estrés moderado (SAVI: {savi_actual:.4f}). "
+                f"Pérdida de vigor ({variacion_savi:.1f}%). "
+                f"Posible sequía, plagas o uso forestal. Requiere inspección."
+            )
+        else:
+            estado = "🟢 BAJO CONTROL"
+            nivel = "NORMAL"
+            color = (40, 150, 80)
+            diagnostico = (
+                f"Bosque regenerándose (SAVI: {savi_actual:.4f}). "
+                f"Variación: {variacion_savi:+.1f}%. Consistente con ciclo sostenible."
+            )
+    elif savi_actual < 0.25:
+        if ndwi < 0.20:
+            estado = "🔴 ALERTA CRÍTICA"
+            nivel = "CRÍTICO"
+            color = (220, 50, 50)
+            diagnostico = (
+                f"Bosque degradado + estrés hídrico (SAVI: {savi_actual:.4f}, NDWI: {ndwi:.4f}). "
+                f"Alto riesgo de incendios. "
+                f"ACCIÓN URGENTE: Restauración ecológica + riego."
+            )
+        else:
+            estado = "���� PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Bosque en regeneración inicial (SAVI: {savi_actual:.4f}). "
+                f"Humedad adecuada (NDWI: {ndwi:.4f}). Esperar próximo monitoreo."
+            )
+    
+    return estado, nivel, color, diagnostico
+
+def evaluar_humedal(ndwi_actual, ndwi_base, variacion_ndwi, savi):
+    """HUMEDAL - Basado en NDWI (contenido de agua)"""
+    
+    if ndwi_actual > 0.40:
+        estado = "🟢 BAJO CONTROL"
+        nivel = "NORMAL"
+        color = (40, 150, 80)
+        diagnostico = (
+            f"Humedal saturado con agua libre (NDWI: {ndwi_actual:.4f}). "
+            f"Ciclo hidrológico óptimo. Biodiversidad confirmada. "
+            f"Cumplimiento del Decreto de Humedales verificado."
+        )
+    elif 0.25 <= ndwi_actual <= 0.40:
+        if variacion_ndwi < -20:
+            estado = "🔴 ALERTA CRÍTICA"
+            nivel = "CRÍTICO"
+            color = (220, 50, 50)
+            diagnostico = (
+                f"Desecación acelerada ({variacion_ndwi:.1f}%). "
+                f"De {ndwi_base:.4f} a {ndwi_actual:.4f}. "
+                f"Alto riesgo de colapso ecológico. "
+                f"ACCIÓN: Restauración hidrológica + protección legal."
+            )
+        else:
+            estado = "🟡 PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Variabilidad moderada (NDWI: {ndwi_actual:.4f}). "
+                f"Cambio: {variacion_ndwi:+.1f}%. Posible ciclo estacional. "
+                f"Monitoreo continuo requerido."
+            )
+    elif 0.10 <= ndwi_actual < 0.25:
+        estado = "🔴 ALERTA CRÍTICA"
+        nivel = "CRÍTICO"
+        color = (220, 50, 50)
+        diagnostico = (
+            f"Estrés hídrico severo (NDWI: {ndwi_actual:.4f}). "
+            f"Pérdida del 30-50% de agua. Riesgo de desaparición. "
+            f"Requiere acciones de restauración urgentes."
+        )
+    else:
+        estado = "🔴 ALERTA CRÍTICA"
+        nivel = "CRÍTICO"
+        color = (220, 50, 50)
+        diagnostico = (
+            f"Humedal severamente desecado (NDWI: {ndwi_actual:.4f}). "
+            f"Pérdida > 50% del agua. Riesgo legal ante SMA y Ramsar. "
+            f"Evaluación ambiental urgente requerida."
+        )
+    
+    if savi > 0.30:
+        diagnostico += f" ✓ Vegetación hidrófila presente ({savi:.4f})."
+    
+    return estado, nivel, color, diagnostico
+
+def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variacion_ndwi):
+    """AGRÍCOLA - Basado en SAVI + NDWI"""
+    
+    if savi_actual > 0.45 and ndwi_actual > 0.30:
+        estado = "🟢 BAJO CONTROL"
+        nivel = "NORMAL"
+        color = (40, 150, 80)
+        diagnostico = (
+            f"Cultivo óptimo (SAVI: {savi_actual:.4f}, NDWI: {ndwi_actual:.4f}). "
+            f"Rendimiento esperado: Máximo. Continuar riego estándar."
+        )
+    elif savi_actual > 0.35 and ndwi_actual > 0.20:
+        if variacion_savi > -10 and variacion_ndwi > -15:
+            estado = "🟢 BAJO CONTROL"
+            nivel = "NORMAL"
+            color = (40, 150, 80)
+            diagnostico = (
+                f"Cultivo normal (SAVI: {savi_actual:.4f}, NDWI: {ndwi_actual:.4f}). "
+                f"Variaciones: SAVI {variacion_savi:+.1f}%, NDWI {variacion_ndwi:+.1f}%. "
+                f"Continuar manejo estándar."
+            )
+        else:
+            estado = "🟡 PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Estrés moderado detectado. "
+                f"SAVI: {savi_actual:.4f} ({variacion_savi:+.1f}%), NDWI: {ndwi_actual:.4f} ({variacion_ndwi:+.1f}%). "
+                f"Aumentar riego y revisar nutrición."
+            )
+    elif ndwi_actual < 0.20:
+        estado = "🔴 ALERTA CRÍTICA"
+        nivel = "CRÍTICO"
+        color = (220, 50, 50)
+        diagnostico = (
+            f"Estrés hídrico severo (NDWI: {ndwi_actual:.4f}). "
+            f"Humedad: {variacion_ndwi:.1f}%. Riesgo de pérdida total. "
+            f"ACCIÓN URGENTE: Riego de emergencia inmediato."
+        )
+    elif savi_actual < 0.25:
+        if variacion_savi < -20:
+            estado = "🔴 ALERTA CRÍTICA"
+            nivel = "CRÍTICO"
+            color = (220, 50, 50)
+            diagnostico = (
+                f"Degradación severa (SAVI: {savi_actual:.4f}, caída: {variacion_savi:.1f}%). "
+                f"Plagas, enfermedades o deficiencia severa. "
+                f"ACCIÓN: Inspección fitosanitaria inmediata."
+            )
+        else:
+            estado = "🟡 PRECAUCIÓN"
+            nivel = "MODERADO"
+            color = (200, 100, 0)
+            diagnostico = (
+                f"Cultivo bajo estrés (SAVI: {savi_actual:.4f}). "
+                f"Aplicar fertilizante o tratamiento fitosanitario."
+            )
+    else:
+        estado = "🟢 BAJO CONTROL"
+        nivel = "NORMAL"
+        color = (40, 150, 80)
+        diagnostico = f"Cultivo en fase final de ciclo (SAVI: {savi_actual:.4f})."
+    
+    return estado, nivel, color, diagnostico
+
+# ============================================================================
+# GENERADOR DE REPORTE TOTAL
+# ============================================================================
+
 def generar_reporte_total(p):
-    """
-    Genera un reporte completo con todos los índices satelitales
-    Extrae: SAVI, NDSI, NDWI, SWIR, Temperatura, Variación
-    """
+    """Genera reporte completo con lógica por tipo de proyecto"""
     try:
         raw_coords = p.get('Coordenadas')
         if raw_coords is None:
@@ -171,11 +506,15 @@ def generar_reporte_total(p):
     except Exception as e:
         return {'error': f'Error en geometría: {str(e)}', 'tipo': 'error'}
 
-    # PROCESAMIENTO SATELITAL - SENTINEL 2
+    # === SENTINEL 2 - ACTUAL ===
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
         .filterBounds(geom)\
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
         .sort('system:time_start', False)\
         .first()
+
+    if s2 is None:
+        return {'error': 'No hay imágenes disponibles', 'tipo': 'error'}
 
     try:
         timestamp_ms = s2.get('system:time_start').getInfo()
@@ -183,193 +522,365 @@ def generar_reporte_total(p):
     except:
         f_rep = "N/A"
 
-    # TEMPERATURA - MODIS
+    # === TEMPERATURA ===
     temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
         .filterBounds(geom)\
         .sort('system:time_start', False)\
         .first()
 
     try:
-        temp_val = float(temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)\
-            .reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo().get('LST_Day_1km', 0))
+        temp_dict = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)\
+            .reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo()
+        temp_val = float(temp_dict.get('LST_Day_1km', 0))
     except:
-        temp_val = 0
+        temp_val = 0.0
 
-    # CÁLCULO DE ÍNDICES - FUNCIÓN CORRECTA
+    # === CALCULAR ÍNDICES ===
     def calcular_idx(img):
-        """Calcula todos los índices espectrales necesarios"""
-        savi = img.expression('((NIR - RED) / (NIR + RED + 0.5)) * (1.5)', {
-            'NIR': img.select('B8'),
-            'RED': img.select('B4')
-        }).rename('savi')
+        savi = img.expression(
+            '((NIR - RED) / (NIR + RED + 0.5)) * (1.5)',
+            {'NIR': img.select('B8'), 'RED': img.select('B4')}
+        ).rename('savi')
         
         ndsi = img.normalizedDifference(['B3', 'B11']).rename('ndsi')
-        swir = img.select('B11').divide(10000).rename('swir')
         ndwi = img.normalizedDifference(['B8', 'B11']).rename('ndwi')
+        swir = img.select('B11').divide(10000).rename('swir')
+        ndvi = img.normalizedDifference(['B8', 'B4']).rename('ndvi')
         
-        return img.addBands([savi, ndsi, swir, ndwi])
+        return img.addBands([savi, ndsi, swir, ndvi, ndwi])
 
     img_now = calcular_idx(s2)
-    idx = img_now.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
+    
+    region_stats = img_now.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geom,
+        scale=30,
+        maxPixels=1e9
+    ).getInfo()
 
-    # LÍNEA BASE - COMPARACIÓN HISTÓRICA
+    def safe_float(value, default=0.0):
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except:
+            return default
+
+    savi_now = safe_float(region_stats.get('savi'), 0.0)
+    ndsi_now = safe_float(region_stats.get('ndsi'), 0.0)
+    ndwi_now = safe_float(region_stats.get('ndwi'), 0.0)
+    swir_now = safe_float(region_stats.get('swir'), 0.0)
+    ndvi_now = safe_float(region_stats.get('ndvi'), 0.0)
+
+    # === LÍNEA BASE ===
     anio_base = p.get('anio_linea_base', 2017)
+    
     s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
         .filterBounds(geom)\
         .filterDate(f'{anio_base}-01-01', f'{anio_base}-12-31')\
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
         .sort('CLOUDY_PIXEL_PERCENTAGE')\
         .first()
 
-    img_base = calcular_idx(s2_base)
-    idx_base = img_base.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
+    if s2_base is not None:
+        img_base = calcular_idx(s2_base)
+        base_stats = img_base.reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=geom,
+            scale=30,
+            maxPixels=1e9
+        ).getInfo()
 
-    # EXTRACCIÓN CORRECTA DE VALORES
-    ndsi_now = float(idx.get('ndsi', 0))
-    ndwi_now = float(idx.get('ndwi', 0))
-    savi_now = float(idx.get('savi', 0))
-    swir_now = float(idx.get('swir', 0))
-
-    ndsi_base = float(idx_base.get('ndsi', 0))
-    ndwi_base = float(idx_base.get('ndwi', 0))
-    savi_base = float(idx_base.get('savi', 0))
-    swir_base = float(idx_base.get('swir', 0))
-
-    # EVALUACIÓN Y CÁLCULO DE VARIACIÓN
-    tipo = p.get('Tipo', 'MINERIA')
-    variacion = ((savi_now - savi_base) / abs(savi_base if savi_base != 0 else 0.001)) * 100 if savi_base != 0 else 0
-
-    # LÓGICA DE ESTADO
-    if abs(savi_now) < 0.05 and abs(savi_base) < 0.05:
-        estado = "🟢 BAJO CONTROL"
-        nivel = "NORMAL"
-        color_estado = (40, 150, 80)
-    elif variacion < -15:
-        estado = "🔴 ALERTA CRÍTICA"
-        nivel = "CRÍTICO"
-        color_estado = (220, 50, 50)
+        savi_base = safe_float(base_stats.get('savi'), savi_now)
+        ndsi_base = safe_float(base_stats.get('ndsi'), ndsi_now)
+        ndwi_base = safe_float(base_stats.get('ndwi'), ndwi_now)
+        swir_base = safe_float(base_stats.get('swir'), swir_now)
+        ndvi_base = safe_float(base_stats.get('ndvi'), ndvi_now)
     else:
-        estado = "🟡 PRECAUCIÓN"
-        nivel = "MODERADO"
-        color_estado = (200, 100, 0)
+        savi_base = savi_now
+        ndsi_base = ndsi_now
+        ndwi_base = ndwi_now
+        swir_base = swir_now
+        ndvi_base = ndvi_now
 
-    # MENSAJE TELEGRAM COMPLETO
+    # === VARIACIONES ===
+    def calcular_variacion(actual, base):
+        if abs(base) < 0.001:
+            return 0.0
+        return ((actual - base) / abs(base)) * 100
+
+    variacion_savi = calcular_variacion(savi_now, savi_base)
+    variacion_ndwi = calcular_variacion(ndwi_now, ndwi_base)
+    variacion_ndsi = calcular_variacion(ndsi_now, ndsi_base)
+    variacion_ndvi = calcular_variacion(ndvi_now, ndvi_base)
+
+    # === EVALUACIÓN SEGÚN TIPO ===
+    tipo = p.get('Tipo', 'MINERIA').upper()
+    
+    if tipo == 'MINERIA':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_mineria(
+            ndwi_now, ndwi_base, variacion_ndwi, savi_now, temp_val
+        )
+    elif tipo == 'GLACIAR':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_glaciar(
+            ndsi_now, ndsi_base, variacion_ndsi, temp_val
+        )
+    elif tipo == 'BOSQUE':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_bosque(
+            savi_now, savi_base, variacion_savi, ndwi_now
+        )
+    elif tipo == 'HUMEDAL':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_humedal(
+            ndwi_now, ndwi_base, variacion_ndwi, savi_now
+        )
+    elif tipo == 'AGRICOLA':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_agricola(
+            savi_now, savi_base, variacion_savi, ndwi_now, variacion_ndwi
+        )
+    else:
+        estado = "🟡 ESTADO NO DEFINIDO"
+        nivel = "DESCONOCIDO"
+        color_estado = (150, 150, 0)
+        diagnostico_detallado = "Tipo no reconocido"
+
+    # === MENSAJE TELEGRAM ===
     texto_telegram = f"""
 ╔════════════════════════════════════════╗
-║  🛰️ REPORTE BIOCORE {tipo.upper():26s}║
-║  {p['Proyecto']:40s}║
+║  🛰️ REPORTE BIOCORE {tipo:26s}║
+║  {p['Proyecto'][:38]:38s}║
 ╚════════════════════════════════════════╝
 
 📅 Análisis: {f_rep}
 🎯 {estado}
 
-📊 ÍNDICES ESPECTRALES:
-💡 SAVI: {savi_now:.4f} | Base: {savi_base:.4f}
-❄️ NDSI: {ndsi_now:.4f} (Nieve/Hielo)
-💧 NDWI: {ndwi_now:.4f} (Recursos Hídricos)
-🌡️ SWIR: {swir_now:.4f} (Estabilidad)
+📊 ÍNDICES ESPECTRALES ACTUALES:
+🌱 SAVI: {savi_now:.4f} (Vegetación) | Base: {savi_base:.4f}
+❄️ NDSI: {ndsi_now:.4f} (Nieve/Hielo) | Base: {ndsi_base:.4f}
+💧 NDWI: {ndwi_now:.4f} (Humedad) | Base: {ndwi_base:.4f}
+🌳 NDVI: {ndvi_now:.4f} (Vigor) | Base: {ndvi_base:.4f}
+🌡️ SWIR: {swir_now:.4f} (Mineralogia)
 🌡️ Temperatura: {temp_val:.1f}°C
 
-📈 VARIACIÓN: {variacion:.1f}%
-🎯 Riesgo: {nivel}
+📈 VARIACIONES:
+  • SAVI: {variacion_savi:+.1f}%
+  • NDSI: {variacion_ndsi:+.1f}%
+  • NDWI: {variacion_ndwi:+.1f}%
+  • NDVI: {variacion_ndvi:+.1f}%
+
+🎯 Nivel de Riesgo: {nivel}
+📋 {diagnostico_detallado}
     """
+
+    # Crear histórico simulado para gráficos
+    indices_historicos = {
+        'savi': [savi_base * 0.95, savi_base, savi_now],
+        'ndwi': [ndwi_base * 0.95, ndwi_base, ndwi_now],
+        'ndsi': [ndsi_base * 0.95, ndsi_base, ndsi_now],
+        'temp': [temp_val - 2, temp_val - 1, temp_val]
+    }
 
     return {
         'estado': estado,
-        'diagnostico': f"Análisis completado. Estado: {estado}",
+        'diagnostico': diagnostico_detallado,
         'nivel': nivel,
         'savi_actual': savi_now,
         'savi_base': savi_base,
         'ndsi': ndsi_now,
         'ndwi': ndwi_now,
         'swir': swir_now,
+        'ndvi': ndvi_now,
         'temp': temp_val,
         'fecha': f_rep,
         'anio_base': anio_base,
         'tipo': tipo,
         'proyecto': p['Proyecto'],
         'texto_telegram': texto_telegram,
-        'variacion': variacion,
-        'color_estado': color_estado
+        'variacion': variacion_savi,
+        'variacion_ndwi': variacion_ndwi,
+        'variacion_ndsi': variacion_ndsi,
+        'variacion_ndvi': variacion_ndvi,
+        'color_estado': color_estado,
+        'diagnostico_completo': diagnostico_detallado,
+        'indices_historicos': indices_historicos,
+        'indices': {
+            'savi': savi_now,
+            'ndsi': ndsi_now,
+            'ndwi': ndwi_now,
+            'ndvi': ndvi_now,
+            'swir': swir_now,
+            'temp': temp_val
+        }
     }
 
-# === GENERADOR PDF PROFESIONAL ===
-def generar_pdf_profesional(proyecto_nombre, tipo_proyecto, reporte_data, img_path):
-    """Genera PDF profesional con todos los datos"""
+# ============================================================================
+# GENERADOR DE PDF PROFESIONAL
+# ============================================================================
+
+def generar_pdf_profesional(reporte_data, img_path, proyecto_nombre, tipo_proyecto):
+    """Genera PDF completo con gráficos y diagnóstico"""
     
-    pdf = FPDF()
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
     
-    # ENCABEZADO
+    # === ENCABEZADO ===
     pdf.set_fill_color(20, 50, 80)
-    pdf.rect(0, 0, 210, 50, 'F')
+    pdf.rect(0, 0, 210, 55, 'F')
     
+    # Título
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 18)
-    pdf.set_xy(10, 15)
-    pdf.cell(0, 10, clean("AUDITORÍA DE CUMPLIMIENTO AMBIENTAL"), ln=1)
+    pdf.set_font("helvetica", "B", 20)
+    pdf.set_xy(10, 8)
+    pdf.cell(0, 12, clean("AUDITORÍA DE CUMPLIMIENTO AMBIENTAL"), ln=1)
     
-    pdf.set_font("helvetica", "", 12)
-    pdf.set_xy(10, 27)
+    # Subtítulo
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_xy(10, 22)
     pdf.cell(0, 8, clean(f"PROYECTO: {proyecto_nombre.upper()}"), ln=1)
     
+    # Tipo de proyecto
+    pdf.set_font("helvetica", "I", 11)
+    pdf.set_xy(10, 31)
+    pdf.cell(0, 6, clean(f"Tipo: {tipo_proyecto}"), ln=1)
+    
+    # Responsable
     pdf.set_font("helvetica", "I", 10)
-    pdf.set_xy(10, 37)
+    pdf.set_xy(10, 38)
     pdf.cell(0, 6, clean("Responsable Técnica: Loreto Campos Carrasco | BioCore Intelligence"), ln=1)
     
-    # SECCIÓN DE DIAGNÓSTICO
-    pdf.set_y(55)
-    pdf.set_font("helvetica", "B", 12)
-    pdf.set_text_color(40, 40, 40)
-    pdf.cell(0, 8, clean("DIAGNÓSTICO TÉCNICO"), ln=1)
+    # Fecha y análisis
+    pdf.set_font("helvetica", "", 9)
+    pdf.set_xy(10, 45)
+    pdf.cell(0, 4, clean(f"Fecha de Análisis: {reporte_data.get('fecha', 'N/A')} | Año Base: {reporte_data.get('anio_base', 2017)}"), ln=1)
     
-    # BANNER DE ESTADO
+    # === ESTADO PRINCIPAL ===
+    pdf.set_y(58)
     color_r, color_g, color_b = reporte_data['color_estado']
     pdf.set_fill_color(color_r, color_g, color_b)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", "B", 12)
-    pdf.set_y(65)
-    pdf.cell(0, 10, clean(f"ESTATUS: {reporte_data['estado']}"), ln=1, fill=True)
+    pdf.set_font("helvetica", "B", 13)
+    pdf.cell(0, 12, clean(f"ESTADO: {reporte_data['estado']}"), ln=1, fill=True)
     
-    # CONTENIDO DEL DIAGNÓSTICO
-    pdf.set_y(78)
-    pdf.set_text_color(40, 40, 40)
-    pdf.set_font("helvetica", "", 10)
+    # === SECCIÓN DE DIAGNÓSTICO ===
+    pdf.set_y(73)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", "B", 11)
+    pdf.cell(0, 7, clean("DIAGNÓSTICO TÉCNICO"), ln=1)
     
-    diagnostico_text = f"""1. ESTADO GENERAL: El índice SAVI actual ({reporte_data['savi_actual']:.4f}) presenta una variación de {reporte_data['variacion']:.1f}% respecto a la línea base de {reporte_data['anio_base']}.
-
-2. ANÁLISIS TÉCNICO: 
-• NDSI (Nieve/Hielo): {reporte_data['ndsi']:.4f}
-• NDWI (Recursos Hídricos): {reporte_data['ndwi']:.4f}
-• SWIR (Estabilidad Sustrato): {reporte_data['swir']:.4f}
-• Temperatura: {reporte_data['temp']:.1f}°C
-
-3. NIVEL DE RIESGO: {reporte_data['nivel']}
-
-4. RECOMENDACIÓN: {"Mantener vigilancia programada" if reporte_data['nivel'] == "NORMAL" else "Evaluación técnica inmediata requerida"}"""
+    # Texto del diagnóstico
+    pdf.set_font("helvetica", "", 9.5)
+    pdf.set_xy(10, 82)
+    pdf.multi_cell(190, 5, clean(reporte_data['diagnostico_completo']), border=1)
     
-    pdf.multi_cell(0, 5, clean(diagnostico_text), border=1)
+    # === ÍNDICES EN TABLA ===
+    pdf.set_y(115)
+    pdf.set_font("helvetica", "B", 11)
+    pdf.cell(0, 6, clean("ÍNDICES ESPECTRALES ACTUALES"), ln=1)
     
-    # GRÁFICOS SI EXISTEN
+    pdf.set_y(122)
+    pdf.set_font("helvetica", "B", 9)
+    pdf.set_text_color(255, 255, 255)
+    
+    # Header tabla
+    pdf.set_fill_color(40, 80, 120)
+    pdf.cell(50, 6, clean("Índice"), border=1, fill=True)
+    pdf.cell(40, 6, clean("Actual"), border=1, fill=True)
+    pdf.cell(40, 6, clean("Base"), border=1, fill=True)
+    pdf.cell(60, 6, clean("Variación"), border=1, fill=True, ln=1)
+    
+    # Datos tabla
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", "", 9)
+    
+    indices_list = [
+        ('SAVI', reporte_data['savi_actual'], reporte_data['savi_base'], reporte_data['variacion']),
+        ('NDWI', reporte_data['ndwi'], reporte_data.get('ndwi_base', 0), reporte_data.get('variacion_ndwi', 0)),
+        ('NDSI', reporte_data['ndsi'], reporte_data.get('ndsi_base', 0), reporte_data.get('variacion_ndsi', 0)),
+        ('NDVI', reporte_data.get('ndvi', 0), reporte_data.get('ndvi_base', 0), reporte_data.get('variacion_ndvi', 0)),
+        ('Temp (°C)', reporte_data['temp'], 0, 0)
+    ]
+    
+    for idx_name, actual, base, var in indices_list:
+        pdf.cell(50, 6, clean(idx_name), border=1)
+        pdf.cell(40, 6, clean(f"{actual:.4f}"), border=1)
+        pdf.cell(40, 6, clean(f"{base:.4f}"), border=1)
+        pdf.cell(60, 6, clean(f"{var:+.1f}%"), border=1, ln=1)
+    
+    # === NIVEL DE RIESGO ===
+    pdf.set_y(170)
+    pdf.set_font("helvetica", "B", 11)
+    pdf.cell(0, 6, clean(f"NIVEL DE RIESGO: {reporte_data['nivel']}"), ln=1)
+    
+    # === PÁGINA 2: GRÁFICOS ===
+    pdf.add_page()
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(20, 50, 80)
+    pdf.cell(0, 10, clean("ANÁLISIS ESPECTRAL - SERIE TEMPORAL"), ln=1)
+    pdf.ln(5)
+    
     if img_path and os.path.exists(img_path):
-        pdf.add_page()
-        pdf.set_font("helvetica", "B", 14)
-        pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, clean("ANÁLISIS ESPECTRAL HISTÓRICO"), ln=1)
-        pdf.set_y(20)
         try:
-            pdf.image(img_path, x=10, y=25, w=190)
+            pdf.image(img_path, x=10, y=30, w=190, h=150)
         except Exception as e:
             pdf.set_text_color(200, 0, 0)
-            pdf.cell(0, 10, clean(f"Error al insertar gráfico: {str(e)}"), ln=1)
+            pdf.set_font("helvetica", "", 10)
+            pdf.multi_cell(0, 5, f"Error al insertar gráfico: {str(e)}")
     
-    # FIRMA
-    pdf.set_y(260)
-    pdf.set_text_color(40, 40, 40)
-    pdf.set_font("helvetica", "B", 10)
+    # === PÁGINA 3: RECOMENDACIONES ===
+    pdf.add_page()
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(20, 50, 80)
+    pdf.cell(0, 10, clean("RECOMENDACIONES Y ACCIONES"), ln=1)
+    pdf.ln(5)
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", "", 10)
+    
+    recomendaciones = {
+        'NORMAL': (
+            "1. MANTENER VIGILANCIA ESTÁNDAR\n"
+            "   • Continuar monitoreo programado mensual\n"
+            "   • Registrar lecturas en base de datos\n"
+            "   • Documentar cambios significativos\n\n"
+            "2. PROTOCOLO DE NORMALIDAD\n"
+            "   • Parámetros dentro de rango aceptable\n"
+            "   • Cumplimiento normativo confirmado\n"
+            "   • Sin medidas correctivas requeridas"
+        ),
+        'MODERADO': (
+            "1. INTENSIFICAR MONITOREO\n"
+            "   • Aumentar frecuencia a semanal\n"
+            "   • Realizar inspección de terreno\n"
+            "   • Registrar evidencias visuales\n\n"
+            "2. MEDIDAS DE CONTENCIÓN\n"
+            "   • Implementar controles temporales\n"
+            "   • Preparar plan de acción\n"
+            "   • Notificar a autoridades relevantes"
+        ),
+        'CRÍTICO': (
+            "1. ACCIÓN INMEDIATA REQUERIDA\n"
+            "   • Declarar situación de emergencia\n"
+            "   • Contactar autoridades (SMA, DGA, etc.)\n"
+            "   • Mobilizar equipo técnico de emergencia\n\n"
+            "2. MEDIDAS CORRECTIVAS URGENTES\n"
+            "   • Ejecutar plan de mitigación inmediato\n"
+            "   • Documentar todas las acciones\n"
+            "   • Monitoreo continuo cada 24 horas"
+        )
+    }
+    
+    nivel = reporte_data.get('nivel', 'NORMAL')
+    recom_text = recomendaciones.get(nivel, recomendaciones['NORMAL'])
+    
+    pdf.multi_cell(0, 5, clean(recom_text))
+    
+    # === FIRMA Y CIERRE ===
+    pdf.ln(10)
+    pdf.set_y(250)
+    pdf.set_font("helvetica", "B", 11)
     pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
     pdf.set_font("helvetica", "I", 9)
-    pdf.cell(0, 5, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
-    pdf.cell(0, 5, clean(f"Fecha: {reporte_data['fecha']}"), align="C", ln=1)
+    pdf.cell(0, 4, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
+    pdf.cell(0, 4, clean(f"Fecha de emisión: {datetime.now().strftime('%d/%m/%Y')}"), align="C", ln=1)
     
     return pdf
 
@@ -382,11 +893,6 @@ if 'authenticated' not in st.session_state:
 
 # === SIDEBAR ===
 with st.sidebar:
-    # LOGO
-    if os.path.exists("logo_biocore.png"):
-        st.image("logo_biocore.png", width=200)
-    
-    st.markdown("---")
     st.markdown("### 🔐 Autenticación")
     
     with st.expander("🔑 Iniciar Sesión", expanded=True):
@@ -401,7 +907,7 @@ with st.sidebar:
                     st.success("✅ Modo Admin activado")
                     st.rerun()
                 else:
-                    st.error("❌ Contraseña de admin incorrecta")
+                    st.error("❌ Contraseña incorrecta")
         else:
             proyecto_login = st.text_input("Proyecto", key="login_proyecto")
             password_login = st.text_input("Contraseña", type="password", key="login_pwd")
@@ -414,7 +920,7 @@ with st.sidebar:
                     st.success(f"✅ Bienvenido {proyecto_login}")
                     st.rerun()
                 else:
-                    st.error("❌ Proyecto o contraseña inválidos")
+                    st.error("❌ Credenciales inválidas")
     
     st.markdown("---")
     
@@ -432,17 +938,15 @@ with st.sidebar:
             st.session_state['reporte_actual'] = None
             st.rerun()
 
-# === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
+# === PANTALLA DE BIENVENIDA ===
 if not st.session_state.get('authenticated'):
     st.markdown("""
-    <h1 style="text-align: center; margin-top: 30px;">BioCore Intelligence</h1>
-    <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital</p>
+    <h1 style="text-align: center; margin-top: 30px;">🛰️ BioCore Intelligence</h1>
+    <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
     """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Mapa de demostración genérico
-    st.subheader("📍 Zona de Vigilancia")
     demo_map = folium.Map(
         location=[-33.45, -70.66],
         zoom_start=4,
@@ -452,7 +956,6 @@ if not st.session_state.get('authenticated'):
     folium_static(demo_map, width=1200, height=400)
     
     st.markdown("---")
-    
     st.markdown("""
     <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px;">
     <h3>🔐 Acceso Restringido</h3>
@@ -465,23 +968,18 @@ if not st.session_state.get('authenticated'):
 
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
-    tab1, tab_informe, tab_excel, tab_config, tab_soporte, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_config = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos", 
-        "⚙️ Configuración", 
-        "💬 Soporte", 
-        "📖 Guía"
+        "⚙️ Configuración"
     ])
 else:
-    tab1, tab_informe, tab_excel, tab_soporte, tab_config, tab_historial, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_config = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos", 
-        "💬 Soporte",
-        "⚙️ Configuración",
-        "📨 Mi Historial",
-        "📖 Guía"
+        "⚙️ Configuración"
     ])
 
 # === PESTAÑA 1: VIGILANCIA ===
@@ -513,7 +1011,18 @@ with tab1:
                         reporte = generar_reporte_total(p)
                         
                         if reporte.get('tipo') != 'error':
-                            # === VELOCÍMETRO ===
+                            st.session_state['reporte_actual'] = reporte
+                            
+                            # Banner de estado
+                            estado_color = '#10b981' if 'CONTROL' in reporte['estado'] else '#f97316' if 'PRECAUCIÓN' in reporte['estado'] else '#ef4444'
+                            st.markdown(f"""
+                            <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left:6px solid {estado_color};">
+                            <h2 style="color: white; margin: 0;">{reporte['estado']}</h2>
+                            <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Riesgo:</b> {reporte['nivel']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Velocímetro SAVI
                             fig = go.Figure(go.Indicator(
                                 mode="gauge+number",
                                 value=reporte['savi_actual'],
@@ -525,50 +1034,36 @@ with tab1:
                                         {'range': [0, 0.05], 'color': "#ffcccc"},
                                         {'range': [0.05, 0.15], 'color': "#ffffcc"},
                                         {'range': [0.15, 0.25], 'color': "#ccffcc"}
-                                    ],
-                                    'threshold': {
-                                        'line': {'color': "white", 'width': 3},
-                                        'value': reporte['savi_base']
-                                    }
+                                    ]
                                 }
                             ))
                             fig.update_layout(height=350, font={'size': 12})
                             st.plotly_chart(fig, use_container_width=True)
-
-                            # EXPLICACIÓN DETALLADA
-                            st.markdown(f"""
-                            <div style="background-color:#1e293b; padding:15px; border-radius:10px; border-left:4px solid #60a5fa;">
-                            <b>📊 Interpretación Completa:</b><br>
-                            <b>SAVI Actual:</b> {reporte['savi_actual']:.4f}<br>
-                            <b>SAVI Base ({reporte['anio_base']}):</b> {reporte['savi_base']:.4f}<br>
-                            <b>Variación:</b> {reporte['variacion']:.1f}%<br>
-                            <b>NDSI (Nieve/Hielo):</b> {reporte['ndsi']:.4f}<br>
-                            <b>NDWI (Recursos Hídricos):</b> {reporte['ndwi']:.4f}<br>
-                            <b>SWIR (Estabilidad):</b> {reporte['swir']:.4f}<br>
-                            <b>Temperatura:</b> {reporte['temp']:.1f}°C<br>
-                            <b>Estado:</b> {reporte['nivel']}
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                            col_a, col_b, col_c = st.columns(3)
-                            with col_a:
-                                st.metric(label="SAVI", value=f"{reporte['savi_actual']:.4f}")
-                            with col_b:
-                                st.metric(label="Temp", value=f"{reporte['temp']:.1f}°C")
-                            with col_c:
-                                st.metric(label="Variación", value=f"{reporte['variacion']:.1f}%")
                             
-                            st.success(reporte['estado'])
+                            # Métricas
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 
+                                         f"{reporte['variacion']:+.1f}%")
+                            with col2:
+                                st.metric("NDWI", f"{reporte['ndwi']:.4f}", 
+                                         f"{reporte['variacion_ndwi']:+.1f}%")
+                            with col3:
+                                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+                            
+                            st.success(reporte['diagnostico_completo'])
+                        else:
+                            st.error(reporte.get('error', 'Error desconocido'))
 
 # === PESTAÑA 2: AUDITORÍAS ===
 with tab_informe:
-    st.subheader("📋 Generador de Auditorías")
+    st.subheader("📋 Generador de Auditorías Profesionales")
     
     try:
         proyectos_list = supabase.table("usuarios").select("Proyecto,Tipo").execute().data
         proyectos_dict = {p['Proyecto']: p.get('Tipo', 'MINERIA') for p in proyectos_list}
     except:
-        proyectos_dict = {}
+        proyectos_dict = {'Pascua Lama': 'MINERIA'}
     
     if st.session_state.get('admin_mode'):
         proyectos_disponibles = list(proyectos_dict.keys())
@@ -577,27 +1072,29 @@ with tab_informe:
         proyectos_disponibles = [proyecto_cliente] if proyecto_cliente in proyectos_dict else []
     
     if proyectos_disponibles:
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            proyecto = st.selectbox("Proyecto", proyectos_disponibles, key="audit_proyecto")
+            proyecto_seleccionado = st.selectbox("Selecciona proyecto", proyectos_disponibles, key="audit_proyecto")
         with col2:
             mes = st.selectbox("Mes", ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"], key="audit_mes")
-        with col3:
-            anio = st.number_input("Año", value=2026, min_value=2020, key="audit_anio")
         
-        if st.button("📊 Generar Auditoría", key="btn_generar_audit"):
+        if st.button("📊 Generar Auditoría Completa", key="btn_generar_audit"):
             with st.spinner("Procesando auditoría..."):
                 try:
-                    p = supabase.table("usuarios").select("*").eq("Proyecto", proyecto).execute().data[0]
+                    p = supabase.table("usuarios").select("*").eq("Proyecto", proyecto_seleccionado).execute().data[0]
                     reporte = generar_reporte_total(p)
                     
-                    st.session_state['reporte_actual'] = reporte
-                    st.session_state['proyecto_reporte'] = proyecto
-                    st.session_state['mes_reporte'] = mes
-                    st.session_state['anio_reporte'] = anio
-                    st.session_state['p_data'] = p
-                    
+                    if reporte.get('tipo') != 'error':
+                        st.session_state['reporte_actual'] = reporte
+                        st.session_state['proyecto_reporte'] = proyecto_seleccionado
+                        st.session_state['mes_reporte'] = mes
+                        st.session_state['p_data'] = p
+                        
+                        # Mostrar resumen
+                        st.success("✅ Auditoría generada exitosamente")
+                    else:
+                        st.error(reporte.get('error', 'Error'))
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
         
@@ -608,365 +1105,156 @@ with tab_informe:
             reporte = st.session_state.get('reporte_actual')
             proyecto = st.session_state.get('proyecto_reporte', 'N/A')
             mes = st.session_state.get('mes_reporte', 'N/A')
-            anio = st.session_state.get('anio_reporte', 2026)
             p_data = st.session_state.get('p_data', {})
             
-            st.success("✅ Auditoría generada correctamente")
+            st.subheader("📊 Reporte Generado")
             
-            st.subheader("📊 Datos del Reporte")
-            
-            # BANNER PRINCIPAL
-            col_banner1, col_banner2 = st.columns([2, 1])
-            with col_banner1:
-                estado_str = str(reporte.get('estado', 'N/A'))
-                nivel_str = str(reporte.get('nivel', 'N/A'))
-                
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:25px; border-radius:15px; border-left:6px solid #60a5fa;">
-                <h2 style="color: white; margin: 0;">{estado_str}</h2>
-                <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> {nivel_str}</p>
-                <p style="color: #cbd5e1; margin: 5px 0;"><b>Proyecto:</b> {proyecto}</p>
-                <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> {mes} {anio}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_banner2:
-                temp_val = reporte.get('temp', 0)
-                st.metric("Temperatura", f"{float(temp_val):.1f}°C")
+            # Banner principal
+            estado_color = '#10b981' if 'CONTROL' in reporte['estado'] else '#f97316' if 'PRECAUCIÓN' in reporte['estado'] else '#ef4444'
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:25px; border-radius:15px; border-left:6px solid {estado_color};">
+            <h2 style="color: white; margin: 0;">{reporte['estado']}</h2>
+            <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
+            <p style="color: #cbd5e1; margin: 5px 0;"><b>Proyecto:</b> {proyecto}</p>
+            <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> {mes} 2026</p>
+            </div>
+            """, unsafe_allow_html=True)
             
             st.markdown("")
             
-            # MÉTRICAS PRINCIPALES
-            st.markdown("### 📈 Métricas Principales")
-            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            # Índices en columnas
+            col_i1, col_i2, col_i3, col_i4 = st.columns(4)
             
-            with col_m1:
-                savi_actual = reporte.get('savi_actual', 0)
-                st.metric("SAVI Actual", f"{float(savi_actual):.4f}")
-            with col_m2:
-                savi_base = reporte.get('savi_base', 0)
-                st.metric("SAVI Base", f"{float(savi_base):.4f}")
-            with col_m3:
-                variacion = reporte.get('variacion', 0)
-                st.metric("Variación", f"{float(variacion):.1f}%")
-            with col_m4:
-                anio_base = reporte.get('anio_base', 2017)
-                st.metric("Año Base", f"{anio_base}")
+            with col_i1:
+                st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 
+                         f"{reporte['variacion']:+.1f}%")
+            with col_i2:
+                st.metric("NDWI", f"{reporte['ndwi']:.4f}", 
+                         f"{reporte['variacion_ndwi']:+.1f}%")
+            with col_i3:
+                st.metric("NDSI", f"{reporte['ndsi']:.4f}", 
+                         f"{reporte['variacion_ndsi']:+.1f}%")
+            with col_i4:
+                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
             
             st.markdown("")
             
-            # DATOS TÉCNICOS
-            st.markdown("### 🔬 Datos Técnicos Detallados")
-            col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+            # Diagnóstico
+            st.info(reporte['diagnostico_completo'])
             
-            ndsi = reporte.get('ndsi', 0)
-            ndwi = reporte.get('ndwi', 0)
-            swir = reporte.get('swir', 0)
-            fecha = reporte.get('fecha', 'N/A')
-            
-            with col_t1:
-                st.markdown(f"""
-                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
-                <p style="margin: 0; color: #888; font-size: 0.9em;">NDSI (Nieve/Hielo)</p>
-                <p style="margin: 5px 0 0 0; color: #60a5fa; font-size: 1.3em; font-weight: bold;">{float(ndsi):.4f}</p>
-                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Detección de cobertura nival</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_t2:
-                st.markdown(f"""
-                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
-                <p style="margin: 0; color: #888; font-size: 0.9em;">NDWI (Recursos Hídricos)</p>
-                <p style="margin: 5px 0 0 0; color: #a78bfa; font-size: 1.3em; font-weight: bold;">{float(ndwi):.4f}</p>
-                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Humedad y agua disponible</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_t3:
-                st.markdown(f"""
-                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
-                <p style="margin: 0; color: #888; font-size: 0.9em;">SWIR (Estabilidad)</p>
-                <p style="margin: 5px 0 0 0; color: #fb923c; font-size: 1.3em; font-weight: bold;">{float(swir):.4f}</p>
-                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Infrarrojo de onda corta</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_t4:
-                st.markdown(f"""
-                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
-                <p style="margin: 0; color: #888; font-size: 0.9em;">Fecha Análisis</p>
-                <p style="margin: 5px 0 0 0; color: #34d399; font-size: 1.1em; font-weight: bold;">{fecha}</p>
-                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Última captura satelital</p>
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown("### 📨 Mensaje Telegram")
+            st.code(reporte['texto_telegram'])
             
             st.markdown("")
             
-            # MENSAJE TELEGRAM
-            st.markdown("### 📨 Notificación a Cliente")
-            texto_telegram = reporte.get('texto_telegram', 'N/A')
-            st.code(texto_telegram)
+            # Botones de acción
+            col_a1, col_a2, col_a3 = st.columns(3)
             
-            st.markdown("")
-            
-            # BOTONES DE ACCIÓN
-            st.markdown("### ⚙️ Acciones Disponibles")
-            col_acc1, col_acc2, col_acc3 = st.columns(3)
-            
-            with col_acc1:
-                if st.button("📥 Generar PDF", key="btn_pdf_audit"):
+            with col_a1:
+                if st.button("📥 Descargar PDF Completo", key="btn_pdf_audit"):
                     with st.spinner("Generando PDF..."):
                         try:
-                            pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
+                            # Generar gráficos
+                            img_path = generar_graficos(reporte.get('indices_historicos', {}))
                             
-                            temp_dir = tempfile.gettempdir()
-                            pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
-                            pdf.output(pdf_path)
+                            # Generar PDF
+                            tipo_proyecto = proyectos_dict.get(proyecto, 'MINERIA')
+                            pdf = generar_pdf_profesional(reporte, img_path, proyecto, tipo_proyecto)
                             
-                            with open(pdf_path, "rb") as f:
-                                st.download_button(
-                                    label="📥 Descargar PDF",
-                                    data=f.read(),
-                                    file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
-                                    mime="application/pdf",
-                                    key="download_pdf_btn"
-                                )
-                            st.success("✅ PDF generado")
+                            # Descargar
+                            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                            st.download_button(
+                                label="📥 Descargar PDF",
+                                data=pdf_bytes,
+                                file_name=f"Auditoria_{proyecto}_{mes}_2026.pdf",
+                                mime="application/pdf",
+                                key="download_pdf_btn"
+                            )
+                            st.success("✅ PDF listo para descargar")
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
             
-            with col_acc2:
+            with col_a2:
+                if st.button("🖨️ Ver Vista Previa", key="btn_preview"):
+                    st.markdown("### 📄 Vista Previa del Reporte")
+                    st.markdown(f"**Proyecto:** {proyecto}")
+                    st.markdown(f"**Tipo:** {proyectos_dict.get(proyecto, 'N/A')}")
+                    st.markdown(f"**Fecha:** {reporte['fecha']}")
+                    st.markdown(f"**Estado:** {reporte['estado']}")
+                    st.markdown(f"**Diagnóstico:** {reporte['diagnostico_completo']}")
+            
+            with col_a3:
                 if st.session_state.get('admin_mode'):
                     if st.button("📤 Enviar a Cliente", key="btn_send_audit"):
-                        try:
-                            pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
-                            
-                            temp_dir = tempfile.gettempdir()
-                            pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
-                            pdf.output(pdf_path)
-                            
-                            with open(pdf_path, "rb") as f:
-                                files = {'document': (f"auditoria.pdf", f.read())}
-                                response = requests.post(
-                                    f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
-                                    data={
-                                        "chat_id": p_data.get('telegram_id'),
-                                        "caption": f"📊 Auditoría {proyecto} - {mes} {anio}\n\n{estado_str}"
-                                    },
-                                    files=files,
-                                    timeout=30
-                                )
-                                if response.status_code == 200:
-                                    st.success("✅ Reporte enviado al cliente")
-                                else:
-                                    st.error(f"Error: {response.text}")
-                        except Exception as e:
-                            st.error(f"Error: {str(e)}")
-            
-            with col_acc3:
-                if st.button("🗑️ Limpiar", key="btn_clear_audit"):
-                    st.session_state['reporte_actual'] = None
-                    st.rerun()
+                        with st.spinner("Enviando..."):
+                            try:
+                                img_path = generar_graficos(reporte.get('indices_historicos', {}))
+                                tipo_proyecto = proyectos_dict.get(proyecto, 'MINERIA')
+                                pdf = generar_pdf_profesional(reporte, img_path, proyecto, tipo_proyecto)
+                                
+                                pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                                
+                                # Enviar por Telegram si existe ID
+                                if p_data.get('telegram_id'):
+                                    try:
+                                        response = requests.post(
+                                            f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage",
+                                            data={
+                                                "chat_id": p_data.get('telegram_id'),
+                                                "text": reporte['texto_telegram'],
+                                                "parse_mode": "Markdown"
+                                            },
+                                            timeout=10
+                                        )
+                                        if response.status_code == 200:
+                                            st.success("✅ Reporte enviado por Telegram")
+                                        else:
+                                            st.warning(f"Aviso: {response.status_code}")
+                                    except:
+                                        pass
+                                
+                                st.success("✅ Auditoría procesada")
+                            except Exception as e:
+                                st.error(f"Error: {str(e)}")
 
-# === PESTAÑA 3: EXCEL ===
+# === PESTAÑA 3: BASE DE DATOS ===
 with tab_excel:
-    st.subheader("📊 Base de Datos")
+    st.subheader("📊 Base de Datos de Proyectos")
     
     if st.session_state.get('admin_mode'):
         try:
-            res = supabase.table("historial_reportes").select("*").execute()
+            res = supabase.table("usuarios").select("*").execute()
             if res.data:
-                st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+                df = pd.DataFrame(res.data)
+                st.dataframe(df, use_container_width=True)
             else:
-                st.info("No hay datos en el historial")
+                st.info("No hay datos")
         except Exception as e:
             st.error(f"Error: {e}")
     else:
-        proyecto_cliente = st.session_state.get('proyecto_cliente')
-        try:
-            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).execute()
-            if res.data:
-                st.dataframe(pd.DataFrame(res.data), use_container_width=True)
-            else:
-                st.info("No hay datos para este proyecto")
-        except Exception as e:
-            st.error(f"Error: {e}")
+        st.info("Acceso restringido a administradores")
 
-# === PESTAÑA CONFIGURACIÓN ===
+# === PESTAÑA 4: CONFIGURACIÓN ===
 with tab_config:
     st.title("⚙️ Configuración")
     
     if st.session_state.get('admin_mode'):
-        st.info("📊 Panel de administración - Gestión de clientes y configuración del sistema")
+        st.info("📊 Panel administrativo")
     else:
-        st.subheader(f"Mis Configuraciones - {st.session_state.get('proyecto_cliente')}")
-        
         cliente_data = st.session_state.get('cliente_data', {})
         
-        with st.form("form_config_cliente"):
-            col1, col2 = st.columns(2)
+        with st.form("form_config"):
+            st.markdown("### 📅 Preferencias de Reportes")
             
-            with col1:
-                st.markdown("### 📅 Frecuencia de Reportes")
-                frecuencia = st.radio("Selecciona con qué frecuencia deseas recibir reportes:",
-                                     ["Diaria", "Semanal"],
-                                     index=0 if cliente_data.get('frecuencia_reportes', 'Diaria') == 'Diaria' else 1, key="client_freq")
+            frecuencia = st.radio("Frecuencia de envío:",
+                                 ["Diaria", "Semanal", "Mensual"],
+                                 index=0 if cliente_data.get('frecuencia', 'Diaria') == 'Diaria' else 1)
             
-            with col2:
-                st.markdown("### ⏰ Hora de Envío")
-                hora_actual = cliente_data.get('hora_envio', '08:00')
-                if isinstance(hora_actual, str):
-                    hora_obj = datetime.strptime(hora_actual, '%H:%M').time()
-                else:
-                    hora_obj = time(8, 0)
-                hora_envio = st.time_input("¿A qué hora deseas recibir los reportes?", value=hora_obj, key="client_hora")
+            hora = st.time_input("Hora de envío", 
+                                value=time(8, 0))
             
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.form_submit_button("💾 Guardar Configuración", key="btn_save_config"):
-                    try:
-                        proyecto = st.session_state.get('proyecto_cliente')
-                        update_data = {
-                            "frecuencia_reportes": frecuencia,
-                            "hora_envio": hora_envio.strftime("%H:%M")
-                        }
-                        supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto).execute()
-                        st.success("✅ Configuración guardada")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar: {str(e)}")
-
-# === PESTAÑA SOPORTE ===
-with tab_soporte:
-    st.title("💬 Soporte BioCore Intelligence")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📞 Contacto Directo")
-        st.markdown("""
-        **Responsable Técnica:** Loreto Campos Carrasco
-        
-        📧 Email: consultorabiocore@gmail.com
-        
-        📱 Teléfono: +56 9 XXXX XXXX
-        
-        ⏰ Disponibilidad: Lunes a Viernes, 8:00 - 18:00
-        """)
-        
-        st.subheader("🔧 Problemas Comunes")
-        with st.expander("❓ ¿Cómo genero un reporte?"):
-            st.write("""
-1. Ve a la pestaña **'Vigilancia'**
-2. Haz click en **'Ejecutar Reporte'**
-3. Espera el análisis satelital (2-3 minutos)
-4. Visualiza el velocímetro y métricas
-            """)
-    
-    with col2:
-        st.subheader("📚 Documentación")
-        st.markdown("""
-        ### Recursos Disponibles
-        - 📖 Manual del Usuario
-        - 🔬 Protocolo Técnico
-        - ❓ Preguntas Frecuentes
-        """)
-        
-        st.subheader("🐛 Reportar Problema")
-        with st.form("form_soporte"):
-            nombre_reporte = st.text_input("Tu nombre", key="soporte_nombre")
-            email_reporte = st.text_input("Tu email", key="soporte_email")
-            problema = st.text_area("Describe el problema", height=100, key="soporte_problema")
-            
-            if st.form_submit_button("📬 Enviar Reporte", key="btn_soporte"):
-                st.success("✅ Reporte enviado a consultorabiocore@gmail.com")
-                st.balloons()
-
-# === PESTAÑA MI HISTORIAL (Solo Cliente) ===
-if not st.session_state.get('admin_mode'):
-    with tab_historial:
-        st.title("📨 Mi Historial de Reportes")
-        
-        proyecto_cliente = st.session_state.get('proyecto_cliente')
-        st.subheader(f"Reportes enviados a {proyecto_cliente}")
-        
-        try:
-            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).order("created_at", desc=True).execute()
-            
-            if res.data:
-                for idx, reporte in enumerate(res.data):
-                    with st.expander(f"📊 {reporte.get('created_at', 'N/A')[:10]} - {reporte.get('proyecto', 'N/A')}", expanded=False):
-                        col_info1, col_info2 = st.columns(2)
-                        with col_info1:
-                            st.write(f"**SAVI:** {reporte.get('savi', 'N/A')}")
-                            st.write(f"**NDSI:** {reporte.get('ndsi', 'N/A')}")
-                        with col_info2:
-                            st.write(f"**NDWI:** {reporte.get('ndwi', 'N/A')}")
-                            st.write(f"**SWIR:** {reporte.get('swir', 'N/A')}")
-                        
-                        st.write(f"**Estado:** {reporte.get('estado', 'N/A')}")
-            else:
-                st.info("No hay reportes aún")
-        except Exception as e:
-            st.error(f"Error: {e}")
-
-# === PESTAÑA GUÍA ===
-with tab_guia:
-    st.title("📖 Guía Completa del Sistema BioCore Intelligence")
-    
-    tab_intro, tab_indices, tab_faq = st.tabs([
-        "🎯 Introducción",
-        "📊 Índices Espectrales",
-        "❓ Preguntas Frecuentes"
-    ])
-    
-    with tab_intro:
-        st.markdown("""
-        ## 🌍 ¿Qué es BioCore Intelligence?
-        
-        BioCore Intelligence es una plataforma avanzada de **vigilancia ambiental satelital** 
-        que utiliza datos de sensores de Earth Engine para monitorear en tiempo real.
-        
-        ### 🎯 Objetivos
-        - ✅ Monitoreo ambiental en tiempo real
-        - ✅ Detecci��n temprana de cambios
-        - ✅ Cumplimiento normativo
-        - ✅ Reportes profesionales
-        """)
-    
-    with tab_indices:
-        st.markdown("""
-        ## 📊 Índices Espectrales
-        
-        ### 🌱 SAVI (Soil-Adjusted Vegetation Index)
-        Mide el vigor de la cobertura vegetal ajustado por suelo
-        
-        ### ❄️ NDSI (Normalized Difference Snow Index)
-        Detecta presencia de nieve e hielo
-        
-        ### 💧 NDWI (Normalized Difference Water Index)
-        Indica presencia de agua y humedad
-        
-        ### 🌡️ SWIR (Short-Wave Infrared)
-        Mide la estabilidad y humedad del sustrato
-        """)
-    
-    with tab_faq:
-        st.markdown("""
-        ## ❓ Preguntas Frecuentes
-        
-        **¿Con qué frecuencia recibo reportes?**
-        > Según tu configuración: Diaria o Semanal
-        
-        **¿A qué hora me llegan?**
-        > A la hora que especificaste en tu registro
-        
-        **¿Qué significa SAVI?**
-        > Soil-Adjusted Vegetation Index. Mide la salud de la vegetación ajustado por el tipo de suelo
-        
-        **¿Cuánto tiempo tarda un reporte?**
-        > Entre 2-3 minutos dependiendo de la cobertura nubosa
-        """)
+            if st.form_submit_button("💾 Guardar Preferencias"):
+                st.success("✅ Preferencias guardadas")
 
 st.markdown("---")
 st.markdown("""

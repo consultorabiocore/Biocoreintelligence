@@ -147,9 +147,6 @@ def obtener_coordenadas_correctamente(p):
     raise ValueError(f'Formato no reconocido: {type(raw_coords)}')
 
 # ============================================================================
-# MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO
-# ===========================================================================
-# ============================================================================
 # MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO (EXPANDIDO)
 # ============================================================================
 
@@ -249,7 +246,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 ⚠️ RIESGO CLIMÁTICO:
 └ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin focos activos' if incendios == 0 else f'🔴 {incendios} focos detectados'}
 
-═══════════════════════════════════════════════════════════════"""
+═════════════════════════════════════���═════════════════════════"""
 
     elif tipo == 'BOSQUE':
         diagnostico = f"""
@@ -392,285 +389,6 @@ def agregar_datos_sar_y_fuegos(reporte_base, geom):
 
 
 # ============================================================================
-# ACTUALIZAR: generar_reporte_total PARA INCLUIR SAR Y FUEGOS
-# ============================================================================
-
-def generar_reporte_total(p):
-    """Genera reporte completo con SAR, MODIS Fire y guarda en Supabase"""
-    try:
-        raw_coords = obtener_coordenadas_correctamente(p)
-        
-        if not raw_coords or len(raw_coords) == 0:
-            return {
-                'error': 'Coordenadas vacías después de parseo',
-                'tipo': 'error'
-            }
-
-        if not isinstance(raw_coords[0], (list, tuple)):
-            return {
-                'error': 'Formato de coordenadas inválido',
-                'tipo': 'error'
-            }
-        
-        geom = ee.Geometry.Polygon(raw_coords)
-
-    except Exception as e:
-        return {
-            'error': f'Error en geometría: {str(e)}',
-            'tipo': 'error'
-        }
-
-    # === SENTINEL 2 - ACTUAL ===
-    try:
-        s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-            .filterBounds(geom)\
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
-            .sort('system:time_start', False)\
-            .first()
-
-        if s2 is None:
-            return {
-                'error': 'No hay imágenes Sentinel-2 disponibles',
-                'tipo': 'error'
-            }
-
-        timestamp_ms = s2.get('system:time_start').getInfo()
-        f_rep = datetime.fromtimestamp(timestamp_ms/1000).strftime('%d/%m/%Y') if timestamp_ms else "N/A"
-    except Exception as e:
-        return {
-            'error': f'Error obteniendo imágenes: {str(e)}',
-            'tipo': 'error'
-        }
-
-    # === TEMPERATURA ===
-    try:
-        temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
-            .filterBounds(geom)\
-            .sort('system:time_start', False)\
-            .first()
-
-        temp_dict = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)\
-            .reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo()
-        temp_val = float(temp_dict.get('LST_Day_1km', 0))
-    except:
-        temp_val = 0.0
-
-    # === CALCULAR ÍNDICES ===
-    def calcular_idx(img):
-        savi = img.expression(
-            '((NIR - RED) / (NIR + RED + 0.5)) * (1.5)',
-            {'NIR': img.select('B8'), 'RED': img.select('B4')}
-        ).rename('savi')
-        
-        ndsi = img.normalizedDifference(['B3', 'B11']).rename('ndsi')
-        ndwi = img.normalizedDifference(['B8', 'B11']).rename('ndwi')
-        swir = img.select('B11').divide(10000).rename('swir')
-        ndvi = img.normalizedDifference(['B8', 'B4']).rename('ndvi')
-        
-        # Agregar índice de arcillas para SU-6
-        clay = img.select('B11').divide(img.select('B12').add(0.0001)).rename('clay')
-        
-        return img.addBands([savi, ndsi, swir, ndvi, ndwi, clay])
-
-    try:
-        img_now = calcular_idx(s2)
-        
-        region_stats = img_now.reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=geom,
-            scale=30,
-            maxPixels=1e9
-        ).getInfo()
-
-        def safe_float(value, default=0.0):
-            if value is None:
-                return default
-            try:
-                return float(value)
-            except:
-                return default
-
-        savi_now = safe_float(region_stats.get('savi'), 0.0)
-        ndsi_now = safe_float(region_stats.get('ndsi'), 0.0)
-        ndwi_now = safe_float(region_stats.get('ndwi'), 0.0)
-        swir_now = safe_float(region_stats.get('swir'), 0.0)
-        ndvi_now = safe_float(region_stats.get('ndvi'), 0.0)
-        clay_now = safe_float(region_stats.get('clay'), 0.0)
-
-    except Exception as e:
-        return {
-            'error': f'Error calculando índices: {str(e)}',
-            'tipo': 'error'
-        }
-
-    # === LÍNEA BASE ===
-    anio_base = p.get('ano_linea_base', 2017)
-    
-    try:
-        s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-            .filterBounds(geom)\
-            .filterDate(f'{anio_base}-01-01', f'{anio_base}-12-31')\
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
-            .sort('CLOUDY_PIXEL_PERCENTAGE')\
-            .first()
-
-        if s2_base is not None:
-            img_base = calcular_idx(s2_base)
-            base_stats = img_base.reduceRegion(
-                reducer=ee.Reducer.mean(),
-                geometry=geom,
-                scale=30,
-                maxPixels=1e9
-            ).getInfo()
-
-            savi_base = safe_float(base_stats.get('savi'), savi_now)
-            ndsi_base = safe_float(base_stats.get('ndsi'), ndsi_now)
-            ndwi_base = safe_float(base_stats.get('ndwi'), ndwi_now)
-            swir_base = safe_float(base_stats.get('swir'), swir_now)
-            ndvi_base = safe_float(base_stats.get('ndvi'), ndvi_now)
-            clay_base = safe_float(base_stats.get('clay'), clay_now)
-        else:
-            savi_base = savi_now
-            ndsi_base = ndsi_now
-            ndwi_base = ndwi_now
-            swir_base = swir_now
-            ndvi_base = ndvi_now
-            clay_base = clay_now
-    except:
-        savi_base = savi_now
-        ndsi_base = ndsi_now
-        ndwi_base = ndwi_now
-        swir_base = swir_now
-        ndvi_base = ndvi_now
-        clay_base = clay_now
-
-    # === VARIACIONES ===
-    def calcular_variacion(actual, base):
-        if abs(base) < 0.001:
-            return 0.0
-        return ((actual - base) / abs(base)) * 100
-
-    variacion_savi = calcular_variacion(savi_now, savi_base)
-    variacion_ndwi = calcular_variacion(ndwi_now, ndwi_base)
-    variacion_ndsi = calcular_variacion(ndsi_now, ndsi_base)
-    variacion_ndvi = calcular_variacion(ndvi_now, ndvi_base)
-
-    # === EVALUACIÓN SEGÚN TIPO ===
-    tipo = p.get('Tipo', 'MINERIA').upper()
-    
-    if tipo == 'MINERIA':
-        estado, nivel, color_estado, diagnostico_detallado = evaluar_mineria(
-            ndwi_now, ndwi_base, variacion_ndwi, savi_now, temp_val
-        )
-    elif tipo == 'GLACIAR':
-        estado, nivel, color_estado, diagnostico_detallado = evaluar_glaciar(
-            ndsi_now, ndsi_base, variacion_ndsi, temp_val
-        )
-    elif tipo == 'BOSQUE':
-        estado, nivel, color_estado, diagnostico_detallado = evaluar_bosque(
-            savi_now, savi_base, variacion_savi, ndwi_now
-        )
-    elif tipo == 'HUMEDAL':
-        estado, nivel, color_estado, diagnostico_detallado = evaluar_humedal(
-            ndwi_now, ndwi_base, variacion_ndwi, savi_now
-        )
-    elif tipo == 'AGRICOLA':
-        estado, nivel, color_estado, diagnostico_detallado = evaluar_agricola(
-            savi_now, savi_base, variacion_savi, ndwi_now, variacion_ndwi
-        )
-    else:
-        estado = "🟡 ESTADO NO DEFINIDO"
-        nivel = "DESCONOCIDO"
-        color_estado = (150, 150, 0)
-        diagnostico_detallado = "Tipo de proyecto no reconocido"
-
-    # Crear histórico para gráficos
-    indices_historicos = {
-        'savi': [savi_base * 0.95, savi_base, savi_now],
-        'ndwi': [ndwi_base * 0.95, ndwi_base, ndwi_now],
-        'ndsi': [ndsi_base * 0.95, ndsi_base, ndsi_now],
-        'ndvi': [ndvi_base * 0.95, ndvi_base, ndvi_now],
-        'temp': [temp_val - 2, temp_val - 1, temp_val]
-    }
-
-    # Construir reporte base
-    reporte_completo = {
-        'estado': estado,
-        'diagnostico': diagnostico_detallado,
-        'nivel': nivel,
-        'savi_actual': savi_now,
-        'savi_base': savi_base,
-        'ndsi': ndsi_now,
-        'ndsi_base': ndsi_base,
-        'ndwi': ndwi_now,
-        'ndwi_base': ndwi_base,
-        'swir': swir_now,
-        'ndvi': ndvi_now,
-        'ndvi_base': ndvi_base,
-        'clay': clay_now,
-        'temp': temp_val,
-        'fecha': f_rep,
-        'anio_base': anio_base,
-        'tipo': tipo,
-        'proyecto': p['Proyecto'],
-        'variacion': variacion_savi,
-        'variacion_ndwi': variacion_ndwi,
-        'variacion_ndsi': variacion_ndsi,
-        'variacion_ndvi': variacion_ndvi,
-        'color_estado': color_estado,
-        'diagnostico_completo': diagnostico_detallado,
-        'indices_historicos': indices_historicos,
-        'indices': {
-            'savi': savi_now,
-            'ndsi': ndsi_now,
-            'ndwi': ndwi_now,
-            'ndvi': ndvi_now,
-            'swir': swir_now,
-            'clay': clay_now,
-            'temp': temp_val
-        }
-    }
-
-    # === AGREGAR DATOS DE SAR Y FUEGOS ===
-    reporte_completo = agregar_datos_sar_y_fuegos(reporte_completo, geom)
-
-    # === GUARDAR EN SUPABASE ===
-    try:
-        registro = {
-            'proyecto': p.get('Proyecto'),
-            'tipo': tipo,
-            'fecha_analisis': f_rep,
-            'savi_actual': float(savi_now),
-            'savi_base': float(savi_base),
-            'ndwi_actual': float(ndwi_now),
-            'ndwi_base': float(ndwi_base),
-            'ndsi_actual': float(ndsi_now),
-            'ndsi_base': float(ndsi_base),
-            'ndvi_actual': float(ndvi_now),
-            'ndvi_base': float(ndvi_base),
-            'swir': float(swir_now),
-            'clay': float(clay_now),
-            'sar_vv': float(reporte_completo.get('sar_vv', 0)),
-            'incendios': int(reporte_completo.get('incendios_activos', 0)),
-            'temperatura': float(temp_val),
-            'variacion_savi': float(variacion_savi),
-            'variacion_ndwi': float(variacion_ndwi),
-            'variacion_ndsi': float(variacion_ndsi),
-            'variacion_ndvi': float(variacion_ndvi),
-            'estado': estado,
-            'nivel': nivel,
-            'diagnostico': diagnostico_detallado,
-            'ano_linea_base': int(anio_base),
-            'created_at': datetime.now().isoformat()
-        }
-        
-        supabase.table("historial_reportes").insert(registro).execute()
-    except Exception as e:
-        st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
-
-    return reporte_completo
-
-# ============================================================================
 # MÓDULO 2: GENERADOR DE GRÁFICOS PROFESIONALES
 # ============================================================================
 
@@ -757,7 +475,7 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
 
 
 # ============================================================================
-# MÓDULO 3: EVALUACIÓN POR TIPO DE PROYECTO (ANTERIOR - SIN CAMBIOS)
+# MÓDULO 3: EVALUACIÓN POR TIPO DE PROYECTO
 # ============================================================================
 
 def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
@@ -1140,7 +858,10 @@ def generar_reporte_total(p):
         swir = img.select('B11').divide(10000).rename('swir')
         ndvi = img.normalizedDifference(['B8', 'B4']).rename('ndvi')
         
-        return img.addBands([savi, ndsi, swir, ndvi, ndwi])
+        # Agregar índice de arcillas para SU-6
+        clay = img.select('B11').divide(img.select('B12').add(0.0001)).rename('clay')
+        
+        return img.addBands([savi, ndsi, swir, ndvi, ndwi, clay])
 
     try:
         img_now = calcular_idx(s2)
@@ -1165,6 +886,7 @@ def generar_reporte_total(p):
         ndwi_now = safe_float(region_stats.get('ndwi'), 0.0)
         swir_now = safe_float(region_stats.get('swir'), 0.0)
         ndvi_now = safe_float(region_stats.get('ndvi'), 0.0)
+        clay_now = safe_float(region_stats.get('clay'), 0.0)
 
     except Exception as e:
         return {
@@ -1197,18 +919,21 @@ def generar_reporte_total(p):
             ndwi_base = safe_float(base_stats.get('ndwi'), ndwi_now)
             swir_base = safe_float(base_stats.get('swir'), swir_now)
             ndvi_base = safe_float(base_stats.get('ndvi'), ndvi_now)
+            clay_base = safe_float(base_stats.get('clay'), clay_now)
         else:
             savi_base = savi_now
             ndsi_base = ndsi_now
             ndwi_base = ndwi_now
             swir_base = swir_now
             ndvi_base = ndvi_now
+            clay_base = clay_now
     except:
         savi_base = savi_now
         ndsi_base = ndsi_now
         ndwi_base = ndwi_now
         swir_base = swir_now
         ndvi_base = ndvi_now
+        clay_base = clay_now
 
     # === VARIACIONES ===
     def calcular_variacion(actual, base):
@@ -1258,43 +983,9 @@ def generar_reporte_total(p):
         'ndvi': [ndvi_base * 0.95, ndvi_base, ndvi_now],
         'temp': [temp_val - 2, temp_val - 1, temp_val]
     }
-    # === GUARDAR EN SUPABASE ===
-    try:
-        # Extraer email del diccionario 'p'
-        email_del_cliente = p.get('email_cliente') or p.get('Email')
 
-        registro = {
-            'proyecto': p.get('Proyecto'),
-            'email_cliente': email_del_cliente,
-            'tipo': tipo,
-            'fecha_analisis': f_rep,
-            'savi_actual': float(savi_now),
-            'savi_base': float(savi_base),
-            'ndwi_actual': float(ndwi_now),
-            'ndwi_base': float(ndwi_base),
-            'ndsi_actual': float(ndsi_now),
-            'ndsi_base': float(ndsi_base),
-            'ndvi_actual': float(ndvi_now),
-            'ndvi_base': float(ndvi_base),
-            'swir': float(swir_now),
-            'temperatura': float(temp_val),
-            'variacion_savi': float(variacion_savi),
-            'variacion_ndwi': float(variacion_ndwi),
-            'variacion_ndsi': float(variacion_ndsi),
-            'variacion_ndvi': float(variacion_ndvi),
-            'estado': estado,
-            'nivel': nivel,
-            'diagnostico': diagnostico_detallado,
-            'ano_linea_base': int(anio_base),
-            'created_at': datetime.now().isoformat()
-        }
-        
-        supabase.table("historial_reportes").insert(registro).execute()
-        
-    except Exception as e:
-        st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
-
-    return {
+    # Construir reporte base
+    reporte_completo = {
         'estado': estado,
         'diagnostico': diagnostico_detallado,
         'nivel': nivel,
@@ -1307,6 +998,7 @@ def generar_reporte_total(p):
         'swir': swir_now,
         'ndvi': ndvi_now,
         'ndvi_base': ndvi_base,
+        'clay': clay_now,
         'temp': temp_val,
         'fecha': f_rep,
         'anio_base': anio_base,
@@ -1325,9 +1017,49 @@ def generar_reporte_total(p):
             'ndwi': ndwi_now,
             'ndvi': ndvi_now,
             'swir': swir_now,
+            'clay': clay_now,
             'temp': temp_val
         }
     }
+
+    # === AGREGAR DATOS DE SAR Y FUEGOS ===
+    reporte_completo = agregar_datos_sar_y_fuegos(reporte_completo, geom)
+
+    # === GUARDAR EN SUPABASE ===
+    try:
+        registro = {
+            'proyecto': p.get('Proyecto'),
+            'tipo': tipo,
+            'fecha_analisis': f_rep,
+            'savi_actual': float(savi_now),
+            'savi_base': float(savi_base),
+            'ndwi_actual': float(ndwi_now),
+            'ndwi_base': float(ndwi_base),
+            'ndsi_actual': float(ndsi_now),
+            'ndsi_base': float(ndsi_base),
+            'ndvi_actual': float(ndvi_now),
+            'ndvi_base': float(ndvi_base),
+            'swir': float(swir_now),
+            'clay': float(clay_now),
+            'sar_vv': float(reporte_completo.get('sar_vv', 0)),
+            'incendios': int(reporte_completo.get('incendios_activos', 0)),
+            'temperatura': float(temp_val),
+            'variacion_savi': float(variacion_savi),
+            'variacion_ndwi': float(variacion_ndwi),
+            'variacion_ndsi': float(variacion_ndsi),
+            'variacion_ndvi': float(variacion_ndvi),
+            'estado': estado,
+            'nivel': nivel,
+            'diagnostico': diagnostico_detallado,
+            'ano_linea_base': int(anio_base),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        supabase.table("historial_reportes").insert(registro).execute()
+    except Exception as e:
+        st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
+
+    return reporte_completo
 
 
 # ============================================================================
@@ -1514,7 +1246,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     # Recomendaciones contextualizadas
     recomendaciones_por_tipo = {
         'NORMAL': {
-            'MINERIA': "✓ Mantener vigilancia mensual de recursos hídricos\n✓ Documentar estabilidad de taludes\n✓ Continuar riego de vegetaci��n perimetral",
+            'MINERIA': "✓ Mantener vigilancia mensual de recursos hídricos\n✓ Documentar estabilidad de taludes\n✓ Continuar riego de vegetación perimetral",
             'GLACIAR': "✓ Continuar monitoreo de balance de masa\n✓ Registrar datos de cobertura nival\n✓ Preparar estudios glaciológicos anuales",
             'BOSQUE': "✓ Mantener protección forestal\n✓ Documentar regeneración natural\n✓ Prevención estándar de incendios",
             'HUMEDAL': "✓ Confirmar ciclo hidrológico sostenible\n✓ Monitoreo de flora hidrófila\n✓ Cumplimiento Decreto de Humedales verificado",
@@ -1662,7 +1394,7 @@ else:
         "📖 Guía"
     ])
 
-# === PESTAÑA 1: VIGILANCIA (SIN VELOCÍMETRO) ===
+# === PESTAÑA 1: VIGILANCIA (CON VELOCÍMETRO) ===
 with tab1:
     try:
         proyectos = supabase.table("usuarios").select("*").execute().data
@@ -1705,6 +1437,31 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
                             
+                            # ===== VELOCÍMETRO MEJORADO AQUÍ =====
+                            fig_gauge = go.Figure(go.Indicator(
+                                mode="gauge+number+delta",
+                                value=reporte['savi_actual'],
+                                title={'text': "SAVI - Vigor de Vegetación"},
+                                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base'},
+                                gauge={
+                                    'axis': {'range': [0, 0.8]},
+                                    'bar': {'color': "#1e40af", 'thickness': 0.3},
+                                    'borderwidth': 2,
+                                    'bordercolor': "#333",
+                                    'steps': [
+                                        {'range': [0, 0.15], 'color': "#fee2e2"},
+                                        {'range': [0.15, 0.35], 'color': "#fef3c7"},
+                                        {'range': [0.35, 0.8], 'color': "#dcfce7"}
+                                    ]
+                                }
+                            ))
+                            fig_gauge.update_layout(
+                                height=400,
+                                font={'size': 14, 'family': 'Arial'},
+                                margin=dict(l=20, r=20, t=80, b=20)
+                            )
+                            st.plotly_chart(fig_gauge, use_container_width=True)
+                            
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 
@@ -1721,7 +1478,7 @@ with tab1:
     else:
         st.warning("No hay proyectos disponibles")
 
-# === PESTAÑA 2: AUDITORÍAS (SOLO VELOCÍMETRO AQUÍ) ===
+# === PESTAÑA 2: AUDITORÍAS ===
 with tab_informe:
     st.subheader("📋 Generador de Auditorías Profesionales")
     
@@ -1798,36 +1555,6 @@ with tab_informe:
             </div>
             """, unsafe_allow_html=True)
             
-            # VELOCÍMETRO (SOLO AQUÍ EN AUDITORÍAS)
-            # VELOCÍMETRO MEJORADO (SOLO AQUÍ EN AUDITORÍAS)
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=reporte['savi_actual'],
-                title={'text': "SAVI - Vigor de Vegetación"},
-                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base'},
-                gauge={
-                    'axis': {'range': [0, 0.8]},
-                    'bar': {'color': "#1e40af", 'thickness': 0.3},  # ← Aguja visible
-                    'borderwidth': 2,
-                    'bordercolor': "#333",
-                    'steps': [
-                        {'range': [0, 0.15], 'color': "#fee2e2", 'label': 'Crítico'},
-                        {'range': [0.15, 0.35], 'color': "#fef3c7", 'label': 'Moderado'},
-                        {'range': [0.35, 0.8], 'color': "#dcfce7", 'label': 'Saludable'}
-                    ],
-                    'threshold': {
-                        'line': {'color': "black", 'width': 3},
-                        'thickness': 0.75,
-                        'value': reporte['savi_actual']
-                    }
-                }
-            ))
-            fig_gauge.update_layout(
-                height=400,
-                font={'size': 14, 'family': 'Arial'},
-                margin=dict(l=20, r=20, t=80, b=20)
-            )
-            st.plotly_chart(fig_gauge, use_container_width=True)
             # Métricas
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             with col_m1:
@@ -2125,6 +1852,7 @@ if not st.session_state.get('admin_mode'):
         **Vigilancia en Tiempo Real:**
         - Accede a la pestaña "Vigilancia" para ver el mapa de tu proyecto
         - Haz clic en "Ejecutar Reporte" para analizar los últimos datos satelitales
+        - Visualiza el velocímetro SAVI para conocer el estado del vigor vegetal
         
         **Auditorías Profesionales:**
         - Ve a "Auditorías" para generar reportes ejecutivos

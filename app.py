@@ -149,6 +149,7 @@ def generar_graficos(df):
         
         return img_path
     except Exception as e:
+        st.error(f"Error en gráficos: {e}")
         return None
 
 # === GENERADOR DE REPORTE ---
@@ -280,12 +281,12 @@ Riesgo: {nivel}
 
 # === GENERADOR PDF PROFESIONAL ===
 def generar_pdf_profesional(proyecto_nombre, tipo_proyecto, reporte_data, img_path):
-    """Genera PDF profesional con diseño como en las imágenes"""
+    """Genera PDF profesional"""
     
     pdf = FPDF()
     pdf.add_page()
     
-    # ENCABEZADO AZUL OSCURO
+    # ENCABEZADO
     pdf.set_fill_color(20, 50, 80)
     pdf.rect(0, 0, 210, 50, 'F')
     
@@ -344,8 +345,9 @@ def generar_pdf_profesional(proyecto_nombre, tipo_proyecto, reporte_data, img_pa
         pdf.set_y(20)
         try:
             pdf.image(img_path, x=10, y=25, w=190)
-        except:
-            pass
+        except Exception as e:
+            pdf.set_text_color(200, 0, 0)
+            pdf.cell(0, 10, clean(f"Error al insertar gráfico: {str(e)}"), ln=1)
     
     # FIRMA
     pdf.set_y(260)
@@ -419,13 +421,17 @@ with st.sidebar:
 
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
-    # Título principal mejorado
-    st.markdown("""
-    <div style="text-align: center; padding: 30px 0;">
-        <h1 style="font-size: 2.5em; margin-bottom: 0;">🌍 Bienvenido a BioCore Intelligence</h1>
-        <p style="font-size: 1.2em; color: #888; margin-top: 10px;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Logo y Título
+    col_logo, col_titulo = st.columns([1, 2])
+    with col_logo:
+        if os.path.exists("logo_biocore.jpg"):
+            st.image("logo_biocore.jpg", width=150)
+    
+    with col_titulo:
+        st.markdown("""
+        <h1 style="margin-top: 30px;">BioCore Intelligence</h1>
+        <p style="font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital</p>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -439,7 +445,7 @@ if not st.session_state.get('authenticated'):
     with col_info2:
         st.markdown("""
         ### 📊 Análisis Inteligente
-        Índices espectrales avanzados: SAVI, NDSI, NDWI
+        Índices espectrales: SAVI, NDSI, NDWI
         """)
     with col_info3:
         st.markdown("""
@@ -455,9 +461,8 @@ if not st.session_state.get('authenticated'):
         if proyectos:
             st.subheader("📍 Proyectos Activos")
             
-            # Grid de proyectos
             cols = st.columns(min(len(proyectos), 2))
-            for idx, p in enumerate(proyectos[:6]):  # Mostrar máximo 6
+            for idx, p in enumerate(proyectos[:6]):
                 with cols[idx % 2]:
                     st.markdown(f"""
                     <div style="background-color: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
@@ -474,12 +479,12 @@ if not st.session_state.get('authenticated'):
     
     st.markdown("---")
     
-    # Footer con instrucciones
+    # Footer
     st.markdown("""
-    <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px; margin: 20px 0;">
+    <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px;">
     <h3>🔐 Acceso Restringido</h3>
-    <p>Inicia sesión desde el panel izquierdo <b>👈</b> para acceder a todas las funciones</p>
-    <p style="font-size: 0.9em; color: #888;">¿Problemas de acceso? Contacta a soporte@biocoreintelligence.cl</p>
+    <p>Inicia sesión desde el panel izquierdo <b>👈</b></p>
+    <p style="font-size: 0.9em; color: #888;">📧 consultorabiocore@gmail.com</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -496,11 +501,12 @@ if st.session_state.get('admin_mode'):
         "📖 Guía"
     ])
 else:
-    tab1, tab_informe, tab_excel, tab_soporte, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_soporte, tab_historial, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos", 
-        "💬 Soporte", 
+        "💬 Soporte",
+        "📨 Mi Historial",
         "📖 Guía"
     ])
 
@@ -533,18 +539,18 @@ with tab1:
                         reporte = generar_reporte_total(p)
                         
                         if reporte.get('tipo') != 'error':
-                            # === VELOCÍMETRO CORREGIDO ===
+                            # === VELOCÍMETRO ACTUALIZADO (0 a 0.25) ===
                             fig = go.Figure(go.Indicator(
                                 mode="gauge+number",
                                 value=reporte['savi_actual'],
                                 title={'text': "SAVI Actual"},
                                 gauge={
-                                    'axis': {'range': [0, 0.5]},
+                                    'axis': {'range': [0, 0.25]},
                                     'bar': {'color': "#2c3e50"},
                                     'steps': [
                                         {'range': [0, 0.05], 'color': "#ffcccc"},
                                         {'range': [0.05, 0.15], 'color': "#ffffcc"},
-                                        {'range': [0.15, 0.5], 'color': "#ccffcc"}
+                                        {'range': [0.15, 0.25], 'color': "#ccffcc"}
                                     ],
                                     'threshold': {
                                         'line': {'color': "white", 'width': 3},
@@ -623,10 +629,14 @@ with tab_informe:
                             
                             img_path = generar_graficos(df_mes)
                             
+                            # Generar PDF y guardarlo en archivo temporal
                             pdf = generar_pdf_profesional(proyecto, proyectos_dict[proyecto], reporte, img_path)
                             
-                            pdf_bytes = pdf.output()
-                            st.session_state['preview_pdf'] = pdf_bytes
+                            temp_dir = tempfile.gettempdir()
+                            pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
+                            pdf.output(pdf_path)
+                            
+                            st.session_state['preview_pdf'] = pdf_path
                             
                             # VISTA PREVIA
                             st.success("✅ Auditoría generada")
@@ -644,27 +654,33 @@ with tab_informe:
                             col_acc1, col_acc2, col_acc3 = st.columns(3)
                             
                             with col_acc1:
-                                st.download_button(
-                                    label="📥 Descargar PDF",
-                                    data=pdf_bytes,
-                                    file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
-                                    mime="application/pdf"
-                                )
+                                with open(pdf_path, "rb") as f:
+                                    st.download_button(
+                                        label="📥 Descargar PDF",
+                                        data=f.read(),
+                                        file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
+                                        mime="application/pdf"
+                                    )
                             
                             if st.session_state.get('admin_mode'):
                                 with col_acc2:
                                     if st.button("📤 Enviar a Cliente"):
                                         try:
-                                            requests.post(
-                                                f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
-                                                data={
-                                                    "chat_id": p['telegram_id'],
-                                                    "caption": f"Auditoría {proyecto} - {mes} {anio}"
-                                                },
-                                                files={'document': ('auditoria.pdf', pdf_bytes)},
-                                                timeout=30
-                                            )
-                                            st.success("✅ Enviado a cliente")
+                                            with open(pdf_path, "rb") as f:
+                                                files = {'document': (f"auditoria.pdf", f.read())}
+                                                response = requests.post(
+                                                    f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
+                                                    data={
+                                                        "chat_id": p['telegram_id'],
+                                                        "caption": f"📊 Auditoría {proyecto} - {mes} {anio}\n\n{reporte['estado']}"
+                                                    },
+                                                    files=files,
+                                                    timeout=30
+                                                )
+                                                if response.status_code == 200:
+                                                    st.success("✅ Enviado a cliente")
+                                                else:
+                                                    st.error(f"Error: {response.text}")
                                         except Exception as e:
                                             st.error(f"Error: {str(e)}")
                                 
@@ -711,7 +727,7 @@ if st.session_state.get('admin_mode'):
                 res = supabase.table("usuarios").select("*").execute()
                 if res.data:
                     for idx, cliente in enumerate(res.data):
-                        col1, col2, col3, col4, col5 = st.columns([2, 2, 1.5, 1.5, 1])
+                        col1, col2, col3, col4, col5, col6 = st.columns([1.8, 1.8, 1.2, 1.2, 1, 0.8])
                         with col1:
                             st.write(f"🏢 {cliente.get('Proyecto', 'N/A')}")
                         with col2:
@@ -719,8 +735,11 @@ if st.session_state.get('admin_mode'):
                         with col3:
                             st.write(f"📌 {cliente.get('Tipo', 'N/A')}")
                         with col4:
-                            st.write(f"📱 {cliente.get('telegram_id', 'N/A')}")
+                            st.write(f"📱 {cliente.get('telegram_id', 'N/A')[:10]}...")
                         with col5:
+                            freq = cliente.get('frecuencia_reportes', 'N/A')
+                            st.write(f"📅 {freq}")
+                        with col6:
                             if st.button("✏️", key=f"edit_{idx}"):
                                 st.session_state[f"edit_cliente_{idx}"] = True
                     
@@ -747,7 +766,7 @@ if st.session_state.get('admin_mode'):
                 
                 col_freq1, col_freq2 = st.columns(2)
                 with col_freq1:
-                    frecuencia = st.selectbox("Frecuencia de Reportes", ["Semanal", "Mensual", "Trimestral"])
+                    frecuencia = st.selectbox("Frecuencia de Reportes", ["Diaria", "Semanal"])
                 
                 with col_freq2:
                     hora_envio = st.time_input("⏰ Hora de Envío", value=time(8, 0))
@@ -811,13 +830,6 @@ with tab_soporte:
 3. Espera el análisis satelital (2-3 minutos)
 4. Visualiza el velocímetro y métricas
             """)
-        
-        with st.expander("❓ ¿Qué significan los valores SAVI, NDSI, NDWI?"):
-            st.write("""
-- **SAVI:** Índice de Vegetación Ajustado al Suelo
-- **NDSI:** Índice de Diferencia Normalizada de Nieve
-- **NDWI:** Índice de Diferencia Normalizada de Agua
-            """)
     
     with col2:
         st.subheader("📚 Documentación")
@@ -833,101 +845,86 @@ with tab_soporte:
             nombre_reporte = st.text_input("Tu nombre")
             email_reporte = st.text_input("Tu email")
             problema = st.text_area("Describe el problema", height=100)
-            severidad = st.selectbox("Severidad", ["Baja", "Media", "Alta", "Crítica"])
             
             if st.form_submit_button("📬 Enviar Reporte"):
                 st.success("✅ Reporte enviado a consultorabiocore@gmail.com")
                 st.balloons()
 
+# === PESTAÑA MI HISTORIAL (Solo Cliente) ===
+if not st.session_state.get('admin_mode'):
+    with tab_historial:
+        st.title("📨 Mi Historial de Reportes")
+        
+        proyecto_cliente = st.session_state.get('proyecto_cliente')
+        st.subheader(f"Reportes enviados a {proyecto_cliente}")
+        
+        try:
+            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).order("created_at", desc=True).execute()
+            
+            if res.data:
+                for idx, reporte in enumerate(res.data):
+                    with st.expander(f"📊 {reporte.get('created_at', 'N/A')[:10]} - {reporte.get('proyecto', 'N/A')}"):
+                        col_info1, col_info2 = st.columns(2)
+                        with col_info1:
+                            st.write(f"**SAVI:** {reporte.get('savi', 'N/A')}")
+                            st.write(f"**NDSI:** {reporte.get('ndsi', 'N/A')}")
+                        with col_info2:
+                            st.write(f"**NDWI:** {reporte.get('ndwi', 'N/A')}")
+                            st.write(f"**SWIR:** {reporte.get('swir', 'N/A')}")
+                        
+                        st.write(f"**Estado:** {reporte.get('estado', 'N/A')}")
+            else:
+                st.info("No hay reportes aún")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
 # === PESTAÑA GUÍA ===
 with tab_guia:
     st.title("📖 Guía Completa del Sistema BioCore Intelligence")
     
-    tab_intro, tab_indices, tab_analisis, tab_protocolo, tab_faq = st.tabs([
+    tab_intro, tab_indices, tab_faq = st.tabs([
         "🎯 Introducción",
         "📊 Índices Espectrales",
-        "🔬 Análisis de Datos",
-        "⚙️ Protocolo Técnico",
         "❓ Preguntas Frecuentes"
     ])
     
-    # === TAB INTRODUCCIÓN ===
     with tab_intro:
         st.markdown("""
         ## 🌍 ¿Qué es BioCore Intelligence?
         
         BioCore Intelligence es una plataforma avanzada de **vigilancia ambiental satelital** 
-        que utiliza datos de sensores de Earth Engine para monitorear en tiempo real la salud 
-        de ecosistemas, glaciares, bosques y zonas de operación industrial.
+        que utiliza datos de sensores de Earth Engine para monitorear en tiempo real.
         
-        ### 🎯 Objetivos Principales
+        ### 🎯 Objetivos
         - ✅ Monitoreo ambiental en tiempo real
-        - ✅ Detección temprana de cambios ambientales
-        - ✅ Cumplimiento normativo (RCA, Ley de Glaciares, etc.)
-        - ✅ Generación de reportes profesionales
-        - ✅ Análisis histórico de tendencias
+        - ✅ Detección temprana de cambios
+        - ✅ Cumplimiento normativo
+        - ✅ Reportes profesionales
         """)
     
-    # === TAB ÍNDICES ESPECTRALES ===
     with tab_indices:
         st.markdown("""
-        ## 📊 Índices Espectrales Explicados
+        ## 📊 Índices Espectrales
         
-        ### 🌱 SAVI (Soil-Adjusted Vegetation Index)
+        ### 🌱 SAVI
+        Mide el vigor de la cobertura vegetal
         
-        **Definición:** Mide el vigor y densidad de la cobertura vegetal
+        ### ❄️ NDSI
+        Detecta presencia de nieve e hielo
         
-        | Valor SAVI | Estado | Acción |
-        |:----------:|:------:|:------:|
-        | < 0.05 | Suelo desnudo | Seguimiento normal |
-        | 0.05-0.20 | Cobertura baja | Alerta |
-        | > 0.20 | Cobertura media-alta | Óptimo |
+        ### 💧 NDWI
+        Indica presencia de agua y humedad
         """)
     
-    # === TAB ANÁLISIS ===
-    with tab_analisis:
-        st.markdown("""
-        ## 🔬 Análisis de Datos
-        
-        Estructura de un reporte BioCore:
-        
-        **1. Encabezado Técnico** - Proyecto, fecha, responsable
-        **2. Diagnóstico Ejecutivo** - Estado (Verde/Amarillo/Rojo)
-        **3. Análisis Espectral** - Tabla de índices
-        **4. Gráficos Históricos** - Series temporales
-        **5. Conclusiones** - Recomendaciones de acción
-        """)
-    
-    # === TAB PROTOCOLO ===
-    with tab_protocolo:
-        st.markdown("""
-        ## ⚙️ Protocolo Técnico
-        
-        BioCore utiliza un protocolo avanzado que distingue cambios reales de ruido del sensor:
-        
-        **✅ Cambios Reales:**
-        - Degradación de cobertura > -15%
-        - Pérdida de cobertura nival
-        - Estrés térmico extremo
-        
-        **⚪ Ruido Normal:**
-        - Variaciones en suelo mineral < 20%
-        - Cambios estacionales
-        """)
-    
-    # === TAB FAQ ===
     with tab_faq:
         st.markdown("""
         ## ❓ Preguntas Frecuentes
         
-        **¿Con qué frecuencia reviso mis reportes?**
-        > Semanal, Mensual o Trimestral según tu configuración
+        **¿Con qué frecuencia recibo reportes?**
+        > Según tu configuración: Diaria o Semanal
         
-        **¿Puedo cambiar mi línea base?**
-        > Sí, contacta a soporte
-        
-        **¿Qué pasa con la nubosidad?**
-        > Sistema busca automáticamente imágenes sin nubes
+        **¿A qué hora me llegan?**
+        > A la hora que especificaste en tu registro
         """)
 
 st.markdown("---")

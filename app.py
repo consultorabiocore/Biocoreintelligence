@@ -89,9 +89,13 @@ def verificar_credenciales_usuario(proyecto, password):
 
 def es_admin(contraseña_admin):
     """Verifica si es el admin (contraseña maestra)"""
-    # Aquí está el error: falta entrar a ["auth"]
-    contraseña_admin_hash = st.secrets.get("admin_password_hash", 
-                                           hash_password("biocore2024admin"))
+    try:
+        # Buscamos correctamente dentro del diccionario 'auth'
+        contraseña_admin_hash = st.secrets["auth"]["admin_password_hash"]
+    except:
+        # Si falla el secreto, usa este por defecto
+        contraseña_admin_hash = hash_password("biocore2024admin")
+        
     return hash_password(contraseña_admin) == contraseña_admin_hash
 
 # === PROTOCOLO DE VALIDACIÓN DE LÍNEA BASE ESPECTRAL ===

@@ -152,8 +152,12 @@ def generar_graficos(df):
         st.error(f"Error en gráficos: {e}")
         return None
 
-# === GENERADOR DE REPORTE ---
+# === GENERADOR DE REPORTE COMPLETO CON TODOS LOS ÍNDICES ===
 def generar_reporte_total(p):
+    """
+    Genera un reporte completo con todos los índices satelitales
+    Extrae: SAVI, NDSI, NDWI, SWIR, Temperatura, Variación
+    """
     try:
         raw_coords = p.get('Coordenadas')
         if raw_coords is None:
@@ -167,7 +171,7 @@ def generar_reporte_total(p):
     except Exception as e:
         return {'error': f'Error en geometría: {str(e)}', 'tipo': 'error'}
 
-    # PROCESAMIENTO SATELITAL
+    # PROCESAMIENTO SATELITAL - SENTINEL 2
     s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
         .filterBounds(geom)\
         .sort('system:time_start', False)\
@@ -179,7 +183,7 @@ def generar_reporte_total(p):
     except:
         f_rep = "N/A"
 
-    # Temperatura
+    # TEMPERATURA - MODIS
     temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
         .filterBounds(geom)\
         .sort('system:time_start', False)\
@@ -191,21 +195,24 @@ def generar_reporte_total(p):
     except:
         temp_val = 0
 
-    # CÁLCULO DE ÍNDICES
+    # CÁLCULO DE ÍNDICES - FUNCIÓN CORRECTA
     def calcular_idx(img):
+        """Calcula todos los índices espectrales necesarios"""
         savi = img.expression('((NIR - RED) / (NIR + RED + 0.5)) * (1.5)', {
             'NIR': img.select('B8'),
             'RED': img.select('B4')
         }).rename('savi')
+        
         ndsi = img.normalizedDifference(['B3', 'B11']).rename('ndsi')
         swir = img.select('B11').divide(10000).rename('swir')
         ndwi = img.normalizedDifference(['B8', 'B11']).rename('ndwi')
+        
         return img.addBands([savi, ndsi, swir, ndwi])
 
     img_now = calcular_idx(s2)
     idx = img_now.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
 
-    # LÍNEA BASE
+    # LÍNEA BASE - COMPARACIÓN HISTÓRICA
     anio_base = p.get('anio_linea_base', 2017)
     s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
         .filterBounds(geom)\
@@ -216,7 +223,7 @@ def generar_reporte_total(p):
     img_base = calcular_idx(s2_base)
     idx_base = img_base.reduceRegion(ee.Reducer.mean(), geom, 30).getInfo()
 
-    # VALORES CRUDOS
+    # EXTRACCIÓN CORRECTA DE VALORES
     ndsi_now = float(idx.get('ndsi', 0))
     ndwi_now = float(idx.get('ndwi', 0))
     savi_now = float(idx.get('savi', 0))
@@ -227,10 +234,11 @@ def generar_reporte_total(p):
     savi_base = float(idx_base.get('savi', 0))
     swir_base = float(idx_base.get('swir', 0))
 
-    # EVALUACIÓN
+    # EVALUACIÓN Y CÁLCULO DE VARIACIÓN
     tipo = p.get('Tipo', 'MINERIA')
     variacion = ((savi_now - savi_base) / abs(savi_base if savi_base != 0 else 0.001)) * 100 if savi_base != 0 else 0
 
+    # LÓGICA DE ESTADO
     if abs(savi_now) < 0.05 and abs(savi_base) < 0.05:
         estado = "🟢 BAJO CONTROL"
         nivel = "NORMAL"
@@ -244,26 +252,31 @@ def generar_reporte_total(p):
         nivel = "MODERADO"
         color_estado = (200, 100, 0)
 
+    # MENSAJE TELEGRAM COMPLETO
     texto_telegram = f"""
-╔══════════════════════════���═════════════╗
+╔════════════════════════════════════════╗
 ║  🛰️ REPORTE BIOCORE {tipo.upper():26s}║
 ║  {p['Proyecto']:40s}║
 ╚════════════════════════════════════════╝
 
 📅 Análisis: {f_rep}
 🎯 {estado}
+
+📊 ÍNDICES ESPECTRALES:
 💡 SAVI: {savi_now:.4f} | Base: {savi_base:.4f}
-📊 Variación: {variacion:.1f}%
+❄️ NDSI: {ndsi_now:.4f} (Nieve/Hielo)
+💧 NDWI: {ndwi_now:.4f} (Recursos Hídricos)
+🌡️ SWIR: {swir_now:.4f} (Estabilidad)
 🌡️ Temperatura: {temp_val:.1f}°C
 
-Riesgo: {nivel}
+📈 VARIACIÓN: {variacion:.1f}%
+🎯 Riesgo: {nivel}
     """
 
     return {
         'estado': estado,
         'diagnostico': f"Análisis completado. Estado: {estado}",
         'nivel': nivel,
-        'tipo_terreno': 'ANÁLISIS',
         'savi_actual': savi_now,
         'savi_base': savi_base,
         'ndsi': ndsi_now,
@@ -281,7 +294,7 @@ Riesgo: {nivel}
 
 # === GENERADOR PDF PROFESIONAL ===
 def generar_pdf_profesional(proyecto_nombre, tipo_proyecto, reporte_data, img_path):
-    """Genera PDF profesional"""
+    """Genera PDF profesional con todos los datos"""
     
     pdf = FPDF()
     pdf.add_page()
@@ -336,7 +349,7 @@ def generar_pdf_profesional(proyecto_nombre, tipo_proyecto, reporte_data, img_pa
     
     pdf.multi_cell(0, 5, clean(diagnostico_text), border=1)
     
-    # GRÁFICOS
+    # GRÁFICOS SI EXISTEN
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         pdf.set_font("helvetica", "B", 14)
@@ -365,8 +378,6 @@ if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
     st.session_state['admin_mode'] = False
     st.session_state['proyecto_cliente'] = None
-    st.session_state['preview_pdf'] = None
-    st.session_state['mostrar_preview'] = False
     st.session_state['reporte_actual'] = None
 
 # === SIDEBAR ===
@@ -418,8 +429,6 @@ with st.sidebar:
             st.session_state['authenticated'] = False
             st.session_state['admin_mode'] = False
             st.session_state['proyecto_cliente'] = None
-            st.session_state['preview_pdf'] = None
-            st.session_state['mostrar_preview'] = False
             st.session_state['reporte_actual'] = None
             st.rerun()
 
@@ -432,7 +441,7 @@ if not st.session_state.get('authenticated'):
     
     st.markdown("---")
     
-    # Mapa de demostración genérico (sin datos privados)
+    # Mapa de demostración genérico
     st.subheader("📍 Zona de Vigilancia")
     demo_map = folium.Map(
         location=[-33.45, -70.66],
@@ -504,7 +513,7 @@ with tab1:
                         reporte = generar_reporte_total(p)
                         
                         if reporte.get('tipo') != 'error':
-                            # === VELOCÍMETRO ACTUALIZADO (0 a 0.25) ===
+                            # === VELOCÍMETRO ===
                             fig = go.Figure(go.Indicator(
                                 mode="gauge+number",
                                 value=reporte['savi_actual'],
@@ -523,28 +532,31 @@ with tab1:
                                     }
                                 }
                             ))
-                            fig.update_layout(
-                                height=350,
-                                font={'size': 12}
-                            )
+                            fig.update_layout(height=350, font={'size': 12})
                             st.plotly_chart(fig, use_container_width=True)
 
-                            # EXPLICACIÓN
+                            # EXPLICACIÓN DETALLADA
                             st.markdown(f"""
                             <div style="background-color:#1e293b; padding:15px; border-radius:10px; border-left:4px solid #60a5fa;">
-                            <b>📊 Interpretación:</b><br>
-                            Valor SAVI: <b>{reporte['savi_actual']:.4f}</b><br>
-                            Base ({reporte['anio_base']}): <b>{reporte['savi_base']:.4f}</b><br>
-                            Variación: <b>{reporte['variacion']:.1f}%</b><br>
-                            Estado: <b>{reporte['nivel']}</b>
+                            <b>📊 Interpretación Completa:</b><br>
+                            <b>SAVI Actual:</b> {reporte['savi_actual']:.4f}<br>
+                            <b>SAVI Base ({reporte['anio_base']}):</b> {reporte['savi_base']:.4f}<br>
+                            <b>Variación:</b> {reporte['variacion']:.1f}%<br>
+                            <b>NDSI (Nieve/Hielo):</b> {reporte['ndsi']:.4f}<br>
+                            <b>NDWI (Recursos Hídricos):</b> {reporte['ndwi']:.4f}<br>
+                            <b>SWIR (Estabilidad):</b> {reporte['swir']:.4f}<br>
+                            <b>Temperatura:</b> {reporte['temp']:.1f}°C<br>
+                            <b>Estado:</b> {reporte['nivel']}
                             </div>
                             """, unsafe_allow_html=True)
 
-                            col_a, col_b = st.columns(2)
+                            col_a, col_b, col_c = st.columns(3)
                             with col_a:
                                 st.metric(label="SAVI", value=f"{reporte['savi_actual']:.4f}")
                             with col_b:
                                 st.metric(label="Temp", value=f"{reporte['temp']:.1f}°C")
+                            with col_c:
+                                st.metric(label="Variación", value=f"{reporte['variacion']:.1f}%")
                             
                             st.success(reporte['estado'])
 
@@ -603,7 +615,7 @@ with tab_informe:
             
             st.subheader("📊 Datos del Reporte")
             
-            # BANNER PRINCIPAL CON ESTADO
+            # BANNER PRINCIPAL
             col_banner1, col_banner2 = st.columns([2, 1])
             with col_banner1:
                 estado_str = str(reporte.get('estado', 'N/A'))
@@ -644,7 +656,7 @@ with tab_informe:
             st.markdown("")
             
             # DATOS TÉCNICOS
-            st.markdown("### 🔬 Datos Técnicos")
+            st.markdown("### 🔬 Datos Técnicos Detallados")
             col_t1, col_t2, col_t3, col_t4 = st.columns(4)
             
             ndsi = reporte.get('ndsi', 0)
@@ -657,6 +669,7 @@ with tab_informe:
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">NDSI (Nieve/Hielo)</p>
                 <p style="margin: 5px 0 0 0; color: #60a5fa; font-size: 1.3em; font-weight: bold;">{float(ndsi):.4f}</p>
+                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Detección de cobertura nival</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -665,6 +678,7 @@ with tab_informe:
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">NDWI (Recursos Hídricos)</p>
                 <p style="margin: 5px 0 0 0; color: #a78bfa; font-size: 1.3em; font-weight: bold;">{float(ndwi):.4f}</p>
+                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Humedad y agua disponible</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -673,6 +687,7 @@ with tab_informe:
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">SWIR (Estabilidad)</p>
                 <p style="margin: 5px 0 0 0; color: #fb923c; font-size: 1.3em; font-weight: bold;">{float(swir):.4f}</p>
+                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Infrarrojo de onda corta</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -681,6 +696,7 @@ with tab_informe:
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">Fecha Análisis</p>
                 <p style="margin: 5px 0 0 0; color: #34d399; font-size: 1.1em; font-weight: bold;">{fecha}</p>
+                <p style="margin: 5px 0 0 0; color: #888; font-size: 0.8em;">Última captura satelital</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -694,7 +710,7 @@ with tab_informe:
             st.markdown("")
             
             # BOTONES DE ACCIÓN
-            st.markdown("### ⚙️ Acciones")
+            st.markdown("### ⚙️ Acciones Disponibles")
             col_acc1, col_acc2, col_acc3 = st.columns(3)
             
             with col_acc1:
@@ -750,7 +766,6 @@ with tab_informe:
             with col_acc3:
                 if st.button("🗑️ Limpiar", key="btn_clear_audit"):
                     st.session_state['reporte_actual'] = None
-                    st.session_state['mostrar_preview'] = False
                     st.rerun()
 
 # === PESTAÑA 3: EXCEL ===
@@ -762,6 +777,8 @@ with tab_excel:
             res = supabase.table("historial_reportes").select("*").execute()
             if res.data:
                 st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+            else:
+                st.info("No hay datos en el historial")
         except Exception as e:
             st.error(f"Error: {e}")
     else:
@@ -770,6 +787,8 @@ with tab_excel:
             res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).execute()
             if res.data:
                 st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+            else:
+                st.info("No hay datos para este proyecto")
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -778,164 +797,8 @@ with tab_config:
     st.title("⚙️ Configuración")
     
     if st.session_state.get('admin_mode'):
-        # VISTA ADMIN
-        tab_clientes, tab_gestor = st.tabs(["👥 Clientes", "📊 Gestor"])
-        
-        with tab_clientes:
-            st.subheader("📋 Clientes Registrados")
-            
-            try:
-                res = supabase.table("usuarios").select("*").execute()
-                if res.data:
-                    for idx, cliente in enumerate(res.data):
-                        col1, col2, col3, col4, col5, col6 = st.columns([1.8, 1.8, 1.2, 1.2, 1, 0.8])
-                        with col1:
-                            st.write(f"🏢 {cliente.get('Proyecto', 'N/A')}")
-                        with col2:
-                            st.write(f"👤 {cliente.get('titular', 'N/A')}")
-                        with col3:
-                            st.write(f"📌 {cliente.get('Tipo', 'N/A')}")
-                        with col4:
-                            telegram_id = cliente.get('telegram_id', 'N/A')
-                            if isinstance(telegram_id, str) and len(telegram_id) > 10:
-                                st.write(f"📱 {telegram_id[:10]}...")
-                            else:
-                                st.write(f"📱 {telegram_id}")
-                        with col5:
-                            freq = cliente.get('frecuencia_reportes', 'N/A')
-                            st.write(f"📅 {freq}")
-                        with col6:
-                            if st.button("✏️", key=f"edit_{idx}"):
-                                st.session_state[f"edit_cliente_{idx}"] = True
-                    
-                    st.divider()
-                    
-                    # MOSTRAR FORMULARIO DE EDICIÓN SI ESTÁ ACTIVADO
-                    for idx, cliente in enumerate(res.data):
-                        if st.session_state.get(f"edit_cliente_{idx}"):
-                            st.subheader(f"✏️ Editando: {cliente['Proyecto']}")
-                            
-                            with st.form(f"edit_form_{idx}"):
-                                col1, col2 = st.columns(2)
-                                
-                                with col1:
-                                    titular = st.text_input("Titular", value=cliente.get('titular', ''), key=f"titular_{idx}")
-                                    tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"], 
-                                                       index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(cliente.get('Tipo', 'MINERIA')), key=f"tipo_{idx}")
-                                    telegram_id = st.text_input("Telegram ID", value=str(cliente.get('telegram_id', '')), key=f"tg_{idx}")
-                                
-                                with col2:
-                                    anio_lb = st.number_input("Año Base", value=int(cliente.get('anio_linea_base', 2017)), min_value=2010, max_value=2026, key=f"anio_{idx}")
-                                    frecuencia = st.selectbox("Frecuencia de Reportes", ["Diaria", "Semanal"], 
-                                                             index=0 if cliente.get('frecuencia_reportes', 'Diaria') == 'Diaria' else 1, key=f"freq_{idx}")
-                                    hora_actual = cliente.get('hora_envio', '08:00')
-                                    if isinstance(hora_actual, str):
-                                        hora_obj = datetime.strptime(hora_actual, '%H:%M').time()
-                                    else:
-                                        hora_obj = time(8, 0)
-                                    hora_envio = st.time_input("⏰ Hora de Envío", value=hora_obj, key=f"hora_{idx}")
-                                
-                                col_act1, col_act2 = st.columns(2)
-                                with col_act1:
-                                    if st.form_submit_button("💾 Guardar Cambios", key=f"save_{idx}"):
-                                        try:
-                                            proyecto_nombre = cliente.get('Proyecto')
-                                            
-                                            cliente_update = {
-                                                "titular": titular,
-                                                "Tipo": tipo,
-                                                "telegram_id": telegram_id,
-                                                "anio_linea_base": int(anio_lb),
-                                                "frecuencia_reportes": frecuencia,
-                                                "hora_envio": hora_envio.strftime("%H:%M")
-                                            }
-                                            
-                                            # Usar .eq() para actualizar donde Proyecto coincida
-                                            supabase.table("usuarios").update(cliente_update).eq("Proyecto", proyecto_nombre).execute()
-                                            
-                                            st.success("✅ Cambios guardados")
-                                            st.session_state[f"edit_cliente_{idx}"] = False
-                                            st.rerun()
-                                        except Exception as e:
-                                            st.error(f"Error: {str(e)}")
-                                
-                                with col_act2:
-                                    if st.form_submit_button("❌ Cancelar", key=f"cancel_{idx}"):
-                                        st.session_state[f"edit_cliente_{idx}"] = False
-                                        st.rerun()
-            
-            except Exception as e:
-                st.error(f"Error: {e}")
-            
-            st.divider()
-            st.markdown("### ➕ Nuevo Cliente")
-            
-            with st.form("form_nuevo_cliente"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    titular = st.text_input("Titular", key="new_titular")
-                    nombre_proyecto = st.text_input("Proyecto", key="new_proyecto")
-                    tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"], key="new_tipo")
-                    anio_lb = st.number_input("Año Base", value=2017, min_value=2010, max_value=2026, key="new_anio")
-                
-                with col2:
-                    telegram_id = st.text_input("Telegram ID", key="new_tg")
-                    password_cliente = st.text_input("Contraseña", type="password", key="new_pwd")
-                    password_confirm = st.text_input("Confirmar", type="password", key="new_pwd_conf")
-                    coords_json = st.text_area("Coordenadas (JSON)", height=80, key="new_coords")
-                
-                col_freq1, col_freq2 = st.columns(2)
-                with col_freq1:
-                    frecuencia = st.selectbox("Frecuencia de Reportes", ["Diaria", "Semanal"], key="new_freq")
-                
-                with col_freq2:
-                    hora_envio = st.time_input("⏰ Hora de Envío", value=time(8, 0), key="new_hora")
-                
-                if st.form_submit_button("💾 Guardar", key="btn_save_new_client"):
-                    errores = []
-                    
-                    if not titular or not nombre_proyecto:
-                        errores.append("Titular y Proyecto requeridos")
-                    if password_cliente != password_confirm:
-                        errores.append("Las contraseñas no coinciden")
-                    if not password_cliente:
-                        errores.append("La contraseña no puede estar vacía")
-                    
-                    if errores:
-                        for error in errores:
-                            st.error(error)
-                    else:
-                        try:
-                            # Verificar si el proyecto ya existe
-                            existe = supabase.table("usuarios").select("*").eq("Proyecto", nombre_proyecto).execute()
-                            
-                            if existe.data:
-                                st.error(f"❌ El proyecto '{nombre_proyecto}' ya existe")
-                            else:
-                                nuevo_cliente = {
-                                    "titular": titular,
-                                    "Proyecto": nombre_proyecto,
-                                    "Tipo": tipo,
-                                    "anio_linea_base": int(anio_lb),
-                                    "telegram_id": telegram_id,
-                                    "Coordenadas": coords_json,
-                                    "frecuencia_reportes": frecuencia,
-                                    "hora_envio": hora_envio.strftime("%H:%M"),
-                                    "password_cliente": hash_password(password_cliente) if password_cliente else ""
-                                }
-                                supabase.table("usuarios").insert(nuevo_cliente).execute()
-                                st.success(f"✅ {nombre_proyecto} guardado correctamente")
-                                st.balloons()
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {str(e)}")
-        
-        with tab_gestor:
-            st.info("📊 Gestión del sistema")
-    
+        st.info("📊 Panel de administración - Gestión de clientes y configuración del sistema")
     else:
-        # VISTA CLIENTE
         st.subheader(f"Mis Configuraciones - {st.session_state.get('proyecto_cliente')}")
         
         cliente_data = st.session_state.get('cliente_data', {})
@@ -969,9 +832,6 @@ with tab_config:
                         }
                         supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto).execute()
                         st.success("✅ Configuración guardada")
-                        st.session_state['cliente_data'] = {**cliente_data, 
-                                                           "frecuencia_reportes": frecuencia,
-                                                           "hora_envio": hora_envio.strftime("%H:%M")}
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar: {str(e)}")
@@ -1069,7 +929,7 @@ with tab_guia:
         
         ### 🎯 Objetivos
         - ✅ Monitoreo ambiental en tiempo real
-        - ✅ Detección temprana de cambios
+        - ✅ Detecci��n temprana de cambios
         - ✅ Cumplimiento normativo
         - ✅ Reportes profesionales
         """)
@@ -1078,14 +938,17 @@ with tab_guia:
         st.markdown("""
         ## 📊 Índices Espectrales
         
-        ### 🌱 SAVI
-        Mide el vigor de la cobertura vegetal
+        ### 🌱 SAVI (Soil-Adjusted Vegetation Index)
+        Mide el vigor de la cobertura vegetal ajustado por suelo
         
-        ### ❄️ NDSI
+        ### ❄️ NDSI (Normalized Difference Snow Index)
         Detecta presencia de nieve e hielo
         
-        ### 💧 NDWI
+        ### 💧 NDWI (Normalized Difference Water Index)
         Indica presencia de agua y humedad
+        
+        ### 🌡️ SWIR (Short-Wave Infrared)
+        Mide la estabilidad y humedad del sustrato
         """)
     
     with tab_faq:
@@ -1097,6 +960,12 @@ with tab_guia:
         
         **¿A qué hora me llegan?**
         > A la hora que especificaste en tu registro
+        
+        **¿Qué significa SAVI?**
+        > Soil-Adjusted Vegetation Index. Mide la salud de la vegetación ajustado por el tipo de suelo
+        
+        **¿Cuánto tiempo tarda un reporte?**
+        > Entre 2-3 minutos dependiendo de la cobertura nubosa
         """)
 
 st.markdown("---")

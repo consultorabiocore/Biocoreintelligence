@@ -422,15 +422,21 @@ with st.sidebar:
             st.rerun()
 
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
+# === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
-    # Logo y Título
-    col_logo = st.columns(1)[0]
-    with col_logo:
-        if os.path.exists("logo_biocore.png"):
-            st.image("logo_biocore.png", width=250)
+    # Logo y Título centrado
+    st.markdown("""
+    <div style="text-align: center;">
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if os.path.exists("logo_biocore.png"):
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image("logo_biocore.png", width=150)
     
     st.markdown("""
-    <h1 style="text-align: center; margin-top: 30px;">BioCore Intelligence</h1>
+    <h1 style="text-align: center; margin-top: 10px;">BioCore Intelligence</h1>
     <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital</p>
     """, unsafe_allow_html=True)
     
@@ -585,14 +591,14 @@ with tab_informe:
     if proyectos_disponibles:
         col1, col2, col3 = st.columns(3)
         with col1:
-            proyecto = st.selectbox("Proyecto", proyectos_disponibles)
+            proyecto = st.selectbox("Proyecto", proyectos_disponibles, key="audit_proyecto")
         with col2:
             mes = st.selectbox("Mes", ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                                       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
+                                       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"], key="audit_mes")
         with col3:
-            anio = st.number_input("Año", value=2026, min_value=2020)
+            anio = st.number_input("Año", value=2026, min_value=2020, key="audit_anio")
         
-        if st.button("📊 Generar Auditoría"):
+        if st.button("📊 Generar Auditoría", key="btn_generar_audit"):
             with st.spinner("Procesando auditoría..."):
                 try:
                     p = supabase.table("usuarios").select("*").eq("Proyecto", proyecto).execute().data[0]
@@ -607,6 +613,8 @@ with tab_informe:
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
         
+        st.markdown("---")
+        
         # Mostrar reporte si existe
         if st.session_state.get('reporte_actual'):
             reporte = st.session_state['reporte_actual']
@@ -615,54 +623,92 @@ with tab_informe:
             anio = st.session_state['anio_reporte']
             p_data = st.session_state.get('p_data', {})
             
-            st.success("✅ Auditoría generada")
+            st.success("✅ Auditoría generada correctamente")
             
-            st.subheader("📊 Vista Previa del Reporte")
+            st.subheader("📊 Datos del Reporte")
             
-            # Detalles principales
-            st.markdown(f"""
-            <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left:5px solid #60a5fa;">
-            <h3>🎯 Estado: {reporte['estado']}</h3>
-            <p><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
-            <p><b>Proyecto:</b> {proyecto}</p>
-            <p><b>Período:</b> {mes} {anio}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            # BANNER PRINCIPAL CON ESTADO
+            col_banner1, col_banner2 = st.columns([2, 1])
+            with col_banner1:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:25px; border-radius:15px; border-left:6px solid #60a5fa;">
+                <h2 style="color: white; margin: 0;">{reporte['estado']}</h2>
+                <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
+                <p style="color: #cbd5e1; margin: 5px 0;"><b>Proyecto:</b> {proyecto}</p>
+                <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> {mes} {anio}</p>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Métricas en columnas
-            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_banner2:
+                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+            
+            st.markdown("")
+            
+            # MÉTRICAS PRINCIPALES
+            st.markdown("### 📈 Métricas Principales")
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            
             with col_m1:
                 st.metric("SAVI Actual", f"{reporte['savi_actual']:.4f}")
             with col_m2:
-                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+                st.metric("SAVI Base", f"{reporte['savi_base']:.4f}")
             with col_m3:
                 st.metric("Variación", f"{reporte['variacion']:.1f}%")
+            with col_m4:
+                st.metric("Año Base", f"{reporte['anio_base']}")
             
-            # Datos técnicos
-            st.markdown("### 📊 Datos Técnicos")
+            st.markdown("")
+            
+            # DATOS TÉCNICOS
+            st.markdown("### 🔬 Datos Técnicos")
             col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+            
             with col_t1:
-                st.info(f"**SAVI Base**\n{reporte['savi_base']:.4f}")
+                st.markdown(f"""
+                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
+                <p style="margin: 0; color: #888; font-size: 0.9em;">NDSI (Nieve/Hielo)</p>
+                <p style="margin: 5px 0 0 0; color: #60a5fa; font-size: 1.3em; font-weight: bold;">{reporte['ndsi']:.4f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col_t2:
-                st.info(f"**NDSI**\n{reporte['ndsi']:.4f}")
+                st.markdown(f"""
+                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
+                <p style="margin: 0; color: #888; font-size: 0.9em;">NDWI (Recursos Hídricos)</p>
+                <p style="margin: 5px 0 0 0; color: #a78bfa; font-size: 1.3em; font-weight: bold;">{reporte['ndwi']:.4f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col_t3:
-                st.info(f"**NDWI**\n{reporte['ndwi']:.4f}")
+                st.markdown(f"""
+                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
+                <p style="margin: 0; color: #888; font-size: 0.9em;">SWIR (Estabilidad)</p>
+                <p style="margin: 5px 0 0 0; color: #fb923c; font-size: 1.3em; font-weight: bold;">{reporte['swir']:.4f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col_t4:
-                st.info(f"**SWIR**\n{reporte['swir']:.4f}")
+                st.markdown(f"""
+                <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
+                <p style="margin: 0; color: #888; font-size: 0.9em;">Fecha Análisis</p>
+                <p style="margin: 5px 0 0 0; color: #34d399; font-size: 1.1em; font-weight: bold;">{reporte['fecha']}</p>
+                </div>
+                """, unsafe_allow_html=True)
             
-            st.markdown("---")
+            st.markdown("")
             
-            # Mensaje Telegram
-            st.markdown("### 📨 Mensaje Telegram a Enviar:")
+            # MENSAJE TELEGRAM
+            st.markdown("### 📨 Notificación a Cliente")
             st.code(reporte['texto_telegram'])
             
-            st.markdown("---")
+            st.markdown("")
             
-            # Botones de acción
+            # BOTONES DE ACCIÓN
+            st.markdown("### ⚙️ Acciones")
             col_acc1, col_acc2, col_acc3 = st.columns(3)
             
             with col_acc1:
-                if st.button("📥 Generar PDF"):
+                if st.button("📥 Generar PDF", key="btn_pdf"):
                     with st.spinner("Generando PDF..."):
                         try:
                             pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
@@ -677,7 +723,7 @@ with tab_informe:
                                     data=f.read(),
                                     file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
                                     mime="application/pdf",
-                                    key="download_pdf"
+                                    key="download_pdf_btn"
                                 )
                             st.success("✅ PDF generado")
                         except Exception as e:
@@ -685,7 +731,7 @@ with tab_informe:
             
             with col_acc2:
                 if st.session_state.get('admin_mode'):
-                    if st.button("📤 Enviar a Cliente"):
+                    if st.button("📤 Enviar a Cliente", key="btn_send"):
                         try:
                             pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
                             
@@ -712,7 +758,7 @@ with tab_informe:
                             st.error(f"Error: {str(e)}")
             
             with col_acc3:
-                if st.button("🗑️ Limpiar"):
+                if st.button("🗑️ Limpiar", key="btn_clear"):
                     st.session_state['reporte_actual'] = None
                     st.session_state['mostrar_preview'] = False
                     st.rerun()

@@ -94,7 +94,6 @@ def es_admin(contraseña_admin):
                                            hash_password("biocore2024admin"))
     return hash_password(contraseña_admin) == contraseña_admin_hash
 
-
 # === PROTOCOLO DE VALIDACIÓN DE LÍNEA BASE ESPECTRAL ===
 
 class ProtocoloValidacionBaseline:

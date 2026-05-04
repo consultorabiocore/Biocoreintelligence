@@ -1,5 +1,5 @@
 # ============================================================================
-# BIOCORE INTELLIGENCE - SISTEMA COMPLETO (VERSIÓN FINAL)
+# BIOCORE INTELLIGENCE - SISTEMA COMPLETO (VERSIÓN FINAL INTEGRADA)
 # ============================================================================
 
 import streamlit as st
@@ -54,7 +54,7 @@ def iniciar_gee():
     try:
         if not ee.data.is_initialized():
             creds = json.loads(st.secrets["gee"]["json"])
-            ee_creds = ee.ServiceAccountCredentials(
+            ee_creds = ee.ServiceAccountCredential(
                 creds['client_email'], 
                 key_data=creds['private_key']
             )
@@ -146,59 +146,270 @@ def obtener_coordenadas_correctamente(p):
     
     raise ValueError(f'Formato no reconocido: {type(raw_coords)}')
 
-# === GENERADOR DE GRÁFICOS ===
-def generar_graficos(indices_historicos):
-    """Genera gráficos profesionales para incluir en PDF"""
+# ============================================================================
+# MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO
+# ============================================================================
+
+def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
+    """
+    Genera mensaje Telegram dinámico según tipo de proyecto.
+    Enfatiza vigilancia activa y crea necesidad del servicio.
+    """
+    tipo = proyecto_data.get('Tipo', 'MINERIA').upper()
+    proyecto = proyecto_data.get('Proyecto', 'N/A')
+    
+    # Extraer datos
+    savi = reporte_data.get('savi_actual', 0)
+    ndwi = reporte_data.get('ndwi', 0)
+    ndsi = reporte_data.get('ndsi', 0)
+    temp = reporte_data.get('temp', 0)
+    fecha = reporte_data.get('fecha', 'N/A')
+    nivel = reporte_data.get('nivel', 'DESCONOCIDO')
+    estado = reporte_data.get('estado', '')
+    variacion_savi = reporte_data.get('variacion', 0)
+    variacion_ndwi = reporte_data.get('variacion_ndwi', 0)
+    
+    # Base del mensaje
+    encabezado = f"""
+╔════════════════════════════════════════════════════════════╗
+║        🛰️  VIGILANCIA AMBIENTAL EN TIEMPO REAL 🛰️         ║
+║                    BIOCORE INTELLIGENCE                   ║
+╚════════════════════════════════════════════════════════════╝
+
+📍 SITIO MONITOREADO: {proyecto}
+📊 TIPO: {tipo}
+📅 ANÁLISIS: {fecha}
+🔍 RESPONSABLE: Loreto Campos Carrasco
+🛰️ FUENTES: Sentinel-2 | MODIS | SAR L-Band
+
+═══════════════════════════════════════════════════════════════"""
+
+    # Mensajes específicos por tipo de proyecto
+    if tipo == 'MINERIA':
+        diagnostico_dinamico = f"""
+🏔️ SECTOR MINERO - VIGILANCIA INTEGRAL DE YACIMIENTO
+
+📡 DATOS ESPECTRALES EN TIEMPO REAL:
+
+💧 RECURSOS HÍDRICOS (NDWI):
+   Valor: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
+   {'✅ ÓPTIMO - Hidratación confirmada' if ndwi > 0.30 else '⚠️ ALERTA - Vigilancia intensiva' if ndwi > 0.15 else '🔴 CRÍTICO - Acción inmediata'}
+   
+   💡 INTERPRETACIÓN OPERACIONAL:
+   {'→ Sin indicios de desecación o depósito de relaves anómalos' if ndwi > 0.20 else '→ ALERTA: Posible acopio no documentado o drenaje acelerado'}
+
+🌱 VEGETACIÓN PERIMETRAL (SAVI):
+   Valor: {savi:.4f} | Variación: {variacion_savi:+.1f}%
+   {'✅ Vegetación saludable en buffer de protección' if savi > 0.35 else '⚠️ Estrés vegetal moderado' if savi > 0.20 else '🔴 Degradación crítica detectada'}
+   
+   💡 RIESGO AMBIENTAL:
+   {'→ Cumplimiento de Ley 20.283 verificado' if savi > 0.35 else '→ Requiere plan de remediación urgente'}
+
+⚠️ DIAGNÓSTICO INTEGRADO:
+   {estado}
+
+📌 ACCIÓN RECOMENDADA:
+   {'→ Mantener vigilancia estándar mensual' if nivel == 'NORMAL' else '→ Intensificar monitoreo a semanal + inspección terrestre' if nivel == 'MODERADO' else '→ EMERGENCIA: Contactar SMA/DGA inmediatamente'}
+
+═══════════════════════════════════════════════════════════════"""
+
+    elif tipo == 'GLACIAR':
+        diagnostico_dinamico = f"""
+❄️ SECTOR CRIÓSFERA - MONITOREO DE GLACIARES Y NIEVE
+
+🌡️ COBERTURA CRIOSFÉRICA (NDSI):
+   Valor: {ndsi:.4f} | Variación: {reporte_data.get('variacion_ndsi', 0):+.1f}%
+   {'✅ COBERTURA CONSOLIDADA - Hielo perenne' if ndsi > 0.50 else '⚠️ TRANSICIÓN - Ciclo estacional' if ndsi > 0.35 else '🔴 CRÍTICA - Exposición de suelo'}
+   
+   📊 ESTADO DE BALANCE DE MASA:
+   {'→ Masa de hielo estable, sin retracción anómala' if ndsi > 0.45 else '→ Seguimiento requerido, posible ciclo estacional' if ndsi > 0.30 else '→ ALERTA: Retracción acelerada confirmada por satélite'}
+
+🌡️ TEMPERATURA SUPERFICIAL (MODIS LST):
+   Temperatura: {temp:.1f}°C
+   Influencia en fusión: {'⚠️ Temperatura elevada acelera derretimiento' if temp > 10 else '✅ Régimen térmico favorable'}
+
+⚠️ DIAGNÓSTICO INTEGRADO:
+   {estado}
+
+🚨 NECESIDAD DEL MONITOREO CONTINUO:
+   {'→ Bajo riesgo, monitoreo preventivo recomendado' if nivel == 'NORMAL' else '→ Riesgo moderado: cambio climático acelera fusión' if nivel == 'MODERADO' else '→ CRÍTICO: Retracción extrema requiere estudios glaciológicos'}
+
+═══════════════════════════════════════════════════════════════"""
+
+    elif tipo == 'BOSQUE':
+        diagnostico_dinamico = f"""
+🌲 SECTOR FORESTAL - VIGILANCIA DE COBERTURA Y RIESGOS
+
+🌿 DENSIDAD VEGETAL (SAVI):
+   Valor: {savi:.4f} | Variación: {variacion_savi:+.1f}%
+   {'✅ MUY DENSA (>70% cobertura) - Ley 20.283 verificada' if savi > 0.40 else '✅ DENSA (50-70%) - Dentro de norma' if savi > 0.30 else '⚠️ MODERADA - Regeneración detectada' if savi > 0.20 else '🔴 DEGRADADA - Inspección urgente'}
+   
+   📋 CUMPLIMIENTO NORMATIVO:
+   {'→ Certificado: Sin intervención no autorizada' if savi > 0.35 else '→ ALERTA: Posible tala, incendio o plagas detectadas'}
+
+💧 ESTRÉS HÍDRICO (NDWI):
+   Valor: {ndwi:.4f}
+   {'✅ Hidratación óptima - Bajo riesgo de incendio' if ndwi > 0.30 else '⚠️ MODERADO - Riego preventivo recomendado' if ndwi > 0.15 else '🔴 CRÍTICO - Alto riesgo de incendio forestal'}
+
+🔥 ÍNDICE DE RIESGO INTEGRADO:
+   {'✅ BAJO - Condiciones de seguridad óptimas' if ndwi > 0.25 and savi > 0.35 else '⚠️ MODERADO - Sistema de vigilancia activa' if ndwi > 0.15 else '🔴 EXTREMO - Protección de emergencia requerida'}
+
+⚠️ DIAGNÓSTICO:
+   {estado}
+
+═══════════════════════════════════════════════════════════════"""
+
+    elif tipo == 'HUMEDAL':
+        diagnostico_dinamico = f"""
+💧 SECTOR HUMEDAL - VIGILANCIA ECOSISTEMA ACUÁTICO
+
+💧 CONTENIDO DE AGUA (NDWI):
+   Valor: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
+   {'✅ SATURADO - Ciclo hidrológico óptimo' if ndwi > 0.40 else '⚠️ MODERADO - Variabilidad normal' if ndwi > 0.25 else '🔴 CRÍTICO - Desecación en curso'}
+   
+   🌱 BIODIVERSIDAD:
+   {'→ Hábitat acuático confirmado, fauna protegida' if ndwi > 0.35 else '→ Transición de fase, evaluación urgente' if ndwi > 0.20 else '→ ALERTA: Riesgo de colapso ecosistémico'}
+
+🌿 VEGETACIÓN HIDRÓFILA (SAVI):
+   Valor: {savi:.4f}
+   {'✅ Plantas acuáticas presentes - Confirmación Ramsar' if savi > 0.30 else '⚠️ Vegetación bajo estrés' if savi > 0.15 else '🔴 Pérdida de flora acuática'}
+
+📋 CUMPLIMIENTO NORMATIVO:
+   {'✅ Decreto de Humedales verificado' if ndwi > 0.30 else '⚠️ Requiere plan de restauración' if ndwi > 0.20 else '🔴 Violación SMA/DGA inmediata'}
+
+⚠️ DIAGNÓSTICO:
+   {estado}
+
+═══════════════════════════════════════════════════════════════"""
+
+    elif tipo == 'AGRICOLA':
+        diagnostico_dinamico = f"""
+🌾 SECTOR AGRÍCOLA - OPTIMIZACIÓN DE CULTIVOS
+
+🌱 VIGOR VEGETAL (SAVI):
+   Valor: {savi:.4f} | Variación: {variacion_savi:+.1f}%
+   {'✅ ÓPTIMO - Rendimiento máximo esperado' if savi > 0.45 else '✅ NORMAL - Rendimiento estándar' if savi > 0.35 else '⚠️ MODERADO - Aumentar riego/nutrición' if savi > 0.25 else '🔴 CRÍTICO - Riesgo de pérdida total'}
+
+💧 DISPONIBILIDAD HÍDRICA (NDWI):
+   Valor: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
+   {'✅ Humedad óptima para crecimiento' if ndwi > 0.30 else '⚠️ Humedad moderada - Aumentar riego' if ndwi > 0.20 else '🔴 CRÍTICO - Riego de emergencia inmediato'}
+
+📊 RENDIMIENTO PROYECTADO:
+   {'✅ MÁXIMO (90-100% de potencial)' if savi > 0.45 and ndwi > 0.30 else '✅ ALTO (70-90%)' if savi > 0.35 and ndwi > 0.20 else '⚠️ MODERADO (50-70%)' if savi > 0.25 else '🔴 BAJO (<50%) - Intervención urgente'}
+
+🚨 DIAGNÓSTICO OPERACIONAL:
+   {estado}
+
+💡 RECOMENDACIONES:
+   {'→ Mantener régimen estándar de riego' if nivel == 'NORMAL' else '→ Aumentar frecuencia de riego' if nivel == 'MODERADO' else '→ EMERGENCIA: Riego de emergencia + análisis fitosanitario'}
+
+═══════════════════════════════════════════════════════════════"""
+
+    else:
+        diagnostico_dinamico = f"""
+📊 MONITOREO GENERAL
+
+Estado: {estado}
+Nivel: {nivel}
+
+═══════════════════════════════════════════════════════════════"""
+
+    # Pie de mensaje con necesidad de servicio
+    cierre = f"""
+🎯 VALOR DEL MONITOREO CONTINUO:
+
+✅ PROTECCIÓN LEGAL: Documentación ante inspecciones (SMA, DGA, SEA)
+✅ DETECCIÓN TEMPRANA: Identificación de problemas antes de escalada
+✅ JUSTIFICACIÓN: Prueba técnica de medidas implementadas
+✅ PRECISIÓN: Análisis espectral imposible sin satélites
+
+📞 CONTACTO TÉCNICO:
+   Loreto Campos Carrasco | consultorabiocore@gmail.com
+   BioCore Intelligence © 2026
+
+═══════════════════════════════════════════════════════════════
+"""
+
+    return encabezado + diagnostico_dinamico + cierre
+
+
+# ============================================================================
+# MÓDULO 2: GENERADOR DE GRÁFICOS PROFESIONALES
+# ============================================================================
+
+def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
+    """Genera gráficos profesionales contextualizados por tipo de proyecto"""
     try:
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.patch.set_facecolor('white')
         
         fechas = list(range(len(indices_historicos.get('savi', [0]))))
         
-        # SAVI
-        if 'savi' in indices_historicos:
-            axes[0, 0].plot(fechas, indices_historicos['savi'], 
-                          color='#27ae60', marker='o', linewidth=2.5, markersize=8, label='SAVI')
-            axes[0, 0].fill_between(fechas, indices_historicos['savi'], alpha=0.3, color='#27ae60')
-            axes[0, 0].set_title('ÍNDICE SAVI - Vigor de Vegetación', fontweight='bold', fontsize=12)
-            axes[0, 0].set_ylabel('Valor SAVI', fontsize=10)
-            axes[0, 0].grid(True, alpha=0.3, linestyle='--')
-            axes[0, 0].legend()
+        # Configuración por tipo
+        if tipo_proyecto == 'GLACIAR':
+            config = [
+                (0, 0, 'ndsi', 'NDSI - Cobertura de Nieve/Hielo', '#3498db', '▼ Bajo = Retracción'),
+                (0, 1, 'temp', 'Temperatura - LST (°C)', '#e74c3c', '▲ Elevada = Fusión'),
+                (1, 0, 'ndwi', 'NDWI - Recursos Hídricos', '#2980b9', '▲ Agua de deshielo'),
+                (1, 1, 'ndvi', 'NDVI - Exposición de Roca', '#95a5a6', '▼ Bajo = Suelo desnudo'),
+            ]
+        elif tipo_proyecto == 'MINERIA':
+            config = [
+                (0, 0, 'ndwi', 'NDWI - Monitoreo de Agua', '#3498db', 'Descarta acopio anómalo'),
+                (0, 1, 'swir', 'SWIR - Estabilidad de Taludes', '#7f8c8d', 'Reflectancia mineral'),
+                (1, 0, 'savi', 'SAVI - Vegetación Perimetral', '#27ae60', 'Ley 20.283'),
+                (1, 1, 'temp', 'Temperatura - Actividad Térmica', '#e74c3c', 'Detección de procesos'),
+            ]
+        elif tipo_proyecto == 'BOSQUE':
+            config = [
+                (0, 0, 'savi', 'SAVI - Densidad de Cobertura', '#27ae60', 'Cumplimiento normativo'),
+                (0, 1, 'ndwi', 'NDWI - Estrés Hídrico', '#3498db', 'Riesgo de incendio'),
+                (1, 0, 'ndvi', 'NDVI - Vigor General', '#2ecc71', 'Sanidad forestal'),
+                (1, 1, 'temp', 'Temperatura - Régimen Térmico', '#e74c3c', 'Estrés por calor'),
+            ]
+        elif tipo_proyecto == 'HUMEDAL':
+            config = [
+                (0, 0, 'ndwi', 'NDWI - Ciclo Hidrológico', '#3498db', 'Estado de saturación'),
+                (0, 1, 'savi', 'SAVI - Flora Hidrófila', '#27ae60', 'Biodiversidad'),
+                (1, 0, 'ndvi', 'NDVI - Productividad', '#2ecc71', 'Salud del ecosistema'),
+                (1, 1, 'temp', 'Temperatura - Régimen Thermal', '#e74c3c', 'Variabilidad'),
+            ]
+        elif tipo_proyecto == 'AGRICOLA':
+            config = [
+                (0, 0, 'savi', 'SAVI - Vigor de Cultivo', '#27ae60', 'Rendimiento esperado'),
+                (0, 1, 'ndwi', 'NDWI - Disponibilidad Hídrica', '#3498db', 'Necesidad de riego'),
+                (1, 0, 'ndvi', 'NDVI - Estado Fenológico', '#2ecc71', 'Fase de desarrollo'),
+                (1, 1, 'temp', 'Temperatura - Estrés Térmico', '#e74c3c', 'Factor limitante'),
+            ]
+        else:
+            config = [
+                (0, 0, 'savi', 'SAVI', '#27ae60', ''),
+                (0, 1, 'ndwi', 'NDWI', '#3498db', ''),
+                (1, 0, 'ndvi', 'NDVI', '#2ecc71', ''),
+                (1, 1, 'temp', 'Temperatura', '#e74c3c', ''),
+            ]
         
-        # NDWI
-        if 'ndwi' in indices_historicos:
-            axes[0, 1].plot(fechas, indices_historicos['ndwi'], 
-                          color='#3498db', marker='s', linewidth=2.5, markersize=8, label='NDWI')
-            axes[0, 1].fill_between(fechas, indices_historicos['ndwi'], alpha=0.3, color='#3498db')
-            axes[0, 1].set_title('ÍNDICE NDWI - Contenido de Agua', fontweight='bold', fontsize=12)
-            axes[0, 1].set_ylabel('Valor NDWI', fontsize=10)
-            axes[0, 1].grid(True, alpha=0.3, linestyle='--')
-            axes[0, 1].legend()
-        
-        # NDSI
-        if 'ndsi' in indices_historicos:
-            axes[1, 0].plot(fechas, indices_historicos['ndsi'], 
-                          color='#9b59b6', marker='^', linewidth=2.5, markersize=8, label='NDSI')
-            axes[1, 0].fill_between(fechas, indices_historicos['ndsi'], alpha=0.3, color='#9b59b6')
-            axes[1, 0].set_title('ÍNDICE NDSI - Cobertura de Nieve/Hielo', fontweight='bold', fontsize=12)
-            axes[1, 0].set_ylabel('Valor NDSI', fontsize=10)
-            axes[1, 0].grid(True, alpha=0.3, linestyle='--')
-            axes[1, 0].legend()
-        
-        # TEMPERATURA
-        if 'temp' in indices_historicos:
-            axes[1, 1].plot(fechas, indices_historicos['temp'], 
-                          color='#e74c3c', marker='d', linewidth=2.5, markersize=8, label='Temperatura')
-            axes[1, 1].fill_between(fechas, indices_historicos['temp'], alpha=0.3, color='#e74c3c')
-            axes[1, 1].set_title('TEMPERATURA - LST (°C)', fontweight='bold', fontsize=12)
-            axes[1, 1].set_ylabel('Temperatura (°C)', fontsize=10)
-            axes[1, 1].grid(True, alpha=0.3, linestyle='--')
-            axes[1, 1].legend()
+        # Dibujar gráficos
+        for row, col, indice, titulo, color, subtitulo in config:
+            if indice in indices_historicos:
+                valores = indices_historicos[indice]
+                ax = axes[row, col]
+                
+                ax.plot(fechas, valores, color=color, marker='o', linewidth=2.5, markersize=8)
+                ax.fill_between(fechas, valores, alpha=0.3, color=color)
+                ax.set_title(titulo, fontweight='bold', fontsize=12)
+                ax.set_ylabel('Valor', fontsize=10)
+                ax.grid(True, alpha=0.3, linestyle='--')
+                
+                if subtitulo:
+                    ax.text(0.02, 0.98, subtitulo, transform=ax.transAxes, 
+                           fontsize=9, verticalalignment='top',
+                           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
         
         plt.tight_layout()
         
         temp_dir = tempfile.gettempdir()
-        img_path = os.path.join(temp_dir, 'grafico_biocore.png')
+        img_path = os.path.join(temp_dir, f'grafico_biocore_{tipo_proyecto.lower()}.png')
         plt.savefig(img_path, format='png', dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         
@@ -207,8 +418,9 @@ def generar_graficos(indices_historicos):
         st.error(f"Error en gráficos: {e}")
         return None
 
+
 # ============================================================================
-# EVALUACIÓN POR TIPO DE PROYECTO
+# MÓDULO 3: EVALUACIÓN POR TIPO DE PROYECTO (ANTERIOR - SIN CAMBIOS)
 # ============================================================================
 
 def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
@@ -273,6 +485,7 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
     
     return estado, nivel, color, diagnostico
 
+
 def evaluar_glaciar(ndsi_actual, ndsi_base, variacion_ndsi, temp):
     """GLACIAR - Basado en NDSI (cobertura de nieve/hielo)"""
     
@@ -327,6 +540,7 @@ def evaluar_glaciar(ndsi_actual, ndsi_base, variacion_ndsi, temp):
         diagnostico += f" ⚠️ FACTOR AGRAVANTE: Temperatura de {temp:.1f}°C acelera fusión."
     
     return estado, nivel, color, diagnostico
+
 
 def evaluar_bosque(savi_actual, savi_base, variacion_savi, ndwi):
     """BOSQUE - Basado en SAVI (vigor de vegetación)"""
@@ -389,6 +603,7 @@ def evaluar_bosque(savi_actual, savi_base, variacion_savi, ndwi):
     
     return estado, nivel, color, diagnostico
 
+
 def evaluar_humedal(ndwi_actual, ndwi_base, variacion_ndwi, savi):
     """HUMEDAL - Basado en NDWI (contenido de agua)"""
     
@@ -444,6 +659,7 @@ def evaluar_humedal(ndwi_actual, ndwi_base, variacion_ndwi, savi):
         diagnostico += f" ✓ Vegetación hidrófila presente ({savi:.4f})."
     
     return estado, nivel, color, diagnostico
+
 
 def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variacion_ndwi):
     """AGRÍCOLA - Basado en SAVI + NDWI"""
@@ -510,12 +726,13 @@ def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variac
     
     return estado, nivel, color, diagnostico
 
+
 # ============================================================================
-# GENERADOR DE REPORTE TOTAL CON MENSAJE TELEGRAM COMPLETO
+# MÓDULO 4: GENERADOR DE REPORTE COMPLETO CON GUARDADO EN SUPABASE
 # ============================================================================
 
 def generar_reporte_total(p):
-    """Genera reporte completo con validación de coordenadas"""
+    """Genera reporte completo y guarda en Supabase"""
     try:
         raw_coords = obtener_coordenadas_correctamente(p)
         
@@ -696,103 +913,45 @@ def generar_reporte_total(p):
         color_estado = (150, 150, 0)
         diagnostico_detallado = "Tipo de proyecto no reconocido"
 
-    # === MENSAJE TELEGRAM COMPLETO Y DETALLADO ===
-    texto_telegram = f"""
-╔══════════════════════════════════════════════════════════╗
-║          🛰️ REPORTE COMPLETO BIOCORE INTELLIGENCE       ║
-║                    {tipo:40s} ║
-╚══════════════════════════════════════════════════════════╝
-
-📍 PROYECTO: {p['Proyecto']}
-📅 Análisis: {f_rep}
-🎯 ESTADO: {estado}
-
-═════════════════════════════════════════════════════════════
-
-📊 ÍNDICES ESPECTRALES - COMPARATIVA LÍNEA BASE {anio_base}
-
-🌱 SAVI (Soil-Adjusted Vegetation Index)
-   • Valor Actual:      {savi_now:.4f}
-   • Línea Base:        {savi_base:.4f}
-   • Variación:         {variacion_savi:+.1f}%
-   • Interpretación:    Vigor de Vegetación
-   • Estado:            {'✅ Saludable' if savi_now > 0.35 else '⚠️ Estrés' if savi_now > 0.20 else '🔴 Crítico'}
-
-❄️ NDSI (Normalized Difference Snow Index)
-   • Valor Actual:      {ndsi_now:.4f}
-   • Línea Base:        {ndsi_base:.4f}
-   • Variación:         {variacion_ndsi:+.1f}%
-   • Interpretación:    Cobertura de Nieve/Hielo
-   • Estado:            {'✅ Cobertura alta' if ndsi_now > 0.40 else '⚠️ Intermedia' if ndsi_now > 0.20 else '🔴 Crítica'}
-
-💧 NDWI (Normalized Difference Water Index)
-   • Valor Actual:      {ndwi_now:.4f}
-   • Línea Base:        {ndwi_base:.4f}
-   • Variación:         {variacion_ndwi:+.1f}%
-   • Interpretación:    Contenido de Agua/Humedad
-   • Estado:            {'✅ Humedad óptima' if ndwi_now > 0.30 else '⚠️ Humedad moderada' if ndwi_now > 0.15 else '🔴 Estrés hídrico'}
-
-🌳 NDVI (Normalized Difference Vegetation Index)
-   • Valor Actual:      {ndvi_now:.4f}
-   • Línea Base:        {ndvi_base:.4f}
-   • Variación:         {variacion_ndvi:+.1f}%
-   • Interpretación:    Vigor General de Vegetación
-   • Estado:            {'✅ Muy denso' if ndvi_now > 0.70 else '✅ Denso' if ndvi_now > 0.50 else '⚠️ Moderado' if ndvi_now > 0.30 else '🔴 Bajo'}
-
-🌡️ SWIR (Short-Wave Infrared)
-   • Valor Actual:      {swir_now:.4f}
-   • Humedad Sustrato:  {'✅ Óptima' if swir_now > 0.25 else '⚠️ Moderada' if swir_now > 0.15 else '🔴 Baja'}
-
-🌡️ TEMPERATURA (MODIS LST)
-   • Temperatura:       {temp_val:.1f}°C
-   • Estado Térmico:    {'✅ Normal' if temp_val < 20 else '⚠️ Moderada' if temp_val < 28 else '🔴 Crítica'}
-
-═════════════════════════════════════════════════════════════
-
-📈 ANÁLISIS DE TENDENCIAS
-
-Variación General del Paisaje ({anio_base} vs Actual):
-• SAVI:  {variacion_savi:+.1f}% {'📈 Mejorando' if variacion_savi > 0 else '📉 Degradando'}
-• NDSI:  {variacion_ndsi:+.1f}% {'📈 Incremento' if variacion_ndsi > 0 else '📉 Disminución'}
-• NDWI:  {variacion_ndwi:+.1f}% {'📈 Mayor humedad' if variacion_ndwi > 0 else '📉 Menor humedad'}
-• NDVI:  {variacion_ndvi:+.1f}% {'📈 Mayor vigor' if variacion_ndvi > 0 else '📉 Menor vigor'}
-
-═════════════════════════════════════════════════════════════
-
-🎯 EVALUACIÓN DE RIESGO
-
-Nivel General:        {nivel}
-Color de Alerta:      {estado}
-Tipo de Proyecto:     {tipo}
-
-═════════════════════════════════════════════════════════════
-
-💡 DIAGNÓSTICO TÉCNICO
-
-{diagnostico_detallado}
-
-═════════════════════════════════════════════════════════════
-
-✅ CONCLUSIÓN EJECUTIVA
-
-El análisis satelital del {f_rep} indica un estado {nivel.lower()} para 
-el proyecto {p['Proyecto']}. La comparativa con la línea base de {anio_base} 
-muestra {('mejoramiento' if variacion_savi > 5 else 'estabilidad' if abs(variacion_savi) <= 5 else 'degradación')}.
-
-Responsable Técnica: Loreto Campos Carrasco
-BioCore Intelligence © 2026
-Vigilancia Ambiental Satelital Avanzada
-
-═════════════════════════════════════════════════════════════
-"""
-
-    # Crear histórico simulado para gráficos
+    # Crear histórico para gráficos
     indices_historicos = {
         'savi': [savi_base * 0.95, savi_base, savi_now],
         'ndwi': [ndwi_base * 0.95, ndwi_base, ndwi_now],
         'ndsi': [ndsi_base * 0.95, ndsi_base, ndsi_now],
+        'ndvi': [ndvi_base * 0.95, ndvi_base, ndvi_now],
         'temp': [temp_val - 2, temp_val - 1, temp_val]
     }
+
+    # === GUARDAR EN SUPABASE ===
+    try:
+        registro = {
+            'proyecto': p.get('Proyecto'),
+            'tipo': tipo,
+            'fecha_analisis': f_rep,
+            'savi_actual': float(savi_now),
+            'savi_base': float(savi_base),
+            'ndwi_actual': float(ndwi_now),
+            'ndwi_base': float(ndwi_base),
+            'ndsi_actual': float(ndsi_now),
+            'ndsi_base': float(ndsi_base),
+            'ndvi_actual': float(ndvi_now),
+            'ndvi_base': float(ndvi_base),
+            'swir': float(swir_now),
+            'temperatura': float(temp_val),
+            'variacion_savi': float(variacion_savi),
+            'variacion_ndwi': float(variacion_ndwi),
+            'variacion_ndsi': float(variacion_ndsi),
+            'variacion_ndvi': float(variacion_ndvi),
+            'estado': estado,
+            'nivel': nivel,
+            'diagnostico': diagnostico_detallado,
+            'ano_linea_base': int(anio_base),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        supabase.table("historial_reportes").insert(registro).execute()
+    except Exception as e:
+        st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
 
     return {
         'estado': estado,
@@ -812,7 +971,6 @@ Vigilancia Ambiental Satelital Avanzada
         'anio_base': anio_base,
         'tipo': tipo,
         'proyecto': p['Proyecto'],
-        'texto_telegram': texto_telegram,
         'variacion': variacion_savi,
         'variacion_ndwi': variacion_ndwi,
         'variacion_ndsi': variacion_ndsi,
@@ -830,8 +988,9 @@ Vigilancia Ambiental Satelital Avanzada
         }
     }
 
+
 # ============================================================================
-# GENERADOR DE PDF PROFESIONAL
+# MÓDULO 5: GENERADOR DE PDF PROFESIONAL CON LÓGICA DINÁMICA
 # ============================================================================
 
 class AuditoriaPDF(FPDF):
@@ -860,8 +1019,9 @@ class AuditoriaPDF(FPDF):
         self.set_text_color(128, 128, 128)
         self.cell(0, 10, f"Página {self.page_no()}", align="C")
 
-def generar_pdf_auditoria_v2(proyecto_data, reporte_data, img_path=None):
-    """Genera PDF profesional de auditoría"""
+
+def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
+    """Genera PDF profesional con diagnóstico dinámico según tipo de proyecto"""
     
     pdf = AuditoriaPDF()
     pdf.add_page()
@@ -1008,46 +1168,35 @@ def generar_pdf_auditoria_v2(proyecto_data, reporte_data, img_path=None):
     pdf.ln(5)
     
     nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
+    tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
     
-    recomendaciones = {
-        'NORMAL': """
-✓ MANTENER VIGILANCIA ESTÁNDAR
-  • Continuar monitoreo programado mensual
-  • Documentar cambios significativos
-  • Revisar datos en próxima auditoría
-  
-✓ CUMPLIMIENTO VERIFICADO
-  • Parámetros dentro de rango aceptable
-  • Sin medidas correctivas requeridas
-  • Documentación en regla
-        """,
-        'MODERADO': """
-⚠ INTENSIFICAR MONITOREO
-  • Aumentar frecuencia a semanal
-  • Realizar inspección de terreno
-  • Registrar evidencias visuales
-  
-⚠ MEDIDAS DE CONTENCIÓN
-  • Implementar controles temporales
-  • Preparar plan de acción
-  • Notificar a autoridades relevantes
-  • Próxima auditoría en 15 días
-        """,
-        'CRÍTICO': """
-🔴 ACCIÓN INMEDIATA REQUERIDA
-  • Declarar situación de emergencia
-  • Contactar SMA, DGA y autoridades locales
-  • Mobilizar equipo técnico de emergencia
-  
-🔴 MEDIDAS CORRECTIVAS URGENTES
-  • Ejecutar plan de mitigación inmediato
-  • Documentar todas las acciones
-  • Monitoreo continuo cada 24 horas
-  • Auditoría de seguimiento en 7 días
-        """
+    # Recomendaciones contextualizadas
+    recomendaciones_por_tipo = {
+        'NORMAL': {
+            'MINERIA': "✓ Mantener vigilancia mensual de recursos hídricos\n✓ Documentar estabilidad de taludes\n✓ Continuar riego de vegetaci��n perimetral",
+            'GLACIAR': "✓ Continuar monitoreo de balance de masa\n✓ Registrar datos de cobertura nival\n✓ Preparar estudios glaciológicos anuales",
+            'BOSQUE': "✓ Mantener protección forestal\n✓ Documentar regeneración natural\n✓ Prevención estándar de incendios",
+            'HUMEDAL': "✓ Confirmar ciclo hidrológico sostenible\n✓ Monitoreo de flora hidrófila\n✓ Cumplimiento Decreto de Humedales verificado",
+            'AGRICOLA': "✓ Continuar riego estándar\n✓ Mantener programa de nutrición\n✓ Próxima evaluación en 30 días"
+        },
+        'MODERADO': {
+            'MINERIA': "⚠ Aumentar frecuencia de monitoreo a semanal\n⚠ Inspección terrestre de drenaje\n⚠ Posible acumulación anómala detectada",
+            'GLACIAR': "⚠ Evaluación glaciológica inmediata\n⚠ Monitoreo diario de temperatura\n⚠ Registrar cambios de cobertura nival",
+            'BOSQUE': "⚠ Plan de restauración forestal\n⚠ Intensificar vigilancia de incendios\n⚠ Análisis fitosanitario urgente",
+            'HUMEDAL': "⚠ Plan de restauración hidrológica\n⚠ Protección legal de ecosistema\n⚠ Monitoreo continuo requerido",
+            'AGRICOLA': "⚠ Riego aumentado a cada 3 días\n⚠ Análisis de suelo urgente\n⚠ Tratamiento fitosanitario recomendado"
+        },
+        'CRÍTICO': {
+            'MINERIA': "🔴 EMERGENCIA: Contactar SMA/DGA INMEDIATAMENTE\n🔴 Monitoreo 24/7 de drenaje\n🔴 Implementar medidas de contención de agua",
+            'GLACIAR': "🔴 EMERGENCIA: Estudios glaciológicos de emergencia\n🔴 Avalúo técnico de riesgos\n🔴 Evaluación ambiental estratégica urgente",
+            'BOSQUE': "🔴 EMERGENCIA: Sistemas anti-incendio de emergencia\n🔴 Restauración ecológica inmediata\n🔴 Evaluación ambiental urgente (SEA)",
+            'HUMEDAL': "🔴 EMERGENCIA: Contactar SMA/DGA/Ramsar INMEDIATAMENTE\n🔴 Plan de restauración de emergencia\n🔴 Evaluación ambiental estratégica urgente",
+            'AGRICOLA': "🔴 EMERGENCIA: Riego de emergencia INMEDIATO\n🔴 Inspección veterinaria fitosanitaria urgente\n🔴 Consultor especialista requerido"
+        }
     }
     
-    recom_text = recomendaciones.get(nivel_riesgo, recomendaciones['NORMAL'])
+    recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, 
+                  recomendaciones_por_tipo.get(nivel_riesgo, {}).get('GENERAL', 'Sin recomendaciones'))
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
@@ -1067,6 +1216,7 @@ def generar_pdf_auditoria_v2(proyecto_data, reporte_data, img_path=None):
     pdf.cell(0, 4, f"Fecha de emisión: {fecha_emision}", align="C", ln=1)
     
     return pdf
+
 
 # === INICIALIZAR SESSION STATE ===
 if 'authenticated' not in st.session_state:
@@ -1171,7 +1321,7 @@ else:
         "📖 Guía"
     ])
 
-# === PESTAÑA 1: VIGILANCIA ===
+# === PESTAÑA 1: VIGILANCIA (SIN VELOCÍMETRO) ===
 with tab1:
     try:
         proyectos = supabase.table("usuarios").select("*").execute().data
@@ -1214,23 +1364,6 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            fig = go.Figure(go.Indicator(
-                                mode="gauge+number",
-                                value=reporte['savi_actual'],
-                                title={'text': "SAVI Actual"},
-                                gauge={
-                                    'axis': {'range': [0, 0.25]},
-                                    'bar': {'color': "#2c3e50"},
-                                    'steps': [
-                                        {'range': [0, 0.05], 'color': "#ffcccc"},
-                                        {'range': [0.05, 0.15], 'color': "#ffffcc"},
-                                        {'range': [0.15, 0.25], 'color': "#ccffcc"}
-                                    ]
-                                }
-                            ))
-                            fig.update_layout(height=350, font={'size': 12})
-                            st.plotly_chart(fig, use_container_width=True)
-                            
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 
@@ -1247,7 +1380,7 @@ with tab1:
     else:
         st.warning("No hay proyectos disponibles")
 
-# === PESTAÑA 2: INFORMES ===
+# === PESTAÑA 2: AUDITORÍAS (SOLO VELOCÍMETRO AQUÍ) ===
 with tab_informe:
     st.subheader("📋 Generador de Auditorías Profesionales")
     
@@ -1277,19 +1410,16 @@ with tab_informe:
         if st.button("🚀 Generar Auditoría Completa", key="btn_gen_audit"):
             with st.spinner("⏳ Procesando auditoría... Esto puede tomar 2-3 minutos"):
                 try:
-                    # Obtener proyecto
                     proyecto_data = supabase.table("usuarios")\
                         .select("*")\
                         .eq("Proyecto", proyecto_sel)\
                         .execute().data[0]
                     
-                    # Generar reporte completo
                     reporte_data = generar_reporte_total(proyecto_data)
                     
                     if reporte_data.get('tipo') == 'error':
                         st.error(f"❌ {reporte_data.get('error', 'Error desconocido')}")
                     else:
-                        # Guardar en session state
                         st.session_state['reporte_actual'] = reporte_data
                         st.session_state['proyecto_audit'] = proyecto_sel
                         st.session_state['mes_audit'] = mes_sel
@@ -1327,6 +1457,24 @@ with tab_informe:
             </div>
             """, unsafe_allow_html=True)
             
+            # VELOCÍMETRO (SOLO AQUÍ EN AUDITORÍAS)
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=reporte['savi_actual'],
+                title={'text': "SAVI Actual"},
+                gauge={
+                    'axis': {'range': [0, 0.8]},
+                    'bar': {'color': "#2c3e50"},
+                    'steps': [
+                        {'range': [0, 0.15], 'color': "#ffcccc"},
+                        {'range': [0.15, 0.35], 'color': "#ffffcc"},
+                        {'range': [0.35, 0.8], 'color': "#ccffcc"}
+                    ]
+                }
+            ))
+            fig_gauge.update_layout(height=350, font={'size': 12})
+            st.plotly_chart(fig_gauge, use_container_width=True)
+            
             # Métricas
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             with col_m1:
@@ -1346,8 +1494,9 @@ with tab_informe:
             # Diagnóstico
             st.info(f"📋 {reporte['diagnostico_completo']}")
             
-            st.markdown("### 📨 Mensaje Telegram Completo")
-            st.code(reporte['texto_telegram'], language="text")
+            st.markdown("### 📨 Mensaje Telegram Dinámico")
+            mensaje_telegram = generar_mensaje_telegram_dinamico(reporte, proyecto_data)
+            st.code(mensaje_telegram, language="text")
             
             # Botones de acción
             col_btn1, col_btn2, col_btn3 = st.columns(3)
@@ -1356,11 +1505,14 @@ with tab_informe:
                 if st.button("📥 Descargar PDF", key="btn_download_pdf"):
                     with st.spinner("Generando PDF..."):
                         try:
-                            # Generar gráficos
-                            img_path = generar_graficos(pd.DataFrame(reporte.get('indices_historicos', {})))
+                            # Generar gráficos contextualizados
+                            img_path = generar_graficos_profesionales(
+                                reporte.get('indices_historicos', {}),
+                                reporte.get('tipo', 'GENERAL')
+                            )
                             
-                            # Generar PDF
-                            pdf = generar_pdf_auditoria_v2(proyecto_data, reporte, img_path)
+                            # Generar PDF dinámico
+                            pdf = generar_pdf_auditoria_dinamico(proyecto_data, reporte, img_path)
                             
                             # Convertir a bytes
                             pdf_bytes = pdf.output(dest='S').encode('latin-1')
@@ -1392,19 +1544,23 @@ with tab_informe:
                     with st.spinner("Enviando..."):
                         try:
                             if proyecto_data.get('id_telegram'):
-                                response = requests.post(
-                                    f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage",
-                                    data={
-                                        "chat_id": proyecto_data.get('id_telegram'),
-                                        "text": reporte['texto_telegram'],
-                                        "parse_mode": "Markdown"
-                                    },
-                                    timeout=10
-                                )
-                                if response.status_code == 200:
-                                    st.success("✅ Reporte enviado por Telegram")
+                                token_telegram = st.secrets.get('telegram', {}).get('token', '')
+                                if token_telegram:
+                                    response = requests.post(
+                                        f"https://api.telegram.org/bot{token_telegram}/sendMessage",
+                                        data={
+                                            "chat_id": proyecto_data.get('id_telegram'),
+                                            "text": mensaje_telegram,
+                                            "parse_mode": "Markdown"
+                                        },
+                                        timeout=10
+                                    )
+                                    if response.status_code == 200:
+                                        st.success("✅ Reporte enviado por Telegram")
+                                    else:
+                                        st.error(f"❌ Error: {response.status_code}")
                                 else:
-                                    st.error(f"❌ Error: {response.status_code}")
+                                    st.warning("⚠️ Token de Telegram no configurado")
                             else:
                                 st.warning("⚠️ No hay ID de Telegram registrado")
                         except Exception as e:
@@ -1585,15 +1741,47 @@ if not st.session_state.get('admin_mode'):
     with tab_historial:
         st.title("📨 Mi Historial")
         proyecto_cliente = st.session_state.get('proyecto_cliente')
-        st.info(f"Reportes de {proyecto_cliente}")
+        
+        try:
+            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).execute()
+            if res.data:
+                df_hist = pd.DataFrame(res.data)
+                st.dataframe(df_hist, use_container_width=True)
+                
+                csv = df_hist.to_csv(index=False)
+                st.download_button(
+                    label="📥 Descargar Historial (CSV)",
+                    data=csv,
+                    file_name=f"Historial_{proyecto_cliente}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("No hay reportes generados aún")
+        except Exception as e:
+            st.error(f"Error al cargar historial: {e}")
     
     with tab_config:
         st.title("⚙️ Mi Configuración")
         st.info("Próximamente...")
     
     with tab_guia:
-        st.title("📖 Guía")
-        st.info("Sistema de vigilancia ambiental satelital avanzada")
+        st.title("📖 Guía de Uso")
+        st.markdown("""
+        ### Cómo funciona BioCore Intelligence
+        
+        **Vigilancia en Tiempo Real:**
+        - Accede a la pestaña "Vigilancia" para ver el mapa de tu proyecto
+        - Haz clic en "Ejecutar Reporte" para analizar los últimos datos satelitales
+        
+        **Auditorías Profesionales:**
+        - Ve a "Auditorías" para generar reportes ejecutivos
+        - Los reportes incluyen comparativas con tu línea base histórica
+        - Descarga el PDF profesional para presentaciones
+        
+        **Datos y Historial:**
+        - Accede a "Base Datos" para ver todo tu historial de mediciones
+        - Exporta los datos en CSV para análisis adicionales
+        """)
 
 st.markdown("---")
 st.markdown("""

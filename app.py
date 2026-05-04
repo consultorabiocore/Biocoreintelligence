@@ -921,43 +921,41 @@ def generar_reporte_total(p):
         'ndvi': [ndvi_base * 0.95, ndvi_base, ndvi_now],
         'temp': [temp_val - 2, temp_val - 1, temp_val]
     }
-
     # === GUARDAR EN SUPABASE ===
-# === GUARDAR EN SUPABASE ===
-try:
-    # Extraemos el email desde el objeto 'p' (el cliente seleccionado)
-    email_del_cliente = p.get('email_cliente') or p.get('Email')
+    try:
+        # Extraer email del diccionario 'p'
+        email_del_cliente = p.get('email_cliente') or p.get('Email')
 
-    registro = {
-        'proyecto': p.get('Proyecto'),
-        'email_cliente': email_del_cliente,  # AGREGADO: Para evitar el NULL en el historial
-        'tipo': tipo,
-        'fecha_analisis': f_rep,
-        'savi_actual': float(savi_now),
-        'savi_base': float(savi_base),
-        'ndwi_actual': float(ndwi_now),
-        'ndwi_base': float(ndwi_base),
-        'ndsi_actual': float(ndsi_now),
-        'ndsi_base': float(ndsi_base),
-        'ndvi_actual': float(ndvi_now),
-        'ndvi_base': float(ndvi_base),
-        'swir': float(swir_now),
-        'temperatura': float(temp_val),
-        'variacion_savi': float(variacion_savi),
-        'variacion_ndwi': float(variacion_ndwi),
-        'variacion_ndsi': float(variacion_ndsi),
-        'variacion_ndvi': float(variacion_ndvi),
-        'estado': estado,
-        'nivel': nivel,
-        'diagnostico': diagnostico_detallado,
-        'ano_linea_base': int(anio_base),     # Coincide con tu SQL 'ano_linea_base'
-        'created_at': datetime.now().isoformat()
-    }
-    
-    supabase.table("historial_reportes").insert(registro).execute()
-    
-except Exception as e:
-    st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
+        registro = {
+            'proyecto': p.get('Proyecto'),
+            'email_cliente': email_del_cliente,
+            'tipo': tipo,
+            'fecha_analisis': f_rep,
+            'savi_actual': float(savi_now),
+            'savi_base': float(savi_base),
+            'ndwi_actual': float(ndwi_now),
+            'ndwi_base': float(ndwi_base),
+            'ndsi_actual': float(ndsi_now),
+            'ndsi_base': float(ndsi_base),
+            'ndvi_actual': float(ndvi_now),
+            'ndvi_base': float(ndvi_base),
+            'swir': float(swir_now),
+            'temperatura': float(temp_val),
+            'variacion_savi': float(variacion_savi),
+            'variacion_ndwi': float(variacion_ndwi),
+            'variacion_ndsi': float(variacion_ndsi),
+            'variacion_ndvi': float(variacion_ndvi),
+            'estado': estado,
+            'nivel': nivel,
+            'diagnostico': diagnostico_detallado,
+            'ano_linea_base': int(anio_base),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        supabase.table("historial_reportes").insert(registro).execute()
+        
+    except Exception as e:
+        st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
 
     return {
         'estado': estado,

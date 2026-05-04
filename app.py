@@ -16,12 +16,18 @@ import hashlib
 from io import BytesIO
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="BioCore Intelligence V7", layout="wide")
+st.set_page_config(page_title="BioCore Intelligence", layout="wide")
 
 st.markdown("""
 <style>
     [data-testid="stSidebar"] {
         background-color: #0e1117;
+    }
+    h1 {
+        font-size: 2rem !important;
+    }
+    h2 {
+        font-size: 1.5rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -413,27 +419,70 @@ with st.sidebar:
 
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
-    st.title("🌍 Bienvenido a BioCore Intelligence V7")
-    st.markdown("### Sistema de Vigilancia Ambiental Satelital")
+    # Título principal mejorado
+    st.markdown("""
+    <div style="text-align: center; padding: 30px 0;">
+        <h1 style="font-size: 2.5em; margin-bottom: 0;">🌍 Bienvenido a BioCore Intelligence</h1>
+        <p style="font-size: 1.2em; color: #888; margin-top: 10px;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Información sobre el sistema
+    col_info1, col_info2, col_info3 = st.columns(3)
+    with col_info1:
+        st.markdown("""
+        ### 🛰️ Vigilancia Satelital
+        Monitoreo en tiempo real con Sentinel-2 y MODIS
+        """)
+    with col_info2:
+        st.markdown("""
+        ### 📊 Análisis Inteligente
+        Índices espectrales avanzados: SAVI, NDSI, NDWI
+        """)
+    with col_info3:
+        st.markdown("""
+        ### 📋 Reportes Profesionales
+        Auditorías técnicas automatizadas
+        """)
+    
+    st.markdown("---")
     
     # Mostrar mapa de demostración
     try:
         proyectos = supabase.table("usuarios").select("*").execute().data
         if proyectos:
             st.subheader("📍 Proyectos Activos")
-            for p in proyectos[:3]:  # Mostrar primeros 3 proyectos
-                col1, col2 = st.columns([2, 1])
-                with col1:
+            
+            # Grid de proyectos
+            cols = st.columns(min(len(proyectos), 2))
+            for idx, p in enumerate(proyectos[:6]):  # Mostrar máximo 6
+                with cols[idx % 2]:
+                    st.markdown(f"""
+                    <div style="background-color: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <b>📌 {p['Proyecto']}</b><br>
+                    Tipo: {p.get('Tipo', 'N/A')}<br>
+                    Titular: {p.get('titular', 'N/A')}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     m_obj = dibujar_mapa_biocore(p['Coordenadas'])
-                    folium_static(m_obj, width=500, height=400)
-                with col2:
-                    st.write(f"**Proyecto:** {p['Proyecto']}")
-                    st.write(f"**Tipo:** {p.get('Tipo', 'N/A')}")
-                    st.write(f"**Titular:** {p.get('titular', 'N/A')}")
+                    folium_static(m_obj, width=350, height=300)
     except:
         pass
     
-    st.info("👈 Inicia sesión desde el panel izquierdo para acceder a más funciones")
+    st.markdown("---")
+    
+    # Footer con instrucciones
+    st.markdown("""
+    <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px; margin: 20px 0;">
+    <h3>🔐 Acceso Restringido</h3>
+    <p>Inicia sesión desde el panel izquierdo <b>👈</b> para acceder a todas las funciones</p>
+    <p style="font-size: 0.9em; color: #888;">¿Problemas de acceso? Contacta a soporte@biocoreintelligence.cl</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.stop()
 
 # === TABS PRINCIPALES ===
@@ -484,53 +533,51 @@ with tab1:
                         reporte = generar_reporte_total(p)
                         
                         if reporte.get('tipo') != 'error':
-                            # === VELOCÍMETRO GRANDE ===
+                            # === VELOCÍMETRO CORREGIDO ===
                             fig = go.Figure(go.Indicator(
-                                mode="gauge+number+delta",
+                                mode="gauge+number",
                                 value=reporte['savi_actual'],
-                                domain={'x': [0, 1], 'y': [0, 1]},
-                                title={'text': f"SAVI: Vigilancia Espectral"},
-                                delta={'reference': reporte['savi_base']},
+                                title={'text': "SAVI Actual"},
                                 gauge={
-                                    'axis': {'range': [0, 0.15], 'thickness': 0.75, 'tickwidth': 1},
-                                    'bar': {'color': "#2c3e50", 'thickness': 0.75},
+                                    'axis': {'range': [0, 0.5]},
+                                    'bar': {'color': "#2c3e50"},
                                     'steps': [
-                                        {'range': [0, 0.05], 'color': "#e74c3c"},
-                                        {'range': [0.05, 0.10], 'color': "#f1c40f"},
-                                        {'range': [0.10, 0.15], 'color': "#2ecc71"}
+                                        {'range': [0, 0.05], 'color': "#ffcccc"},
+                                        {'range': [0.05, 0.15], 'color': "#ffffcc"},
+                                        {'range': [0.15, 0.5], 'color': "#ccffcc"}
                                     ],
                                     'threshold': {
-                                        'line': {'color': "white", 'width': 4},
+                                        'line': {'color': "white", 'width': 3},
                                         'value': reporte['savi_base']
                                     }
                                 }
                             ))
                             fig.update_layout(
-                                height=400,
-                                margin=dict(l=40, r=40, t=80, b=40),
-                                paper_bgcolor="rgba(0,0,0,0)",
-                                font={'color': "white", 'size': 12}
+                                height=350,
+                                font={'size': 12}
                             )
                             st.plotly_chart(fig, use_container_width=True)
 
                             # EXPLICACIÓN
                             st.markdown(f"""
                             <div style="background-color:#1e293b; padding:15px; border-radius:10px; border-left:4px solid #60a5fa;">
-                            <b>📊 Interpretación:</b> El valor SAVI de <b>{reporte['savi_actual']:.4f}</b> comparado con la línea base de {reporte['anio_base']} 
-                            ({reporte['savi_base']:.4f}) muestra una variación de <b>{reporte['variacion']:.1f}%</b>. 
-                            Esto indica un estado de <b>{reporte['nivel']}</b>.
+                            <b>📊 Interpretación:</b><br>
+                            Valor SAVI: <b>{reporte['savi_actual']:.4f}</b><br>
+                            Base ({reporte['anio_base']}): <b>{reporte['savi_base']:.4f}</b><br>
+                            Variación: <b>{reporte['variacion']:.1f}%</b><br>
+                            Estado: <b>{reporte['nivel']}</b>
                             </div>
                             """, unsafe_allow_html=True)
 
                             col_a, col_b = st.columns(2)
                             with col_a:
-                                st.metric(label="SAVI Actual", value=f"{reporte['savi_actual']:.4f}")
+                                st.metric(label="SAVI", value=f"{reporte['savi_actual']:.4f}")
                             with col_b:
-                                st.metric(label="Temperatura", value=f"{reporte['temp']:.1f}°C")
+                                st.metric(label="Temp", value=f"{reporte['temp']:.1f}°C")
                             
                             st.success(reporte['estado'])
 
-# === PESTAÑA 2: AUDITORÍAS (CON VISTA PREVIA) ===
+# === PESTAÑA 2: AUDITORÍAS ===
 with tab_informe:
     st.subheader("📋 Generador de Auditorías")
     
@@ -585,7 +632,6 @@ with tab_informe:
                             st.success("✅ Auditoría generada")
                             st.subheader("👁️ Vista Previa")
                             
-                            # Mostrar información del reporte
                             col_prev1, col_prev2 = st.columns([2, 1])
                             with col_prev1:
                                 st.write(f"**Proyecto:** {proyecto}")
@@ -595,7 +641,6 @@ with tab_informe:
                                 st.write(f"**Riesgo:** {reporte['nivel']}")
                                 st.write(f"**Temperatura:** {reporte['temp']:.1f}°C")
                             
-                            # Acciones
                             col_acc1, col_acc2, col_acc3 = st.columns(3)
                             
                             with col_acc1:
@@ -740,7 +785,7 @@ if st.session_state.get('admin_mode'):
         with tab_config:
             st.info("⚙️ Configuración del sistema")
 
-# === PESTAÑA SOPORTE (VISIBLE PARA TODOS) ===
+# === PESTAÑA SOPORTE ===
 with tab_soporte:
     st.title("💬 Soporte BioCore Intelligence")
     
@@ -751,7 +796,7 @@ with tab_soporte:
         st.markdown("""
         **Responsable Técnica:** Loreto Campos Carrasco
         
-        📧 Email: soporte@biocoreintelligence.cl
+        📧 Email: consultorabiocore@gmail.com
         
         📱 Teléfono: +56 9 XXXX XXXX
         
@@ -769,29 +814,18 @@ with tab_soporte:
         
         with st.expander("❓ ¿Qué significan los valores SAVI, NDSI, NDWI?"):
             st.write("""
-- **SAVI:** Índice de Vegetación Ajustado al Suelo (vigor de cobertura vegetal)
-- **NDSI:** Índice de Diferencia Normalizada de Nieve (cobertura de hielo/nieve)
-- **NDWI:** Índice de Diferencia Normalizada de Agua (presencia de agua/humedad)
-- **SWIR:** Infrarrojo de Onda Corta (estabilidad de sustrato)
-            """)
-        
-        with st.expander("❓ ¿Cómo descargo mis auditorías?"):
-            st.write("""
-1. Ve a **'Auditorías'**
-2. Selecciona tu proyecto, mes y año
-3. Haz click en **'Generar Auditoría'**
-4. Visualiza la vista previa
-5. Haz click en **'Descargar PDF'**
+- **SAVI:** Índice de Vegetación Ajustado al Suelo
+- **NDSI:** Índice de Diferencia Normalizada de Nieve
+- **NDWI:** Índice de Diferencia Normalizada de Agua
             """)
     
     with col2:
         st.subheader("📚 Documentación")
         st.markdown("""
         ### Recursos Disponibles
-        - 📖 [Manual del Usuario](#manual)
-        - 🔬 [Protocolo Técnico](#protocolo)
-        - ❓ [Preguntas Frecuentes](#faq)
-        - 🎥 [Tutoriales en Video](#video)
+        - 📖 Manual del Usuario
+        - 🔬 Protocolo Técnico
+        - ❓ Preguntas Frecuentes
         """)
         
         st.subheader("🐛 Reportar Problema")
@@ -802,8 +836,8 @@ with tab_soporte:
             severidad = st.selectbox("Severidad", ["Baja", "Media", "Alta", "Crítica"])
             
             if st.form_submit_button("📬 Enviar Reporte"):
-                st.success("✅ Reporte enviado. Te contactaremos dentro de 24 horas.")
-                st.balloon()
+                st.success("✅ Reporte enviado a consultorabiocore@gmail.com")
+                st.balloons()
 
 # === PESTAÑA GUÍA ===
 with tab_guia:
@@ -822,7 +856,7 @@ with tab_guia:
         st.markdown("""
         ## 🌍 ¿Qué es BioCore Intelligence?
         
-        BioCore Intelligence V7 es una plataforma avanzada de **vigilancia ambiental satelital** 
+        BioCore Intelligence es una plataforma avanzada de **vigilancia ambiental satelital** 
         que utiliza datos de sensores de Earth Engine para monitorear en tiempo real la salud 
         de ecosistemas, glaciares, bosques y zonas de operación industrial.
         
@@ -832,26 +866,6 @@ with tab_guia:
         - ✅ Cumplimiento normativo (RCA, Ley de Glaciares, etc.)
         - ✅ Generación de reportes profesionales
         - ✅ Análisis histórico de tendencias
-        
-        ### 🛰️ Tecnología Utilizada
-        
-        **Satélites de Monitoreo:**
-        - **Sentinel-2:** Imágenes ópticas multiespectrales
-        - **MODIS:** Datos de temperatura y radiancia
-        - **Sentinel-1:** Radar para análisis de rugosidad superficial
-        
-        **Procesamiento:**
-        - Google Earth Engine
-        - Cálculo de índices espectrales
-        - Análisis temporal y comparativo
-        
-        ### 📈 Flujo de Trabajo
-        
-        ```
-        1. Selecciona Proyecto → 2. Ejecuta Reporte → 3. Analiza Velocímetro
-        ↓
-        4. Descarga Auditoría → 5. Comparte con Stakeholders
-        ```
         """)
     
     # === TAB ÍNDICES ESPECTRALES ===
@@ -863,188 +877,42 @@ with tab_guia:
         
         **Definición:** Mide el vigor y densidad de la cobertura vegetal
         
-        **Fórmula:**
-        ```
-        SAVI = ((NIR - RED) / (NIR + RED + 0.5)) × 1.5
-        ```
-        
-        **Interpretación:**
         | Valor SAVI | Estado | Acción |
         |:----------:|:------:|:------:|
-        | < 0.05 | Suelo desnudo/mineral | Seguimiento normal |
-        | 0.05 - 0.20 | Cobertura vegetal baja | Alerta moderada |
-        | 0.20 - 0.40 | Cobertura vegetal media | Normal |
-        | > 0.40 | Cobertura vegetal densa | Óptimo |
-        
-        ---
-        
-        ### ❄️ NDSI (Normalized Difference Snow Index)
-        
-        **Definición:** Detecta presencia de nieve e hielo
-        
-        **Fórmula:**
-        ```
-        NDSI = (GREEN - SWIR) / (GREEN + SWIR)
-        ```
-        
-        **Interpretación:**
-        | Valor NDSI | Significado |
-        |:----------:|:-----------:|
-        | < 0.2 | Sin nieve |
-        | 0.2 - 0.4 | Nieve dispersa |
-        | > 0.4 | Cobertura nival consolidada |
-        
-        ---
-        
-        ### 💧 NDWI (Normalized Difference Water Index)
-        
-        **Definición:** Indica presencia de agua y humedad en suelo/vegetación
-        
-        **Fórmula:**
-        ```
-        NDWI = (NIR - SWIR) / (NIR + SWIR)
-        ```
-        
-        **Interpretación:**
-        | Valor NDWI | Significado |
-        |:----------:|:-----------:|
-        | < -0.1 | Muy seco |
-        | -0.1 a 0.1 | Moderadamente seco |
-        | > 0.1 | Húmedo/Presencia de agua |
-        
-        ---
-        
-        ### 🪨 SWIR (Short-Wave Infrared)
-        
-        **Definición:** Mide la reflectancia en infrarrojo de onda corta (estabilidad de sustrato)
-        
-        **Interpretación:**
-        - Valores altos → Suelo seco/estable
-        - Valores bajos → Suelo húmedo/inestable
+        | < 0.05 | Suelo desnudo | Seguimiento normal |
+        | 0.05-0.20 | Cobertura baja | Alerta |
+        | > 0.20 | Cobertura media-alta | Óptimo |
         """)
     
-    # === TAB ANÁLISIS DE DATOS ===
+    # === TAB ANÁLISIS ===
     with tab_analisis:
         st.markdown("""
-        ## 🔬 Análisis de Datos y Reportes
+        ## 🔬 Análisis de Datos
         
-        ### 📋 Estructura de un Reporte
+        Estructura de un reporte BioCore:
         
-        Todo reporte en BioCore contiene:
-        
-        **1. Encabezado Técnico**
-        - Nombre del proyecto
-        - Fecha de análisis
-        - Responsable técnico
-        
-        **2. Diagnóstico Ejecutivo**
-        - Estado general (Verde/Amarillo/Rojo)
-        - Nivel de riesgo
-        - Recomendaciones inmediatas
-        
-        **3. Análisis Espectral Detallado**
-        - Tabla de índices (SAVI, NDSI, NDWI, SWIR)
-        - Comparación con línea base histórica
-        - Variaciones porcentuales
-        - Temperatura detectada
-        
-        **4. Gráficos Históricos**
-        - Series temporales de cada índice
-        - Tendencias de cambio
-        - Anomalías detectadas
-        
-        **5. Conclusiones y Acciones**
-        - Interpretación técnica
-        - Recomendaciones de seguimiento
-        - Firma del responsable técnico
-        
-        ### 📊 Interpretación de Velocímetro
-        
-        El velocímetro muestra:
-        - **Valor actual (centro):** SAVI del último análisis
-        - **Línea blanca (referencia):** SAVI de línea base
-        - **Colores de fondo:**
-          - 🔴 Rojo: Alerta crítica (SAVI muy bajo)
-          - 🟡 Amarillo: Precaución
-          - 🟢 Verde: Normal/Óptimo
-        
-        ### 📈 Comparación Histórica
-        
-        BioCore compara automáticamente:
-        - Datos actuales vs línea base histórica
-        - Calcula variación porcentual
-        - Identifica tendencias
-        - Detecta anomalías
-        
-        **Ejemplo:**
-        ```
-        SAVI Actual: 0.2540
-        SAVI Base (2017): 0.2100
-        Variación: +19.5% ✅
-        Interpretación: Mejora en cobertura vegetal
-        ```
+        **1. Encabezado Técnico** - Proyecto, fecha, responsable
+        **2. Diagnóstico Ejecutivo** - Estado (Verde/Amarillo/Rojo)
+        **3. Análisis Espectral** - Tabla de índices
+        **4. Gráficos Históricos** - Series temporales
+        **5. Conclusiones** - Recomendaciones de acción
         """)
     
-    # === TAB PROTOCOLO TÉCNICO ===
+    # === TAB PROTOCOLO ===
     with tab_protocolo:
         st.markdown("""
-        ## ⚙️ Protocolo Técnico de Validación
+        ## ⚙️ Protocolo Técnico
         
-        ### 🔍 Sistema de Validación de Línea Base Espectral
+        BioCore utiliza un protocolo avanzado que distingue cambios reales de ruido del sensor:
         
-        BioCore utiliza un protocolo avanzado que distingue:
-        
-        **✅ Cambios Reales (Alertas Legítimas)**
-        - Degradación de cobertura vegetal > -15%
-        - Pérdida de cobertura nival en criosfera
-        - Presencia anómala de agua
+        **✅ Cambios Reales:**
+        - Degradación de cobertura > -15%
+        - Pérdida de cobertura nival
         - Estrés térmico extremo
         
-        **⚪ Ruido de Sensor (Variaciones Normales)**
-        - Fluctuaciones en suelo mineral < 20%
-        - Variaciones estacionales normales
-        - Cambios dentro de incertidumbre del sensor
-        
-        ### 🎯 Clasificación Automática de Terreno
-        
-        El sistema clasifica automáticamente:
-        
-        | Clase | Criterio | Tolerancia |
-        |:-----:|:--------:|:----------:|
-        | MINERAL_ÁRIDO | SAVI < 0.10 | ±20% |
-        | VEGETADO | SAVI ≥ 0.30 | ±10% |
-        | CRIOSFERA | NDSI ≥ 0.35 | Crítico |
-        | HÍDRICO | NDWI ≥ 0.20 | Crítico |
-        
-        ### 🚨 Umbrales de Alerta
-        
-        **CRÍTICO 🔴**
-        - SAVI cae > 15% bajo línea base
-        - NDSI en glaciar desciende abruptamente
-        - Temperatura > 28°C en zona de montaña
-        
-        **MODERADO 🟡**
-        - SAVI cae 5-15% bajo línea base
-        - Anomalía hídrica en zona seca
-        - Cambios irregulares en patrones
-        
-        **NORMAL 🟢**
-        - Variaciones < 5%
-        - Cambios consistentes con patrón histórico
-        - Todas las métricas dentro de rango
-        
-        ### 📊 Metodología de Comparación
-        
-        ```
-        1. Descarga imagen satelital actual (Sentinel-2)
-        2. Calcula índices (SAVI, NDSI, NDWI, SWIR)
-        3. Obtiene año de línea base del cliente
-        4. Busca imágenes de ese año (menos nubes)
-        5. Calcula diferencia absoluta y relativa
-        6. Aplica filtros de validación
-        7. Genera clasificación final
-        8. Entrega reporte con recomendaciones
-        ```
+        **⚪ Ruido Normal:**
+        - Variaciones en suelo mineral < 20%
+        - Cambios estacionales
         """)
     
     # === TAB FAQ ===
@@ -1052,94 +920,24 @@ with tab_guia:
         st.markdown("""
         ## ❓ Preguntas Frecuentes
         
-        ### 🎯 Preguntas Generales
+        **¿Con qué frecuencia reviso mis reportes?**
+        > Semanal, Mensual o Trimestral según tu configuración
         
-        **¿Con qué frecuencia debo revisar mis reportes?**
-        > Depende de tu configuración. Recomendamos:
-        > - **Semanal** para zonas críticas (glaciares, operaciones activas)
-        > - **Mensual** para zonas estables (bosques, reservas)
-        > - **Trimestral** para monitoreo general
+        **¿Puedo cambiar mi línea base?**
+        > Sí, contacta a soporte
         
-        **¿Puedo cambiar mi línea base histórica?**
-        > Sí. Contacta a Soporte y especifica el nuevo año. Es recomendable 
-        > elegir un año sin anomalías naturales para mejor comparación.
-        
-        **¿Qué pasa si hay mucha nubosidad?**
-        > El sistema busca automáticamente la imagen más reciente sin nubes 
-        > (algoritmo CLOUDY_PIXEL_PERCENTAGE). En zonas muy nubladas puede 
-        > haber demora de 3-7 días.
-        
-        ---
-        
-        ### 📊 Sobre Índices
-        
-        **¿Por qué mi SAVI es muy bajo?**
-        > Posibles causas:
-        > - Zona con suelo desnudo/mineral (normal en altura)
-        > - Temporada seca (normal estacional)
-        > - Degradación real (requiere acción)
-        > Consulta con Soporte para interpretación específica.
-        
-        **¿Qué significa un NDSI negativo?**
-        > Significa que no hay nieve en esa zona. Valores negativos son normales 
-        > en zonas bajas o durante verano. Para criosfera, es señal de alerta.
-        
-        **¿El NDWI puede ser negativo?**
-        > Sí, y es normal. Valores muy negativos indican sequedad extrema. 
-        > Valores cercanos a -0.1 son típicos de desiertos y zonas áridas.
-        
-        ---
-        
-        ### 💾 Sobre Reportes
-        
-        **¿Cuánto tiempo guarda BioCore mis datos históricos?**
-        > Conservamos datos desde que empezó tu monitoreo. No hay límite de 
-        > retención. Puedes acceder a cualquier reporte anterior desde 'Base de Datos'.
-        
-        **¿Puedo exportar mis datos?**
-        > Sí. Ve a 'Base de Datos' y descarga el CSV con toda tu información histórica.
-        
-        **¿Cómo obtengo una auditoría para un mes específico?**
-        > Ve a 'Auditorías', selecciona mes y año, y haz click en 'Generar Auditoría'. 
-        > La vista previa se abrirá para que verifiques antes de descargar.
-        
-        ---
-        
-        ### 🔐 Seguridad y Privacidad
-        
-        **¿Es seguro subir mis coordenadas?**
-        > Completamente. Los datos están encriptados en servidor de Supabase 
-        > con certificación GDPR. Solo tú y el admin pueden ver tus proyectos.
-        
-        **¿Quién puede ver mis reportes?**
-        > Solo:
-        > - Tú (cliente) - acceso a tus propios reportes
-        > - Loreto Campos (admin) - acceso a todos para soporte
-        > - Nadie más tiene acceso
-        
-        ---
-        
-        ### 🆘 Soporte y Ayuda
-        
-        **¿Cuál es el tiempo de respuesta de Soporte?**
-        > - Crítico 🔴: < 2 horas
-        > - Alto 🟠: < 4 horas
-        > - Medio 🟡: < 24 horas
-        > - Bajo 🟢: < 48 horas
-        
-        **¿Hay capacitación disponible?**
-        > Sí. Contacta a Soporte para:
-        > - Sesión de bienvenida (30 min)
-        > - Training técnico personalizado (1-2 horas)
-        > - Webinars mensuales (gratuitos)
+        **¿Qué pasa con la nubosidad?**
+        > Sistema busca automáticamente imágenes sin nubes
         """)
 
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 0.9em; padding: 20px;">
-<b>BioCore Intelligence V7</b> | Vigilancia Ambiental Satelital Avanzada
+<b>BioCore Intelligence</b> | Vigilancia Ambiental Satelital Avanzada
 <br>
 Responsable Técnica: Loreto Campos Carrasco
+<br>
+📧 consultorabiocore@gmail.com
 <br>
 © 2026 - Todos los derechos reservados
 </div>

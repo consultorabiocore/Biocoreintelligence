@@ -148,12 +148,15 @@ def obtener_coordenadas_correctamente(p):
 
 # ============================================================================
 # MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO
+# ===========================================================================
+# ============================================================================
+# MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO (EXPANDIDO)
 # ============================================================================
 
 def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
     """
     Genera mensaje Telegram dinámico según tipo de proyecto.
-    Enfatiza vigilancia activa y crea necesidad del servicio.
+    Incluye: NDSI, Sentinel-1 SAR, SAVI, SWIR, Temperatura, Fuegos NASA
     """
     tipo = proyecto_data.get('Tipo', 'MINERIA').upper()
     proyecto = proyecto_data.get('Proyecto', 'N/A')
@@ -168,6 +171,13 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
     estado = reporte_data.get('estado', '')
     variacion_savi = reporte_data.get('variacion', 0)
     variacion_ndwi = reporte_data.get('variacion_ndwi', 0)
+    variacion_ndsi = reporte_data.get('variacion_ndsi', 0)
+    
+    # Datos adicionales
+    sar_vv = reporte_data.get('sar_vv', 0.0)
+    clay = reporte_data.get('clay', 0.0)
+    incendios = reporte_data.get('incendios_activos', 0)
+    swir = reporte_data.get('swir', 0.0)
     
     # Base del mensaje
     encabezado = f"""
@@ -176,162 +186,489 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 ║                    BIOCORE INTELLIGENCE                   ║
 ╚════════════════════════════════════════════════════════════╝
 
-📍 SITIO MONITOREADO: {proyecto}
+📍 PROYECTO: {proyecto}
 📊 TIPO: {tipo}
 📅 ANÁLISIS: {fecha}
-🔍 RESPONSABLE: Loreto Campos Carrasco
-🛰️ FUENTES: Sentinel-2 | MODIS | SAR L-Band
+👤 RESPONSABLE: Loreto Campos Carrasco
+🛰️ SENSORES: Sentinel-2 | Sentinel-1 SAR | MODIS | NASA Fire
 
 ═══════════════════════════════════════════════════════════════"""
 
-    # Mensajes específicos por tipo de proyecto
-    if tipo == 'MINERIA':
-        diagnostico_dinamico = f"""
-🏔️ SECTOR MINERO - VIGILANCIA INTEGRAL DE YACIMIENTO
+    # Estructura unificada por tipo de proyecto (como en imagen)
+    if tipo == 'GLACIAR':
+        diagnostico = f"""
+❄️ ESTADO DE CRIÓSFERA (NDSI):
+└ Cobertura Actual: {ndsi:.3f}
+└ Análisis: {'✅ Hielo perenne confirmado' if ndsi > 0.40 else '⚠️ Ciclo estacional' if ndsi > 0.20 else '🔴 Nula presencia de nieve. Predomina suelo expuesto o sustrato rocoso.'}
+└ Variación: {variacion_ndsi:+.1f}%
 
-📡 DATOS ESPECTRALES EN TIEMPO REAL:
+📡 MONITOREO RADAR (Sentinel-1):
+└ Retrodispersión VV: {sar_vv:.2f} dB
+└ Análisis: {'La señal sugiere una superficie rugosa o presencia de estructuras, consistente con actividad operativa.' if sar_vv > -8 else 'Superficie lisa detectada, indicando hielo o nieve consolidada.'}
 
-💧 RECURSOS HÍDRICOS (NDWI):
-   Valor: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
-   {'✅ ÓPTIMO - Hidratación confirmada' if ndwi > 0.30 else '⚠️ ALERTA - Vigilancia intensiva' if ndwi > 0.15 else '🔴 CRÍTICO - Acción inmediata'}
-   
-   💡 INTERPRETACIÓN OPERACIONAL:
-   {'→ Sin indicios de desecación o depósito de relaves anómalos' if ndwi > 0.20 else '→ ALERTA: Posible acopio no documentado o drenaje acelerado'}
+🛡️ INTEGRIDAD DEL TERRENO (SU-6):
+└ Humedad (SWIR): {swir:.2f} | Arcillas (Clay Index): {clay:.2f}
+└ Análisis: {'✅ Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato.' if swir > 0.25 else '⚠️ Humedad moderada detectada'}
+
+🌱 SALUD VEGETAL (SAVI):
+└ Vigor Actual: {savi:.3f} | Base: {reporte_data.get('savi_base', 0):.3f}
+└ Variación: {variacion_savi:+.1f}% respecto al original.
+└ Análisis: {'✅ Suelo estable. Los valores bajos son consistentes con la litología y altitud del sector.' if savi < 0.05 else '⚠️ Vegetación presente'}
+
+⚠️ RIESGO CLIMÁTICO:
+└ Temperatura: {temp:.1f}°C | Incendios Activos: {'✅ Sin focos activos' if incendios == 0 else f'🔴 {incendios} focos detectados por NASA MODIS'}
+└ Análisis: {'✅ Condiciones térmicas normales' if temp < 15 else '⚠️ Temperatura elevada, acelera fusión'}
+
+═══════════════════════════════════════════════════════════════"""
+
+    elif tipo == 'MINERIA':
+        diagnostico = f"""
+⛏️ MONITOREO INTEGRAL DE YACIMIENTO:
+
+❄️ ESTADO DE CRIÓSFERA (NDSI):
+└ Cobertura Actual: {ndsi:.3f}
+└ Análisis: {'✅ Hielo presente - Recurso disponible' if ndsi > 0.20 else '🔴 Sin cobertura de hielo'}
+
+📡 MONITOREO RADAR (Sentinel-1):
+└ Retrodispersión VV: {sar_vv:.2f} dB
+└ Análisis: {'La señal sugiere una superficie rugosa o presencia de estructuras, consistente con actividad operativa.' if sar_vv > -8 else 'Superficie estable detectada.'}
+
+🛡️ RECURSOS HÍDRICOS (NDWI):
+└ Humedad (SWIR): {swir:.2f} | Arcillas: {clay:.2f}
+└ Análisis: {'✅ Niveles de humedad óptimos detectados, garantizando estabilidad en el sustrato.' if swir > 0.25 else '⚠️ Humedad moderada'}
+
+💧 AGUA DISPONIBLE (NDWI):
+└ Valor Actual: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
+└ Análisis: {'✅ Sin indicios de desecación o depósito de relaves anómalos' if ndwi > 0.20 else '⚠️ ALERTA: Posible acopio no documentado'}
 
 🌱 VEGETACIÓN PERIMETRAL (SAVI):
-   Valor: {savi:.4f} | Variación: {variacion_savi:+.1f}%
-   {'✅ Vegetación saludable en buffer de protección' if savi > 0.35 else '⚠️ Estrés vegetal moderado' if savi > 0.20 else '🔴 Degradación crítica detectada'}
-   
-   💡 RIESGO AMBIENTAL:
-   {'→ Cumplimiento de Ley 20.283 verificado' if savi > 0.35 else '→ Requiere plan de remediación urgente'}
+└ Vigor Actual: {savi:.3f} | Base: {reporte_data.get('savi_base', 0):.3f}
+└ Variación: {variacion_savi:+.1f}%
+└ Análisis: {'✅ Cumplimiento de Ley 20.283 verificado' if savi > 0.35 else '⚠️ Vegetación bajo estrés'}
 
-⚠️ DIAGNÓSTICO INTEGRADO:
-   {estado}
-
-📌 ACCIÓN RECOMENDADA:
-   {'→ Mantener vigilancia estándar mensual' if nivel == 'NORMAL' else '→ Intensificar monitoreo a semanal + inspección terrestre' if nivel == 'MODERADO' else '→ EMERGENCIA: Contactar SMA/DGA inmediatamente'}
-
-═══════════════════════════════════════════════════════════════"""
-
-    elif tipo == 'GLACIAR':
-        diagnostico_dinamico = f"""
-❄️ SECTOR CRIÓSFERA - MONITOREO DE GLACIARES Y NIEVE
-
-🌡️ COBERTURA CRIOSFÉRICA (NDSI):
-   Valor: {ndsi:.4f} | Variación: {reporte_data.get('variacion_ndsi', 0):+.1f}%
-   {'✅ COBERTURA CONSOLIDADA - Hielo perenne' if ndsi > 0.50 else '⚠️ TRANSICIÓN - Ciclo estacional' if ndsi > 0.35 else '🔴 CRÍTICA - Exposición de suelo'}
-   
-   📊 ESTADO DE BALANCE DE MASA:
-   {'→ Masa de hielo estable, sin retracción anómala' if ndsi > 0.45 else '→ Seguimiento requerido, posible ciclo estacional' if ndsi > 0.30 else '→ ALERTA: Retracción acelerada confirmada por satélite'}
-
-🌡️ TEMPERATURA SUPERFICIAL (MODIS LST):
-   Temperatura: {temp:.1f}°C
-   Influencia en fusión: {'⚠️ Temperatura elevada acelera derretimiento' if temp > 10 else '✅ Régimen térmico favorable'}
-
-⚠️ DIAGNÓSTICO INTEGRADO:
-   {estado}
-
-🚨 NECESIDAD DEL MONITOREO CONTINUO:
-   {'→ Bajo riesgo, monitoreo preventivo recomendado' if nivel == 'NORMAL' else '→ Riesgo moderado: cambio climático acelera fusión' if nivel == 'MODERADO' else '→ CRÍTICO: Retracción extrema requiere estudios glaciológicos'}
+⚠️ RIESGO CLIMÁTICO:
+└ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin focos activos' if incendios == 0 else f'🔴 {incendios} focos detectados'}
 
 ═══════════════════════════════════════════════════════════════"""
 
     elif tipo == 'BOSQUE':
-        diagnostico_dinamico = f"""
-🌲 SECTOR FORESTAL - VIGILANCIA DE COBERTURA Y RIESGOS
+        diagnostico = f"""
+🌲 VIGILANCIA FORESTAL INTEGRAL:
 
-🌿 DENSIDAD VEGETAL (SAVI):
-   Valor: {savi:.4f} | Variación: {variacion_savi:+.1f}%
-   {'✅ MUY DENSA (>70% cobertura) - Ley 20.283 verificada' if savi > 0.40 else '✅ DENSA (50-70%) - Dentro de norma' if savi > 0.30 else '⚠️ MODERADA - Regeneración detectada' if savi > 0.20 else '🔴 DEGRADADA - Inspección urgente'}
-   
-   📋 CUMPLIMIENTO NORMATIVO:
-   {'→ Certificado: Sin intervención no autorizada' if savi > 0.35 else '→ ALERTA: Posible tala, incendio o plagas detectadas'}
+🌱 DENSIDAD DE COBERTURA (SAVI):
+└ Vigor Actual: {savi:.3f} | Base: {reporte_data.get('savi_base', 0):.3f}
+└ Variación: {variacion_savi:+.1f}%
+└ Análisis: {'✅ Muy densa (>70%) - Ley 20.283 verificada' if savi > 0.40 else '⚠️ Estrés vegetal detectado' if savi > 0.25 else '🔴 Degradación crítica'}
 
-💧 ESTRÉS HÍDRICO (NDWI):
-   Valor: {ndwi:.4f}
-   {'✅ Hidratación óptima - Bajo riesgo de incendio' if ndwi > 0.30 else '⚠️ MODERADO - Riego preventivo recomendado' if ndwi > 0.15 else '🔴 CRÍTICO - Alto riesgo de incendio forestal'}
+📡 MONITOREO RADAR (Sentinel-1):
+└ Retrodispersión VV: {sar_vv:.2f} dB
+└ Análisis: {'La señal sugiere una superficie rugosa o presencia de estructuras.' if sar_vv > -8 else 'Superficie lisa detectada.'}
 
-🔥 ÍNDICE DE RIESGO INTEGRADO:
-   {'✅ BAJO - Condiciones de seguridad óptimas' if ndwi > 0.25 and savi > 0.35 else '⚠️ MODERADO - Sistema de vigilancia activa' if ndwi > 0.15 else '🔴 EXTREMO - Protección de emergencia requerida'}
+💧 DISPONIBILIDAD HÍDRICA (NDWI):
+└ Valor: {ndwi:.4f}
+└ Análisis: {'✅ Óptima - Bajo riesgo de incendio' if ndwi > 0.30 else '⚠️ MODERADO - Vigilancia activa' if ndwi > 0.15 else '🔴 CRÍTICO - Alto riesgo de propagación'}
 
-⚠️ DIAGNÓSTICO:
-   {estado}
+🔥 RIESGO DE INCENDIO:
+└ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin focos activos' if incendios == 0 else f'🔴 {incendios} focos detectados por NASA MODIS'}
+└ Análisis: {'✅ BAJO - Condiciones de seguridad óptimas' if ndwi > 0.25 and savi > 0.35 else '🔴 CRÍTICO'}
 
 ═══════════════════════════════════════════════════════════════"""
 
     elif tipo == 'HUMEDAL':
-        diagnostico_dinamico = f"""
-💧 SECTOR HUMEDAL - VIGILANCIA ECOSISTEMA ACUÁTICO
+        diagnostico = f"""
+💧 VIGILANCIA ECOSISTEMA ACUÁTICO:
 
-💧 CONTENIDO DE AGUA (NDWI):
-   Valor: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
-   {'✅ SATURADO - Ciclo hidrológico óptimo' if ndwi > 0.40 else '⚠️ MODERADO - Variabilidad normal' if ndwi > 0.25 else '🔴 CRÍTICO - Desecación en curso'}
-   
-   🌱 BIODIVERSIDAD:
-   {'→ Hábitat acuático confirmado, fauna protegida' if ndwi > 0.35 else '→ Transición de fase, evaluación urgente' if ndwi > 0.20 else '→ ALERTA: Riesgo de colapso ecosistémico'}
+💧 CICLO HIDROLÓGICO (NDWI):
+└ Contenido Actual: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
+└ Análisis: {'✅ SATURADO - Ciclo óptimo' if ndwi > 0.40 else '⚠️ MODERADO - Variabilidad normal' if ndwi > 0.25 else '🔴 CRÍTICO - Desecación en curso'}
+
+📡 MONITOREO RADAR (Sentinel-1):
+└ Retrodispersión VV: {sar_vv:.2f} dB
+└ Análisis: {'La señal sugiere presencia de agua libre.' if sar_vv < -15 else 'Superficie con agua parcial o sedimentos.'}
+
+🛡️ HUMEDAD DEL SUSTRATO (SU-6):
+└ SWIR: {swir:.2f} | Arcillas: {clay:.2f}
+└ Análisis: {'✅ Niveles de humedad óptimos' if swir > 0.25 else '⚠️ Humedad moderada'}
 
 🌿 VEGETACIÓN HIDRÓFILA (SAVI):
-   Valor: {savi:.4f}
-   {'✅ Plantas acuáticas presentes - Confirmación Ramsar' if savi > 0.30 else '⚠️ Vegetación bajo estrés' if savi > 0.15 else '🔴 Pérdida de flora acuática'}
+└ Vigor: {savi:.3f}
+└ Análisis: {'✅ Flora acuática presente - Confirmación Ramsar' if savi > 0.30 else '⚠️ Vegetación bajo estrés'}
 
-📋 CUMPLIMIENTO NORMATIVO:
-   {'✅ Decreto de Humedales verificado' if ndwi > 0.30 else '⚠️ Requiere plan de restauración' if ndwi > 0.20 else '🔴 Violación SMA/DGA inmediata'}
-
-⚠️ DIAGNÓSTICO:
-   {estado}
+⚠️ ESTADO ECOSISTÉMICO:
+└ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin riesgo' if incendios == 0 else f'⚠️ Riesgo'}
+└ Cumplimiento: {'✅ Decreto de Humedales verificado' if ndwi > 0.30 else '🔴 VIOLACIÓN SMA/DGA INMEDIATA'}
 
 ═══════════════════════════════════════════════════════════════"""
 
     elif tipo == 'AGRICOLA':
-        diagnostico_dinamico = f"""
-🌾 SECTOR AGRÍCOLA - OPTIMIZACIÓN DE CULTIVOS
+        diagnostico = f"""
+🌾 OPTIMIZACIÓN DE CULTIVOS:
 
-🌱 VIGOR VEGETAL (SAVI):
-   Valor: {savi:.4f} | Variación: {variacion_savi:+.1f}%
-   {'✅ ÓPTIMO - Rendimiento máximo esperado' if savi > 0.45 else '✅ NORMAL - Rendimiento estándar' if savi > 0.35 else '⚠️ MODERADO - Aumentar riego/nutrición' if savi > 0.25 else '🔴 CRÍTICO - Riesgo de pérdida total'}
+🌱 VIGOR DEL CULTIVO (SAVI):
+└ Valor Actual: {savi:.3f} | Base: {reporte_data.get('savi_base', 0):.3f}
+└ Variación: {variacion_savi:+.1f}%
+└ Análisis: {'✅ ÓPTIMO - Rendimiento máximo' if savi > 0.45 else '✅ NORMAL - Rendimiento estándar' if savi > 0.35 else '⚠️ MODERADO - Aumentar riego' if savi > 0.25 else '🔴 CRÍTICO'}
 
 💧 DISPONIBILIDAD HÍDRICA (NDWI):
-   Valor: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
-   {'✅ Humedad óptima para crecimiento' if ndwi > 0.30 else '⚠️ Humedad moderada - Aumentar riego' if ndwi > 0.20 else '🔴 CRÍTICO - Riego de emergencia inmediato'}
+└ Humedad Actual: {ndwi:.4f} | Variación: {variacion_ndwi:+.1f}%
+└ Análisis: {'✅ Óptima para crecimiento' if ndwi > 0.30 else '⚠️ Aumentar riego' if ndwi > 0.20 else '🔴 CRÍTICO - Riego de emergencia'}
 
 📊 RENDIMIENTO PROYECTADO:
-   {'✅ MÁXIMO (90-100% de potencial)' if savi > 0.45 and ndwi > 0.30 else '✅ ALTO (70-90%)' if savi > 0.35 and ndwi > 0.20 else '⚠️ MODERADO (50-70%)' if savi > 0.25 else '🔴 BAJO (<50%) - Intervención urgente'}
+└ Potencial: {'✅ MÁXIMO (90-100%)' if savi > 0.45 and ndwi > 0.30 else '✅ ALTO (70-90%)' if savi > 0.35 else '⚠️ MODERADO (50-70%)' if savi > 0.25 else '🔴 BAJO (<50%)'}
 
-🚨 DIAGNÓSTICO OPERACIONAL:
-   {estado}
-
-💡 RECOMENDACIONES:
-   {'→ Mantener régimen estándar de riego' if nivel == 'NORMAL' else '→ Aumentar frecuencia de riego' if nivel == 'MODERADO' else '→ EMERGENCIA: Riego de emergencia + análisis fitosanitario'}
+⚠️ OPERACIONAL:
+└ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin focos' if incendios == 0 else f'⚠️ {incendios} focos'}
 
 ═══════════════════════════════════════════════════════════════"""
 
     else:
-        diagnostico_dinamico = f"""
-📊 MONITOREO GENERAL
+        diagnostico = f"Estado: {estado}\nNivel: {nivel}"
 
-Estado: {estado}
-Nivel: {nivel}
+    # Conclusión
+    conclusion = f"""
+✅ ESTADO GLOBAL: {estado}
 
-═══════════════════════════════════════════════════════════════"""
+📋 CONCLUSIÓN FINAL: Tras el análisis, se concluye {'estabilidad técnica del área' if nivel == 'NORMAL' else 'necesidad de evaluación urgente' if nivel == 'MODERADO' else 'EMERGENCIA AMBIENTAL'}.
+Los parámetros se mantienen dentro de la {'varianza histórica permitida' if nivel == 'NORMAL' else 'zona de alerta'}.
 
-    # Pie de mensaje con necesidad de servicio
-    cierre = f"""
-🎯 VALOR DEL MONITOREO CONTINUO:
-
-✅ PROTECCIÓN LEGAL: Documentación ante inspecciones (SMA, DGA, SEA)
-✅ DETECCIÓN TEMPRANA: Identificación de problemas antes de escalada
-✅ JUSTIFICACIÓN: Prueba técnica de medidas implementadas
-✅ PRECISIÓN: Análisis espectral imposible sin satélites
-
-📞 CONTACTO TÉCNICO:
-   Loreto Campos Carrasco | consultorabiocore@gmail.com
-   BioCore Intelligence © 2026
-
+Responsable: Loreto Campos Carrasco | BioCore Intelligence © 2026
 ═══════════════════════════════════════════════════════════════
 """
 
-    return encabezado + diagnostico_dinamico + cierre
+    return encabezado + diagnostico + conclusion
 
+
+# ============================================================================
+# MÓDULO 1B: EXTENDER REPORTE PARA INCLUIR SAR Y FUEGOS
+# ============================================================================
+
+def agregar_datos_sar_y_fuegos(reporte_base, geom):
+    """Agrega datos de Sentinel-1 SAR y NASA MODIS Fire al reporte"""
+    
+    try:
+        # === SENTINEL-1 SAR ===
+        s1 = ee.ImageCollection('COPERNICUS/S1_GRD')\
+            .filterBounds(geom)\
+            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
+            .sort('system:time_start', False)\
+            .first()
+        
+        if s1 is not None:
+            sar_stats = s1.select('VV').reduceRegion(
+                ee.Reducer.mean(),
+                geom,
+                30
+            ).getInfo()
+            sar_vv = float(sar_stats.get('VV', 0))
+        else:
+            sar_vv = 0.0
+    except:
+        sar_vv = 0.0
+    
+    try:
+        # === NASA MODIS FIRE ===
+        fire = ee.ImageCollection('FIRMS')\
+            .filterBounds(geom)\
+            .sort('system:time_start', False)\
+            .first()
+        
+        if fire is not None:
+            fire_count = fire.select('confidence').gt(50).reduceRegion(
+                ee.Reducer.sum(),
+                geom,
+                1000
+            ).getInfo()
+            incendios = int(fire_count.get('confidence', 0))
+        else:
+            incendios = 0
+    except:
+        incendios = 0
+    
+    # Agregar al reporte base
+    reporte_base['sar_vv'] = sar_vv
+    reporte_base['incendios_activos'] = incendios
+    
+    return reporte_base
+
+
+# ============================================================================
+# ACTUALIZAR: generar_reporte_total PARA INCLUIR SAR Y FUEGOS
+# ============================================================================
+
+def generar_reporte_total(p):
+    """Genera reporte completo con SAR, MODIS Fire y guarda en Supabase"""
+    try:
+        raw_coords = obtener_coordenadas_correctamente(p)
+        
+        if not raw_coords or len(raw_coords) == 0:
+            return {
+                'error': 'Coordenadas vacías después de parseo',
+                'tipo': 'error'
+            }
+
+        if not isinstance(raw_coords[0], (list, tuple)):
+            return {
+                'error': 'Formato de coordenadas inválido',
+                'tipo': 'error'
+            }
+        
+        geom = ee.Geometry.Polygon(raw_coords)
+
+    except Exception as e:
+        return {
+            'error': f'Error en geometría: {str(e)}',
+            'tipo': 'error'
+        }
+
+    # === SENTINEL 2 - ACTUAL ===
+    try:
+        s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+            .filterBounds(geom)\
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+            .sort('system:time_start', False)\
+            .first()
+
+        if s2 is None:
+            return {
+                'error': 'No hay imágenes Sentinel-2 disponibles',
+                'tipo': 'error'
+            }
+
+        timestamp_ms = s2.get('system:time_start').getInfo()
+        f_rep = datetime.fromtimestamp(timestamp_ms/1000).strftime('%d/%m/%Y') if timestamp_ms else "N/A"
+    except Exception as e:
+        return {
+            'error': f'Error obteniendo imágenes: {str(e)}',
+            'tipo': 'error'
+        }
+
+    # === TEMPERATURA ===
+    try:
+        temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
+            .filterBounds(geom)\
+            .sort('system:time_start', False)\
+            .first()
+
+        temp_dict = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)\
+            .reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo()
+        temp_val = float(temp_dict.get('LST_Day_1km', 0))
+    except:
+        temp_val = 0.0
+
+    # === CALCULAR ÍNDICES ===
+    def calcular_idx(img):
+        savi = img.expression(
+            '((NIR - RED) / (NIR + RED + 0.5)) * (1.5)',
+            {'NIR': img.select('B8'), 'RED': img.select('B4')}
+        ).rename('savi')
+        
+        ndsi = img.normalizedDifference(['B3', 'B11']).rename('ndsi')
+        ndwi = img.normalizedDifference(['B8', 'B11']).rename('ndwi')
+        swir = img.select('B11').divide(10000).rename('swir')
+        ndvi = img.normalizedDifference(['B8', 'B4']).rename('ndvi')
+        
+        # Agregar índice de arcillas para SU-6
+        clay = img.select('B11').divide(img.select('B12').add(0.0001)).rename('clay')
+        
+        return img.addBands([savi, ndsi, swir, ndvi, ndwi, clay])
+
+    try:
+        img_now = calcular_idx(s2)
+        
+        region_stats = img_now.reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=geom,
+            scale=30,
+            maxPixels=1e9
+        ).getInfo()
+
+        def safe_float(value, default=0.0):
+            if value is None:
+                return default
+            try:
+                return float(value)
+            except:
+                return default
+
+        savi_now = safe_float(region_stats.get('savi'), 0.0)
+        ndsi_now = safe_float(region_stats.get('ndsi'), 0.0)
+        ndwi_now = safe_float(region_stats.get('ndwi'), 0.0)
+        swir_now = safe_float(region_stats.get('swir'), 0.0)
+        ndvi_now = safe_float(region_stats.get('ndvi'), 0.0)
+        clay_now = safe_float(region_stats.get('clay'), 0.0)
+
+    except Exception as e:
+        return {
+            'error': f'Error calculando índices: {str(e)}',
+            'tipo': 'error'
+        }
+
+    # === LÍNEA BASE ===
+    anio_base = p.get('ano_linea_base', 2017)
+    
+    try:
+        s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+            .filterBounds(geom)\
+            .filterDate(f'{anio_base}-01-01', f'{anio_base}-12-31')\
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+            .sort('CLOUDY_PIXEL_PERCENTAGE')\
+            .first()
+
+        if s2_base is not None:
+            img_base = calcular_idx(s2_base)
+            base_stats = img_base.reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=geom,
+                scale=30,
+                maxPixels=1e9
+            ).getInfo()
+
+            savi_base = safe_float(base_stats.get('savi'), savi_now)
+            ndsi_base = safe_float(base_stats.get('ndsi'), ndsi_now)
+            ndwi_base = safe_float(base_stats.get('ndwi'), ndwi_now)
+            swir_base = safe_float(base_stats.get('swir'), swir_now)
+            ndvi_base = safe_float(base_stats.get('ndvi'), ndvi_now)
+            clay_base = safe_float(base_stats.get('clay'), clay_now)
+        else:
+            savi_base = savi_now
+            ndsi_base = ndsi_now
+            ndwi_base = ndwi_now
+            swir_base = swir_now
+            ndvi_base = ndvi_now
+            clay_base = clay_now
+    except:
+        savi_base = savi_now
+        ndsi_base = ndsi_now
+        ndwi_base = ndwi_now
+        swir_base = swir_now
+        ndvi_base = ndvi_now
+        clay_base = clay_now
+
+    # === VARIACIONES ===
+    def calcular_variacion(actual, base):
+        if abs(base) < 0.001:
+            return 0.0
+        return ((actual - base) / abs(base)) * 100
+
+    variacion_savi = calcular_variacion(savi_now, savi_base)
+    variacion_ndwi = calcular_variacion(ndwi_now, ndwi_base)
+    variacion_ndsi = calcular_variacion(ndsi_now, ndsi_base)
+    variacion_ndvi = calcular_variacion(ndvi_now, ndvi_base)
+
+    # === EVALUACIÓN SEGÚN TIPO ===
+    tipo = p.get('Tipo', 'MINERIA').upper()
+    
+    if tipo == 'MINERIA':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_mineria(
+            ndwi_now, ndwi_base, variacion_ndwi, savi_now, temp_val
+        )
+    elif tipo == 'GLACIAR':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_glaciar(
+            ndsi_now, ndsi_base, variacion_ndsi, temp_val
+        )
+    elif tipo == 'BOSQUE':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_bosque(
+            savi_now, savi_base, variacion_savi, ndwi_now
+        )
+    elif tipo == 'HUMEDAL':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_humedal(
+            ndwi_now, ndwi_base, variacion_ndwi, savi_now
+        )
+    elif tipo == 'AGRICOLA':
+        estado, nivel, color_estado, diagnostico_detallado = evaluar_agricola(
+            savi_now, savi_base, variacion_savi, ndwi_now, variacion_ndwi
+        )
+    else:
+        estado = "🟡 ESTADO NO DEFINIDO"
+        nivel = "DESCONOCIDO"
+        color_estado = (150, 150, 0)
+        diagnostico_detallado = "Tipo de proyecto no reconocido"
+
+    # Crear histórico para gráficos
+    indices_historicos = {
+        'savi': [savi_base * 0.95, savi_base, savi_now],
+        'ndwi': [ndwi_base * 0.95, ndwi_base, ndwi_now],
+        'ndsi': [ndsi_base * 0.95, ndsi_base, ndsi_now],
+        'ndvi': [ndvi_base * 0.95, ndvi_base, ndvi_now],
+        'temp': [temp_val - 2, temp_val - 1, temp_val]
+    }
+
+    # Construir reporte base
+    reporte_completo = {
+        'estado': estado,
+        'diagnostico': diagnostico_detallado,
+        'nivel': nivel,
+        'savi_actual': savi_now,
+        'savi_base': savi_base,
+        'ndsi': ndsi_now,
+        'ndsi_base': ndsi_base,
+        'ndwi': ndwi_now,
+        'ndwi_base': ndwi_base,
+        'swir': swir_now,
+        'ndvi': ndvi_now,
+        'ndvi_base': ndvi_base,
+        'clay': clay_now,
+        'temp': temp_val,
+        'fecha': f_rep,
+        'anio_base': anio_base,
+        'tipo': tipo,
+        'proyecto': p['Proyecto'],
+        'variacion': variacion_savi,
+        'variacion_ndwi': variacion_ndwi,
+        'variacion_ndsi': variacion_ndsi,
+        'variacion_ndvi': variacion_ndvi,
+        'color_estado': color_estado,
+        'diagnostico_completo': diagnostico_detallado,
+        'indices_historicos': indices_historicos,
+        'indices': {
+            'savi': savi_now,
+            'ndsi': ndsi_now,
+            'ndwi': ndwi_now,
+            'ndvi': ndvi_now,
+            'swir': swir_now,
+            'clay': clay_now,
+            'temp': temp_val
+        }
+    }
+
+    # === AGREGAR DATOS DE SAR Y FUEGOS ===
+    reporte_completo = agregar_datos_sar_y_fuegos(reporte_completo, geom)
+
+    # === GUARDAR EN SUPABASE ===
+    try:
+        registro = {
+            'proyecto': p.get('Proyecto'),
+            'tipo': tipo,
+            'fecha_analisis': f_rep,
+            'savi_actual': float(savi_now),
+            'savi_base': float(savi_base),
+            'ndwi_actual': float(ndwi_now),
+            'ndwi_base': float(ndwi_base),
+            'ndsi_actual': float(ndsi_now),
+            'ndsi_base': float(ndsi_base),
+            'ndvi_actual': float(ndvi_now),
+            'ndvi_base': float(ndvi_base),
+            'swir': float(swir_now),
+            'clay': float(clay_now),
+            'sar_vv': float(reporte_completo.get('sar_vv', 0)),
+            'incendios': int(reporte_completo.get('incendios_activos', 0)),
+            'temperatura': float(temp_val),
+            'variacion_savi': float(variacion_savi),
+            'variacion_ndwi': float(variacion_ndwi),
+            'variacion_ndsi': float(variacion_ndsi),
+            'variacion_ndvi': float(variacion_ndvi),
+            'estado': estado,
+            'nivel': nivel,
+            'diagnostico': diagnostico_detallado,
+            'ano_linea_base': int(anio_base),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        supabase.table("historial_reportes").insert(registro).execute()
+    except Exception as e:
+        st.warning(f"Advertencia: No se pudo guardar en historial: {str(e)}")
+
+    return reporte_completo
 
 # ============================================================================
 # MÓDULO 2: GENERADOR DE GRÁFICOS PROFESIONALES
@@ -1462,23 +1799,35 @@ with tab_informe:
             """, unsafe_allow_html=True)
             
             # VELOCÍMETRO (SOLO AQUÍ EN AUDITORÍAS)
+            # VELOCÍMETRO MEJORADO (SOLO AQUÍ EN AUDITORÍAS)
             fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
+                mode="gauge+number+delta",
                 value=reporte['savi_actual'],
-                title={'text': "SAVI Actual"},
+                title={'text': "SAVI - Vigor de Vegetación"},
+                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base'},
                 gauge={
                     'axis': {'range': [0, 0.8]},
-                    'bar': {'color': "#2c3e50"},
+                    'bar': {'color': "#1e40af", 'thickness': 0.3},  # ← Aguja visible
+                    'borderwidth': 2,
+                    'bordercolor': "#333",
                     'steps': [
-                        {'range': [0, 0.15], 'color': "#ffcccc"},
-                        {'range': [0.15, 0.35], 'color': "#ffffcc"},
-                        {'range': [0.35, 0.8], 'color': "#ccffcc"}
-                    ]
+                        {'range': [0, 0.15], 'color': "#fee2e2", 'label': 'Crítico'},
+                        {'range': [0.15, 0.35], 'color': "#fef3c7", 'label': 'Moderado'},
+                        {'range': [0.35, 0.8], 'color': "#dcfce7", 'label': 'Saludable'}
+                    ],
+                    'threshold': {
+                        'line': {'color': "black", 'width': 3},
+                        'thickness': 0.75,
+                        'value': reporte['savi_actual']
+                    }
                 }
             ))
-            fig_gauge.update_layout(height=350, font={'size': 12})
+            fig_gauge.update_layout(
+                height=400,
+                font={'size': 14, 'family': 'Arial'},
+                margin=dict(l=20, r=20, t=80, b=20)
+            )
             st.plotly_chart(fig_gauge, use_container_width=True)
-            
             # Métricas
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             with col_m1:

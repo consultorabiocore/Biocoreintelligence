@@ -9,7 +9,7 @@ from streamlit_folium import folium_static
 import json
 import pandas as pd
 import requests
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import plotly.graph_objects as go
 from supabase import create_client, Client
 import matplotlib.pyplot as plt
@@ -246,7 +246,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 ⚠️ RIESGO CLIMÁTICO:
 └ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin focos activos' if incendios == 0 else f'🔴 {incendios} focos detectados'}
 
-═════════════════════════════════════���═════════════════════════"""
+═══════════════════════════════════════════════════════════════"""
 
     elif tipo == 'BOSQUE':
         diagnostico = f"""
@@ -329,7 +329,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 Los parámetros se mantienen dentro de la {'varianza histórica permitida' if nivel == 'NORMAL' else 'zona de alerta'}.
 
 Responsable: Loreto Campos Carrasco | BioCore Intelligence © 2026
-═══════════════════════════════════════════════════════════════
+════════════════════════��══════════════════════════════════════
 """
 
     return encabezado + diagnostico + conclusion
@@ -786,7 +786,7 @@ def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variac
 # MÓDULO 4: GENERADOR DE REPORTE COMPLETO CON GUARDADO EN SUPABASE
 # ============================================================================
 
-def generar_reporte_total(p):
+def generar_reporte_total(p, rango_dias=30):
     """Genera reporte completo y guarda en Supabase"""
     try:
         raw_coords = obtener_coordenadas_correctamente(p)
@@ -857,8 +857,6 @@ def generar_reporte_total(p):
         ndwi = img.normalizedDifference(['B8', 'B11']).rename('ndwi')
         swir = img.select('B11').divide(10000).rename('swir')
         ndvi = img.normalizedDifference(['B8', 'B4']).rename('ndvi')
-        
-        # Agregar índice de arcillas para SU-6
         clay = img.select('B11').divide(img.select('B12').add(0.0001)).rename('clay')
         
         return img.addBands([savi, ndsi, swir, ndvi, ndwi, clay])
@@ -1297,6 +1295,8 @@ if 'authenticated' not in st.session_state:
     st.session_state['admin_mode'] = False
     st.session_state['proyecto_cliente'] = None
     st.session_state['reporte_actual'] = None
+    st.session_state['reporte_preview'] = None
+    st.session_state['mostrar_preview'] = False
 
 # === SIDEBAR ===
 with st.sidebar:
@@ -1441,24 +1441,32 @@ with tab1:
                             fig_gauge = go.Figure(go.Indicator(
                                 mode="gauge+number+delta",
                                 value=reporte['savi_actual'],
+                                number={'suffix': ''},
                                 title={'text': "SAVI - Vigor de Vegetación"},
-                                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base'},
+                                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base', 'relative': False},
                                 gauge={
-                                    'axis': {'range': [0, 0.8]},
-                                    'bar': {'color': "#1e40af", 'thickness': 0.3},
+                                    'axis': {'range': [0, 0.8], 'thickness': 0.2, 'tickwidth': 1},
+                                    'bar': {'color': "#1e40af", 'line': {'color': "darkblue", 'width': 2}},
                                     'borderwidth': 2,
                                     'bordercolor': "#333",
                                     'steps': [
-                                        {'range': [0, 0.15], 'color': "#fee2e2"},
-                                        {'range': [0.15, 0.35], 'color': "#fef3c7"},
-                                        {'range': [0.35, 0.8], 'color': "#dcfce7"}
-                                    ]
+                                        {'range': [0, 0.15], 'color': "#fee2e2", 'thickness': 0.15},
+                                        {'range': [0.15, 0.35], 'color': "#fef3c7", 'thickness': 0.15},
+                                        {'range': [0.35, 0.8], 'color': "#dcfce7", 'thickness': 0.15}
+                                    ],
+                                    'threshold': {
+                                        'line': {'color': "black", 'width': 4},
+                                        'thickness': 0.8,
+                                        'value': reporte['savi_actual']
+                                    }
                                 }
                             ))
                             fig_gauge.update_layout(
-                                height=400,
+                                height=420,
                                 font={'size': 14, 'family': 'Arial'},
-                                margin=dict(l=20, r=20, t=80, b=20)
+                                margin=dict(l=20, r=20, t=100, b=20),
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)'
                             )
                             st.plotly_chart(fig_gauge, use_container_width=True)
                             
@@ -1478,7 +1486,7 @@ with tab1:
     else:
         st.warning("No hay proyectos disponibles")
 
-# === PESTAÑA 2: AUDITORÍAS ===
+# === PESTAÑA 2: AUDITORÍAS CON RANGO DE FECHAS Y PREVIEW ===
 with tab_informe:
     st.subheader("📋 Generador de Auditorías Profesionales")
     
@@ -1491,19 +1499,34 @@ with tab_informe:
         proyectos_dict = {}
     
     if proyectos_nombres:
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             proyecto_sel = st.selectbox("📍 Seleccionar Proyecto", proyectos_nombres, key="audit_proj")
         
         with col2:
+            rango_sel = st.selectbox("📊 Rango de Análisis", 
+                ["Últimos 7 días", "Últimas 2 semanas", "Último mes", "Últimos 3 meses", "Último año"],
+                key="audit_rango")
+        
+        with col3:
             mes_sel = st.selectbox("📅 Mes", 
                 ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
                 key="audit_mes")
         
-        with col3:
+        with col4:
             anio_sel = st.number_input("📆 Año", value=2026, min_value=2020, max_value=2030, key="audit_anio")
+        
+        # Mapear rango a días
+        rango_dias_map = {
+            "Últimos 7 días": 7,
+            "Últimas 2 semanas": 14,
+            "Último mes": 30,
+            "Últimos 3 meses": 90,
+            "Último año": 365
+        }
+        rango_dias = rango_dias_map.get(rango_sel, 30)
         
         if st.button("🚀 Generar Auditoría Completa", key="btn_gen_audit"):
             with st.spinner("⏳ Procesando auditoría... Esto puede tomar 2-3 minutos"):
@@ -1513,7 +1536,7 @@ with tab_informe:
                         .eq("Proyecto", proyecto_sel)\
                         .execute().data[0]
                     
-                    reporte_data = generar_reporte_total(proyecto_data)
+                    reporte_data = generar_reporte_total(proyecto_data, rango_dias)
                     
                     if reporte_data.get('tipo') == 'error':
                         st.error(f"❌ {reporte_data.get('error', 'Error desconocido')}")
@@ -1523,6 +1546,7 @@ with tab_informe:
                         st.session_state['mes_audit'] = mes_sel
                         st.session_state['anio_audit'] = anio_sel
                         st.session_state['proyecto_data'] = proyecto_data
+                        st.session_state['mostrar_preview'] = True
                         
                         st.success("✅ Auditoría generada exitosamente")
                         st.rerun()
@@ -1532,17 +1556,17 @@ with tab_informe:
         
         st.markdown("---")
         
-        # Mostrar reporte si existe
-        if 'reporte_actual' in st.session_state and st.session_state['reporte_actual']:
+        # PREVIEW DEL REPORTE
+        if st.session_state.get('mostrar_preview') and 'reporte_actual' in st.session_state and st.session_state['reporte_actual']:
             reporte = st.session_state['reporte_actual']
             proyecto = st.session_state.get('proyecto_audit', 'N/A')
             mes = st.session_state.get('mes_audit', 'N/A')
             anio = st.session_state.get('anio_audit', 2026)
             proyecto_data = st.session_state.get('proyecto_data', {})
             
-            # ===== MOSTRAR RESUMEN =====
-            st.subheader("📊 Resumen de Auditoría")
+            st.info("📋 **VISTA PREVIA DEL REPORTE** - Revisa antes de enviar")
             
+            # ===== MOSTRAR RESUMEN =====
             # Banner principal
             estado_color = '#10b981' if 'CONTROL' in reporte['estado'] else '#f97316' if 'PRECAUCIÓN' in reporte['estado'] else '#ef4444'
             
@@ -1552,6 +1576,7 @@ with tab_informe:
             <h2 style="color: white; margin: 0;">{reporte['estado']}</h2>
             <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Riesgo:</b> {reporte['nivel']}</p>
             <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> {mes} {anio}</p>
+            <p style="color: #cbd5e1; margin: 5px 0;"><b>Rango de análisis:</b> {rango_sel}</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -1572,14 +1597,17 @@ with tab_informe:
             st.markdown("")
             
             # Diagnóstico
-            st.info(f"📋 {reporte['diagnostico_completo']}")
+            st.markdown("### 🔍 Diagnóstico Técnico")
+            st.info(f"{reporte['diagnostico_completo']}")
             
-            st.markdown("### 📨 Mensaje Telegram Dinámico")
-            mensaje_telegram = generar_mensaje_telegram_dinamico(reporte, proyecto_data)
-            st.code(mensaje_telegram, language="text")
+            # Mensaje Telegram
+            with st.expander("📨 Ver Mensaje Telegram"):
+                mensaje_telegram = generar_mensaje_telegram_dinamico(reporte, proyecto_data)
+                st.code(mensaje_telegram, language="text")
             
             # Botones de acción
-            col_btn1, col_btn2, col_btn3 = st.columns(3)
+            st.markdown("### ✅ Acciones")
+            col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
             
             with col_btn1:
                 if st.button("📥 Descargar PDF", key="btn_download_pdf"):
@@ -1615,17 +1643,19 @@ with tab_informe:
                             st.error(f"❌ Error al generar PDF: {str(e)}")
             
             with col_btn2:
-                if st.button("🔄 Generar Nueva", key="btn_new_audit"):
+                if st.button("🔄 Regenerar", key="btn_new_audit"):
                     st.session_state['reporte_actual'] = None
+                    st.session_state['mostrar_preview'] = False
                     st.rerun()
             
             with col_btn3:
-                if st.button("📤 Enviar por Telegram", key="btn_send_telegram"):
+                if st.button("📤 Enviar Telegram", key="btn_send_telegram"):
                     with st.spinner("Enviando..."):
                         try:
                             if proyecto_data.get('id_telegram'):
                                 token_telegram = st.secrets.get('telegram', {}).get('token', '')
                                 if token_telegram:
+                                    mensaje_telegram = generar_mensaje_telegram_dinamico(reporte, proyecto_data)
                                     response = requests.post(
                                         f"https://api.telegram.org/bot{token_telegram}/sendMessage",
                                         data={
@@ -1645,6 +1675,12 @@ with tab_informe:
                                 st.warning("⚠️ No hay ID de Telegram registrado")
                         except Exception as e:
                             st.error(f"❌ Error: {str(e)}")
+            
+            with col_btn4:
+                if st.button("❌ Cancelar", key="btn_cancel"):
+                    st.session_state['reporte_actual'] = None
+                    st.session_state['mostrar_preview'] = False
+                    st.rerun()
     else:
         st.warning("📌 No hay proyectos registrados en la base de datos")
 
@@ -1845,23 +1881,149 @@ if not st.session_state.get('admin_mode'):
         st.info("Próximamente...")
     
     with tab_guia:
-        st.title("📖 Guía de Uso")
+        st.title("📖 Guía de Uso - BioCore Intelligence")
+        
         st.markdown("""
-        ### Cómo funciona BioCore Intelligence
+        ### 🛰️ ¿Cómo funciona BioCore Intelligence?
+
+        **BioCore Intelligence** es un sistema avanzado de vigilancia ambiental satelital que monitorea 
+        proyectos ambientales en tiempo real utilizando datos de satélites de la NASA y ESA.
+
+        ---
+
+        #### 📍 **Pestaña 1: Vigilancia en Tiempo Real**
         
-        **Vigilancia en Tiempo Real:**
-        - Accede a la pestaña "Vigilancia" para ver el mapa de tu proyecto
-        - Haz clic en "Ejecutar Reporte" para analizar los últimos datos satelitales
-        - Visualiza el velocímetro SAVI para conocer el estado del vigor vegetal
+        En esta sección puedes:
+        - 🗺️ Visualizar el mapa de tu proyecto
+        - 🚀 **Ejecutar reportes** inmediatos basados en últimas imágenes satelitales
+        - 📊 Ver el **velocímetro SAVI** para conocer el estado del vigor vegetal
+        - 📋 Consultar métricas instantáneas (SAVI, NDWI, Temperatura)
+        - 🔍 Leer diagnósticos técnicos automáticos del estado del terreno
+
+        **Sensores utilizados:**
+        - 🛰️ **Sentinel-2** (Imágenes RGB multiespectrales)
+        - 📡 **Sentinel-1** (Radar de apertura sintética)
+        - 🌡️ **MODIS** (Temperatura de superficie)
+        - 🔥 **NASA Fire** (Detección de incendios)
+
+        ---
+
+        #### 📋 **Pestaña 2: Auditorías Profesionales**
         
-        **Auditorías Profesionales:**
-        - Ve a "Auditorías" para generar reportes ejecutivos
-        - Los reportes incluyen comparativas con tu línea base histórica
-        - Descarga el PDF profesional para presentaciones
+        Genera reportes ejecutivos con:
+        - 📊 **Rango de análisis** seleccionable (7 días, 2 semanas, 1 mes, 3 meses, 1 año)
+        - 📅 **Período específico** (mes y año)
+        - 🔍 **Vista previa** antes de enviar o descargar
+        - 📥 **Descarga en PDF** profesional con gráficos
+        - 📤 **Envío automático por Telegram**
+        - 💾 **Guardado automático** en base de datos
+
+        **Contenido del PDF:**
+        1. Información del proyecto
+        2. Estado y evaluación de riesgo
+        3. Tabla de índices espectrales
+        4. Diagnóstico técnico detallado
+        5. Gráficos de serie temporal
+        6. Recomendaciones y acciones
+
+        ---
+
+        #### 📊 **Pestaña 3: Base de Datos**
         
-        **Datos y Historial:**
-        - Accede a "Base Datos" para ver todo tu historial de mediciones
-        - Exporta los datos en CSV para análisis adicionales
+        (Solo administradores)
+        - 👥 Ver todos los proyectos registrados
+        - 📥 Descargar datos en CSV
+        - 📈 Análisis histórico de mediciones
+
+        ---
+
+        #### 👥 **Pestaña 4: Gestión de Clientes** (Solo Admin)
+        
+        - ➕ Registrar nuevos clientes y proyectos
+        - ✏️ Editar información de proyectos
+        - 🗑️ Eliminar proyectos obsoletos
+
+        ---
+
+        #### 📨 **Pestaña 5: Mi Historial** (Solo Clientes)
+        
+        - 📋 Ver todos los reportes generados
+        - 📥 Descargar historial en CSV
+        - 📊 Análisis de tendencias
+
+        ---
+
+        ### 🎯 **Índices Espectrales Explicados**
+
+        #### 🌱 **SAVI - Soil-Adjusted Vegetation Index**
+        - **Rango:** 0 a 1
+        - **Significado:** Vigor y densidad de vegetación
+        - **Alto (>0.4):** Vegetación densa y saludable
+        - **Bajo (<0.2):** Vegetación degradada o suelo desnudo
+
+        #### 💧 **NDWI - Normalized Difference Water Index**
+        - **Rango:** -1 a 1
+        - **Significado:** Contenido de agua y humedad
+        - **Alto (>0.3):** Agua abundante o humedad óptima
+        - **Bajo (<0.15):** Estrés hídrico o sequía
+
+        #### ❄️ **NDSI - Normalized Difference Snow Index**
+        - **Rango:** -1 a 1
+        - **Significado:** Cobertura de nieve e hielo
+        - **Alto (>0.5):** Nieve/hielo consolidado
+        - **Bajo (<0.2):** Suelo rocoso expuesto
+
+        #### 🌳 **NDVI - Normalized Difference Vegetation Index**
+        - **Rango:** -1 a 1
+        - **Significado:** Verdor y vitalidad general
+        - **Alto (>0.7):** Bosque denso y saludable
+        - **Bajo (<0.3):** Vegetación escasa
+
+        #### 🌡️ **Temperatura LST (Land Surface Temperature)**
+        - **Unidad:** °C
+        - **Rango:** -40 a +60°C
+        - **Normal:** Depende de elevación y latitud
+        - **Indicador:** Estrés por calor en vegetación
+
+        ---
+
+        ### 📈 **¿Cómo interpretar mi reporte?**
+
+        **Estados posibles:**
+        - 🟢 **BAJO CONTROL (Verde):** Todo normal, sin acciones inmediatas
+        - 🟡 **PRECAUCIÓN (Amarillo):** Vigilancia intensiva recomendada
+        - 🔴 **ALERTA CRÍTICA (Rojo):** Acción inmediata requerida
+
+        **Ejemplos:**
+        - **MINERÍA:** Monitores NDWI (agua disponible) vs SAVI (vegetación perimetral)
+        - **GLACIAR:** Monitorea NDSI (cobertura de hielo) y temperatura (riesgo de fusión)
+        - **BOSQUE:** Vigila SAVI (densidad) y NDWI (riesgo de incendio)
+        - **HUMEDAL:** Verifica NDWI (ciclo hidrológico) vs SAVI (flora hidrófila)
+        - **AGRÍCOLA:** Controla SAVI (rendimiento esperado) y NDWI (necesidad de riego)
+
+        ---
+
+        ### 💡 **Preguntas Frecuentes**
+
+        **¿Con qué frecuencia recibo datos?**
+        Sentinel-2 tiene revisita cada 5 días. Generamos reportes cuando hay nuevas imágenes disponibles.
+
+        **¿Qué tan precisas son las mediciones?**
+        Resolución: 10-20 metros. Precisión: ±5% en índices espectrales.
+
+        **¿Puedo descargar mis reportes?**
+        Sí, todos los reportes están disponibles en PDF y CSV desde tu historial.
+
+        **¿Mi información es confidencial?**
+        Totalmente. Cada cliente solo ve sus propios proyectos.
+
+        ---
+
+        ### 📞 **Soporte Técnico**
+        
+        **Contacto:** Loreto Campos Carrasco
+        📧 **Email:** consultorabiocore@gmail.com
+        ⏰ **Horario:** Lunes-Viernes 8:00-18:00
         """)
 
 st.markdown("---")

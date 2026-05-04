@@ -67,7 +67,14 @@ def clean(text):
     return text.encode('latin-1', errors='replace').decode('latin-1')
 
 
-# === SISTEMA DE AUTENTICACIÓN ===
+# === SISTEMA DE AUTENTICACIÓN SIMPLIFICADO ===
+
+def es_admin(contraseña_admin):
+    """Verifica si es el admin comparando directamente"""
+    # La contraseña admin es: 2861701l
+    return contraseña_admin == "2861701l"
+
+
 def hash_password(password):
     """Genera hash SHA256 de contraseña"""
     return hashlib.sha256(password.encode()).hexdigest()
@@ -85,18 +92,6 @@ def verificar_credenciales_usuario(proyecto, password):
         return False, None
     except:
         return False, None
-
-
-def es_admin(contraseña_admin):
-    """Verifica si es el admin (contraseña maestra) con la ruta correcta"""
-    try:
-        # El código original buscaba en la raíz, pero el TOML tiene [auth]
-        contraseña_admin_hash = st.secrets["auth"]["admin_password_hash"]
-    except:
-        # Respaldo por si no encuentra el secreto
-        contraseña_admin_hash = hashlib.sha256("biocore2024admin".encode()).hexdigest()
-    
-    return hashlib.sha256(contraseña_admin.encode()).hexdigest() == contraseña_admin_hash
 
 
 # === PROTOCOLO DE VALIDACIÓN DE LÍNEA BASE ESPECTRAL ===
@@ -690,7 +685,7 @@ if 'authenticated' not in st.session_state:
     st.session_state['proyecto_cliente'] = None
 
 
-# --- 8. SIDEBAR CON LOGO Y AUTENTICACIÓN (CORREGIDO) ---
+# --- 8. SIDEBAR CON LOGO Y AUTENTICACIÓN ---
 
 with st.sidebar:
     # Logo
@@ -702,36 +697,28 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Sistema de autenticación CORREGIDO
-    st.markdown('<p class="sidebar-title">🔐 Iniciar Sesión</p>', unsafe_allow_html=True)
-    
-    # Primero el checkbox para seleccionar modo admin
-    admin_mode = st.checkbox("🔑 Modo Admin", key="admin_check")
-    
-    st.markdown("---")
-    
-    # Ahora mostrar los campos correspondientes según el modo
-    if admin_mode:
-        # Modo Admin: solo pedir contraseña
-        st.info("Ingresa la contraseña de administrador")
-        password_login = st.text_input("Contraseña Admin", type="password", key="login_pwd_admin")
+    # Sistema de autenticación mejorado
+    with st.expander("🔐 Iniciar Sesión", expanded=True):
+        admin_mode = st.checkbox("🔑 Modo Admin", key="admin_check")
         
-        if st.button("✅ Entrar como Admin", key="btn_login_admin", use_container_width=True):
-            if es_admin(password_login):
-                st.session_state['admin_mode'] = True
-                st.session_state['authenticated'] = True
-                st.success("✅ Modo Admin activado")
-                st.rerun()
-            else:
-                st.error("❌ Contraseña de admin incorrecta")
-    else:
-        # Modo Cliente: pedir proyecto y contraseña
-        st.info("Ingresa tus credenciales de cliente")
-        proyecto_login = st.text_input("Proyecto", key="login_proyecto")
-        password_login = st.text_input("Contraseña", type="password", key="login_pwd_cliente")
-        
-        if st.button("✅ Entrar como Cliente", key="btn_login_cliente", use_container_width=True):
-            if proyecto_login:
+        if admin_mode:
+            st.markdown("### Acceso Administrador")
+            password_admin = st.text_input("🔐 Contraseña Admin", type="password", key="login_admin_pwd")
+            
+            if st.button("✅ Entrar como Admin", key="btn_admin_login", use_container_width=True):
+                if es_admin(password_admin):
+                    st.session_state['admin_mode'] = True
+                    st.session_state['authenticated'] = True
+                    st.success("✅ Modo Admin activado")
+                    st.rerun()
+                else:
+                    st.error("❌ Contraseña de admin incorrecta")
+        else:
+            st.markdown("### Acceso Cliente")
+            proyecto_login = st.text_input("🏢 Proyecto", key="login_proyecto")
+            password_login = st.text_input("🔐 Contraseña", type="password", key="login_pwd")
+            
+            if st.button("✅ Entrar como Cliente", key="btn_client_login", use_container_width=True):
                 is_valid, cliente = verificar_credenciales_usuario(proyecto_login, password_login)
                 if is_valid:
                     st.session_state['authenticated'] = True
@@ -741,8 +728,6 @@ with st.sidebar:
                     st.rerun()
                 else:
                     st.error("❌ Proyecto o contraseña inválidos")
-            else:
-                st.error("❌ Ingresa el nombre del proyecto")
     
     st.markdown("---")
     
@@ -752,11 +737,11 @@ with st.sidebar:
             st.success("🔑 **Sesión Admin Activa**")
         else:
             proyecto = st.session_state.get('proyecto_cliente', 'N/A')
-            st.success(f"👤 **Usuario**: {proyecto}")
+            st.info(f"👤 **Usuario**: {proyecto}")
     
     # Botón logout
     if st.session_state.get('authenticated'):
-        if st.button("🚪 Cerrar Sesión", key="btn_logout", use_container_width=True):
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state['authenticated'] = False
             st.session_state['admin_mode'] = False
             st.session_state['proyecto_cliente'] = None
@@ -928,48 +913,139 @@ with tab_admin:
     else:
         st.title("⚙️ Panel de Admin")
         
-        tab_admin_clientes, tab_admin_config = st.tabs(["Clientes", "Configuración"])
+        tab_admin_clientes, tab_admin_config = st.tabs(["👥 Clientes", "⚙️ Configuración"])
         
         with tab_admin_clientes:
-            st.subheader("Gestión de Clientes")
+            st.subheader("📋 Gestión de Clientes")
+            
+            # === MOSTRAR LISTA DE CLIENTES ===
+            st.markdown("### 📊 Clientes Registrados")
+            try:
+                res = supabase.table("usuarios").select("*").execute()
+                if res.data:
+                    # Crear tabla personalizada
+                    st.markdown("""
+                    | Proyecto | Titular | Tipo | Telegram ID | Año Base | Hora Envío |
+                    |----------|---------|------|-------------|----------|-----------|
+                    """)
+                    
+                    for cliente in res.data:
+                        st.write(f"""
+                    | {cliente.get('Proyecto', 'N/A')} | {cliente.get('titular', 'N/A')} | {cliente.get('Tipo', 'N/A')} | {cliente.get('telegram_id', 'N/A')} | {cliente.get('anio_linea_base', 'N/A')} | {cliente.get('hora_envio', 'N/A')} |
+                    """)
+                    
+                    st.divider()
+                    
+                    # Opciones por cliente
+                    st.markdown("### ⚙️ Opciones por Cliente")
+                    col_proyecto = st.selectbox("Selecciona cliente a editar:", 
+                                               [c.get('Proyecto', 'N/A') for c in res.data],
+                                               key="select_cliente_edit")
+                    
+                    cliente_sel = next((c for c in res.data if c.get('Proyecto') == col_proyecto), None)
+                    
+                    if cliente_sel:
+                        st.info(f"📌 Editando: {cliente_sel.get('Proyecto')}")
+                        
+                        col_e1, col_e2 = st.columns(2)
+                        with col_e1:
+                            if st.button("✏️ Editar Cliente"):
+                                st.session_state['editing_cliente'] = col_proyecto
+                        with col_e2:
+                            if st.button("🗑️ Eliminar Cliente"):
+                                try:
+                                    supabase.table("usuarios").delete().eq("Proyecto", col_proyecto).execute()
+                                    st.success(f"✅ {col_proyecto} eliminado")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
+                else:
+                    st.info("No hay clientes registrados")
+            except Exception as e:
+                st.error(f"Error al cargar clientes: {e}")
+            
+            st.divider()
+            
+            # === CREAR NUEVO CLIENTE ===
+            st.markdown("### ➕ Registrar Nuevo Cliente")
             
             with st.form("form_nuevo_cliente", clear_on_submit=True):
-                c1, c2 = st.columns(2)
-                with c1:
-                    titular = st.text_input("Titular")
-                    nombre = st.text_input("Proyecto")
-                    tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
-                    anio_lb = st.number_input("Año Base", value=2017)
-                with c2:
-                    telegram = st.text_input("Telegram ID")
-                    coords = st.text_input("Coordenadas (JSON)")
-                    hora = st.time_input("Hora", value=time(8, 0))
-                    pwd_cliente = st.text_input("Contraseña Cliente", type="password")
-
-                if st.form_submit_button("💾 Guardar Cliente"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    titular = st.text_input("👤 Titular/Empresa", placeholder="Ej: Minera XYZ")
+                    nombre_proyecto = st.text_input("🏢 Nombre Proyecto", placeholder="Ej: Proyecto_A")
+                    tipo = st.selectbox("📌 Tipo de Proyecto", 
+                                       ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
+                    anio_lb = st.number_input("📅 Año Línea Base", value=2017, min_value=2010, max_value=2026)
+                
+                with col2:
+                    telegram_id = st.text_input("📱 Telegram ID", placeholder="Ej: 123456789")
+                    password_cliente = st.text_input("🔐 Contraseña Cliente", type="password", 
+                                                     placeholder="Mínimo 6 caracteres")
+                    password_confirm = st.text_input("🔐 Confirmar Contraseña", type="password")
+                    hora_envio = st.time_input("⏰ Hora de Envío", value=time(8, 0))
+                
+                coords_json = st.text_area("📍 Coordenadas (JSON)", 
+                                          placeholder='[[lon, lat], [lon, lat], ...]',
+                                          height=100)
+                
+                col_submit1, col_submit2 = st.columns(2)
+                
+                with col_submit1:
+                    submit_btn = st.form_submit_button("💾 Guardar Cliente", use_container_width=True)
+                
+                if submit_btn:
+                    errores = []
+                    
+                    if not titular or not nombre_proyecto:
+                        errores.append("❌ Titular y Proyecto son obligatorios")
+                    
+                    if not telegram_id or not telegram_id.isdigit():
+                        errores.append("❌ Telegram ID debe ser numérico")
+                    
+                    if len(password_cliente) < 6:
+                        errores.append("❌ Contraseña debe tener mínimo 6 caracteres")
+                    
+                    if password_cliente != password_confirm:
+                        errores.append("❌ Las contraseñas no coinciden")
+                    
                     try:
-                        nuevo_cliente = {
-                            "titular": titular,
-                            "Proyecto": nombre,
-                            "Tipo": tipo,
-                            "anio_linea_base": anio_lb,
-                            "telegram_id": telegram,
-                            "Coordenadas": coords,
-                            "hora_envio": hora.strftime("%H:%M"),
-                            "password_cliente": hash_password(pwd_cliente) if pwd_cliente else ""
-                        }
-                        supabase.table("usuarios").upsert(nuevo_cliente).execute()
-                        st.success(f"✅ {nombre} guardado")
-                        st.balloons()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                        coords = json.loads(coords_json)
+                        if not isinstance(coords, list) or len(coords) < 3:
+                            errores.append("❌ Coordenadas: mínimo 3 puntos en formato [[lon,lat], ...]")
+                    except:
+                        errores.append("❌ Coordenadas: formato JSON inválido")
+                    
+                    if errores:
+                        for error in errores:
+                            st.error(error)
+                    else:
+                        try:
+                            nuevo_cliente = {
+                                "titular": titular,
+                                "Proyecto": nombre_proyecto,
+                                "Tipo": tipo,
+                                "anio_linea_base": int(anio_lb),
+                                "telegram_id": telegram_id,
+                                "Coordenadas": coords_json,
+                                "hora_envio": hora_envio.strftime("%H:%M"),
+                                "password_cliente": hash_password(password_cliente)
+                            }
+                            
+                            supabase.table("usuarios").upsert(nuevo_cliente).execute()
+                            st.success(f"✅ Cliente '{nombre_proyecto}' guardado exitosamente")
+                            st.balloons()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar: {str(e)}")
         
         with tab_admin_config:
-            st.subheader("Configuración")
-            st.info("Sección de configuración general del sistema")
+            st.subheader("⚙️ Configuración del Sistema")
+            st.info("📌 Sección de configuración general - En desarrollo")
 
 
-# PESTAÑA 5: GUÍA DEL PROTOCOLO (SOLO ADMIN)
+# PESTAÑA 5: GUÍA DEL PROTOCOLO
 with tab_guia:
     if not st.session_state.get('admin_mode'):
         st.error("❌ Esta sección solo es accesible para administradores")
@@ -997,7 +1073,20 @@ El **Protocolo de Validación de Línea Base Espectral** es un sistema avanzado 
             st.dataframe(df_terrenos, use_container_width=True)
         
         with st.expander("🔍 3. Reglas de Validación"):
-            st.markdown("")
+            st.markdown("""
+**Regla 1: Diferencia Absoluta Mínima**
+- Si |ΔValue| < 0.05 → Se considera ruido de sensor
+- No genera alerta
+
+**Regla 2: Tolerancia en Suelos Minerales**
+- Para MINERAL_ARIDO: Variación relativa permitida hasta ±20%
+- Refleja la naturaleza ruidosa de estos terrenos
+
+**Regla 3: Detección de Cambios Reales**
+- VEGETADO: Degradación si Δ < -15%
+- CRIOSFERA: Pérdida nival si NDSI disminuye significativamente
+- HIDRICO: Anomalía si NDWI aumenta en zona históricamente seca
+            """)
         
         st.markdown("---")
         st.info("📞 Para ajustar parámetros específicos, contacta al equipo de BioCore")

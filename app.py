@@ -89,6 +89,7 @@ def verificar_credenciales_usuario(proyecto, password):
 
 def es_admin(contraseña_admin):
     """Verifica si es el admin (contraseña maestra)"""
+    # Aquí está el error: falta entrar a ["auth"]
     contraseña_admin_hash = st.secrets.get("admin_password_hash", 
                                            hash_password("biocore2024admin"))
     return hash_password(contraseña_admin) == contraseña_admin_hash

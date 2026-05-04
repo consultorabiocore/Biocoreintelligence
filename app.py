@@ -54,7 +54,7 @@ def iniciar_gee():
     try:
         if not ee.data.is_initialized():
             creds = json.loads(st.secrets["gee"]["json"])
-            ee_creds = ee.ServiceAccountCredential(
+            ee_creds = ee.ServiceAccountCredentials(
                 creds['client_email'], 
                 key_data=creds['private_key']
             )

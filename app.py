@@ -464,76 +464,105 @@ with tab1:
 
 # --- PESTAÑA 2: INFORMES (AUDITORÍA PREMIUM) ---
 with tab_informe:
-    proyecto_sel = st.session_state.get('proyecto_seleccionado', 'General')
+    st.subheader("📁 Informes de Auditoría")
+    
+    # Obtener lista de proyectos
+    try:
+        proyectos_list = supabase.table("usuarios").select("Proyecto").execute().data
+        proyectos_nombres = [p['Proyecto'] for p in proyectos_list]
+    except:
+        proyectos_nombres = ['Pascua Lama']
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        proyecto_sel = st.selectbox("📍 Seleccionar Proyecto", proyectos_nombres)
+    
+    with col2:
+        mes_sel = st.selectbox("📅 Mes", 
+            ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
+    
+    with col3:
+        anio_sel = st.number_input("📆 Año", value=2026, min_value=2020, max_value=2030)
+    
     if st.button(f"📄 Generar Auditoría Premium {proyecto_sel}"):
         with st.spinner("Procesando datos y gráficos corporativos..."):
-            res = supabase.table("historial_reportes")\
-                .select("*")\
-                .eq("proyecto", proyecto_sel)\
-                .execute()
+            try:
+                res = supabase.table("historial_reportes")\
+                    .select("*")\
+                    .eq("proyecto", proyecto_sel)\
+                    .execute()
 
-            if res.data:
-                df = pd.DataFrame(res.data)
-                df['Fecha'] = pd.to_datetime(df['created_at'])
-                mes_num = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                           "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre",
-                           "Diciembre"].index(mes_sel) + 1
-                df_mes = df[(df['Fecha'].dt.month == mes_num) &
-                            (df['Fecha'].dt.year == anio_sel)].sort_values('Fecha')
+                if res.data:
+                    df = pd.DataFrame(res.data)
+                    df['Fecha'] = pd.to_datetime(df['created_at'])
+                    
+                    # Convertir mes a número
+                    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+                    mes_num = meses.index(mes_sel) + 1
+                    
+                    df_mes = df[(df['Fecha'].dt.month == mes_num) & 
+                                (df['Fecha'].dt.year == anio_sel)].sort_values('Fecha')
 
-                if not df_mes.empty:
-                    try:
-                        datos_p = supabase.table("usuarios")\
-                            .select("anio_linea_base")\
-                            .eq("Proyecto", proyecto_sel)\
-                            .single()\
-                            .execute()
-                        anio_lb_real = datos_p.data.get('anio_linea_base', 2017)
-                    except:
-                        anio_lb_real = 2017
+                    if not df_mes.empty:
+                        try:
+                            datos_p = supabase.table("usuarios")\
+                                .select("anio_linea_base")\
+                                .eq("Proyecto", proyecto_sel)\
+                                .single()\
+                                .execute()
+                            anio_lb_real = datos_p.data.get('anio_linea_base', 2017)
+                        except:
+                            anio_lb_real = 2017
 
-                    ndsi_val = df_mes['ndsi'].iloc[-1]
-                    pdf = FPDF()
-                    pdf.add_page()
-                    pdf.set_fill_color(20, 50, 80)
-                    pdf.rect(0, 0, 210, 40, 'F')
+                        # Obtener último valor NDSI disponible
+                        ndsi_val = df_mes['ndsi'].iloc[-1] if 'ndsi' in df_mes.columns else 0
+                        
+                        pdf = FPDF()
+                        pdf.add_page()
+                        pdf.set_fill_color(20, 50, 80)
+                        pdf.rect(0, 0, 210, 40, 'F')
 
-                    try:
-                        pdf.image("logo_biocore.jpg", x=10, y=8, w=45)
-                    except:
-                        pass
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.set_font("helvetica", "B", 18)
+                        pdf.set_xy(60, 15)
+                        pdf.cell(0, 10,
+                                 f"AUDITORÍA AMBIENTAL: {proyecto_sel.upper()}",
+                                 align="L", ln=1)
 
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.set_font("helvetica", "B", 18)
-                    pdf.set_xy(60, 15)
-                    pdf.cell(0, 10,
-                             f"AUDITORÍA AMBIENTAL: {proyecto_sel.upper()}",
-                             align="L", ln=1)
+                        es_alerta = ndsi_val < 0.35
+                        color_res = (220, 50, 50) if es_alerta else (40, 150, 80)
+                        pdf.set_y(45)
+                        pdf.set_fill_color(color_res[0], color_res[1], color_res[2])
+                        pdf.set_font("helvetica", "B", 12)
+                        pdf.cell(0, 12,
+                                 f"  ESTATUS: {'ALERTA' if es_alerta else 'ESTABLE'}",
+                                 ln=1, fill=True)
 
-                    es_alerta = ndsi_val < 0.35
-                    color_res = (220, 50, 50) if es_alerta else (40, 150, 80)
-                    pdf.set_y(45)
-                    pdf.set_fill_color(color_res[0], color_res[1], color_res[2])
-                    pdf.set_font("helvetica", "B", 12)
-                    pdf.cell(0, 12,
-                             f"  ESTATUS: {'ALERTA' if es_alerta else 'ESTABLE'}",
-                             ln=1, fill=True)
+                        pdf_file = f"Auditoria_BioCore_{proyecto_sel}.pdf"
+                        pdf.output(pdf_file)
+                        st.success(f"✅ Auditoría generada para {mes_sel}/{anio_sel}")
+                        
+                        st.info(f"📊 Registros encontrados: {len(df_mes)}")
+                        st.dataframe(df_mes[['proyecto', 'created_at', 'ndsi', 'ndwi', 'vegetacion_altura'] 
+                                           if all(col in df_mes.columns for col in ['proyecto', 'created_at', 'ndsi', 'ndwi', 'vegetacion_altura'])
+                                           else df_mes.columns], 
+                                    use_container_width=True)
 
-                    pdf_file = f"Auditoria_BioCore_{proyecto_sel}.pdf"
-                    pdf.output(pdf_file)
-                    st.success(f"✅ Auditoría generada")
-
-                    with open(pdf_file, "rb") as f:
-                        st.download_button(
-                            "📥 Descargar Reporte PDF",
-                            f,
-                            file_name=pdf_file
-                        )
+                        with open(pdf_file, "rb") as f:
+                            st.download_button(
+                                "📥 Descargar Reporte PDF",
+                                f,
+                                file_name=pdf_file
+                            )
+                    else:
+                        st.warning(f"❌ No hay datos para {mes_sel}/{anio_sel} en el proyecto {proyecto_sel}")
                 else:
-                    st.warning(f"No hay datos para {mes_sel}.")
-            else:
-                st.error("No se pudo conectar con la base de datos.")
-
+                    st.error("❌ No se encontraron reportes en la base de datos.")
+            except Exception as e:
+                st.error(f"❌ Error al generar auditoría: {str(e)}")
 
 # --- PESTAÑA 3: EXCEL (HISTORIAL) ---
 with tab_excel:

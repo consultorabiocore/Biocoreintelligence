@@ -566,6 +566,7 @@ with tab1:
                             st.success(reporte['estado'])
 
 # === PESTAÑA 2: AUDITORÍAS ===
+# === PESTAÑA 2: AUDITORÍAS ===
 with tab_informe:
     st.subheader("📋 Generador de Auditorías")
     
@@ -601,116 +602,120 @@ with tab_informe:
                     st.session_state['proyecto_reporte'] = proyecto
                     st.session_state['mes_reporte'] = mes
                     st.session_state['anio_reporte'] = anio
+                    st.session_state['p_data'] = p
                     
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
+        
+        # Mostrar reporte si existe
+        if st.session_state.get('reporte_actual'):
+            reporte = st.session_state['reporte_actual']
+            proyecto = st.session_state['proyecto_reporte']
+            mes = st.session_state['mes_reporte']
+            anio = st.session_state['anio_reporte']
+            p_data = st.session_state.get('p_data', {})
             
-            # Mostrar reporte si existe
-            if 'reporte_actual' in st.session_state:
-                reporte = st.session_state['reporte_actual']
-                proyecto = st.session_state['proyecto_reporte']
-                mes = st.session_state['mes_reporte']
-                anio = st.session_state['anio_reporte']
-                
-                st.success("✅ Auditoría generada")
-                
-                st.subheader("👁️ Vista Previa del Reporte")
-                
-                col_prev1, col_prev2 = st.columns([2, 1])
-                with col_prev1:
-                    st.write(f"**Proyecto:** {proyecto}")
-                    st.write(f"**Periodo:** {mes} {anio}")
-                    st.write(f"**Estado:** {reporte['estado']}")
-                with col_prev2:
-                    st.write(f"**Riesgo:** {reporte['nivel']}")
-                    st.write(f"**Temperatura:** {reporte['temp']:.1f}°C")
-                
-                # Métricas
-                col_m1, col_m2, col_m3 = st.columns(3)
-                with col_m1:
-                    st.metric("SAVI Actual", f"{reporte['savi_actual']:.4f}")
-                with col_m2:
-                    st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
-                with col_m3:
-                    st.metric("Variación", f"{reporte['variacion']:.1f}%")
-                
-                # Detalles
-                st.markdown(f"""
-                <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left:5px solid #60a5fa;">
-                <h3>🎯 Estado: {reporte['estado']}</h3>
-                <p><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
-                <p><b>SAVI Base ({reporte['anio_base']}):</b> {reporte['savi_base']:.4f}</p>
-                <p><b>SAVI Actual:</b> {reporte['savi_actual']:.4f}</p>
-                <p><b>NDSI:</b> {reporte['ndsi']:.4f}</p>
-                <p><b>NDWI:</b> {reporte['ndwi']:.4f}</p>
-                <p><b>SWIR:</b> {reporte['swir']:.4f}</p>
-                <p><b>Fecha del Análisis:</b> {reporte['fecha']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown("### 📨 Mensaje Telegram a Enviar:")
-                st.code(reporte['texto_telegram'])
-                
-                # Botones de acción
-                col_acc1, col_acc2, col_acc3 = st.columns(3)
-                
-                with col_acc1:
-                    if st.button("📥 Generar PDF"):
-                        with st.spinner("Generando PDF..."):
-                            try:
-                                pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
-                                
-                                temp_dir = tempfile.gettempdir()
-                                pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
-                                pdf.output(pdf_path)
-                                
-                                with open(pdf_path, "rb") as f:
-                                    st.download_button(
-                                        label="📥 Descargar PDF",
-                                        data=f.read(),
-                                        file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
-                                        mime="application/pdf"
-                                    )
-                                st.success("✅ PDF generado")
-                            except Exception as e:
-                                st.error(f"Error: {str(e)}")
-                
-                with col_acc2:
-                    if st.session_state.get('admin_mode'):
-                        if st.button("📤 Enviar a Cliente"):
-                            try:
-                                p_data = supabase.table("usuarios").select("*").eq("Proyecto", proyecto).execute().data[0]
-                                
-                                pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
-                                
-                                temp_dir = tempfile.gettempdir()
-                                pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
-                                pdf.output(pdf_path)
-                                
-                                with open(pdf_path, "rb") as f:
-                                    files = {'document': (f"auditoria.pdf", f.read())}
-                                    response = requests.post(
-                                        f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
-                                        data={
-                                            "chat_id": p_data['telegram_id'],
-                                            "caption": f"📊 Auditoría {proyecto} - {mes} {anio}\n\n{reporte['estado']}"
-                                        },
-                                        files=files,
-                                        timeout=30
-                                    )
-                                    if response.status_code == 200:
-                                        st.success("✅ Reporte enviado al cliente")
-                                    else:
-                                        st.error(f"Error: {response.text}")
-                            except Exception as e:
-                                st.error(f"Error: {str(e)}")
-                
-                with col_acc3:
-                    if st.button("🗑️ Limpiar"):
-                        st.session_state['reporte_actual'] = None
-                        st.session_state['mostrar_preview'] = False
-                        st.rerun()
-
+            st.success("✅ Auditoría generada")
+            
+            st.subheader("📊 Vista Previa del Reporte")
+            
+            # Detalles principales
+            st.markdown(f"""
+            <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left:5px solid #60a5fa;">
+            <h3>🎯 Estado: {reporte['estado']}</h3>
+            <p><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
+            <p><b>Proyecto:</b> {proyecto}</p>
+            <p><b>Período:</b> {mes} {anio}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Métricas en columnas
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.metric("SAVI Actual", f"{reporte['savi_actual']:.4f}")
+            with col_m2:
+                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+            with col_m3:
+                st.metric("Variación", f"{reporte['variacion']:.1f}%")
+            
+            # Datos técnicos
+            st.markdown("### 📊 Datos Técnicos")
+            col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+            with col_t1:
+                st.info(f"**SAVI Base**\n{reporte['savi_base']:.4f}")
+            with col_t2:
+                st.info(f"**NDSI**\n{reporte['ndsi']:.4f}")
+            with col_t3:
+                st.info(f"**NDWI**\n{reporte['ndwi']:.4f}")
+            with col_t4:
+                st.info(f"**SWIR**\n{reporte['swir']:.4f}")
+            
+            st.markdown("---")
+            
+            # Mensaje Telegram
+            st.markdown("### 📨 Mensaje Telegram a Enviar:")
+            st.code(reporte['texto_telegram'])
+            
+            st.markdown("---")
+            
+            # Botones de acción
+            col_acc1, col_acc2, col_acc3 = st.columns(3)
+            
+            with col_acc1:
+                if st.button("📥 Generar PDF"):
+                    with st.spinner("Generando PDF..."):
+                        try:
+                            pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
+                            
+                            temp_dir = tempfile.gettempdir()
+                            pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
+                            pdf.output(pdf_path)
+                            
+                            with open(pdf_path, "rb") as f:
+                                st.download_button(
+                                    label="📥 Descargar PDF",
+                                    data=f.read(),
+                                    file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
+                                    mime="application/pdf",
+                                    key="download_pdf"
+                                )
+                            st.success("✅ PDF generado")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+            
+            with col_acc2:
+                if st.session_state.get('admin_mode'):
+                    if st.button("📤 Enviar a Cliente"):
+                        try:
+                            pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
+                            
+                            temp_dir = tempfile.gettempdir()
+                            pdf_path = os.path.join(temp_dir, f"Auditoria_{proyecto}_{mes}_{anio}.pdf")
+                            pdf.output(pdf_path)
+                            
+                            with open(pdf_path, "rb") as f:
+                                files = {'document': (f"auditoria.pdf", f.read())}
+                                response = requests.post(
+                                    f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
+                                    data={
+                                        "chat_id": p_data.get('telegram_id'),
+                                        "caption": f"📊 Auditoría {proyecto} - {mes} {anio}\n\n{reporte['estado']}"
+                                    },
+                                    files=files,
+                                    timeout=30
+                                )
+                                if response.status_code == 200:
+                                    st.success("✅ Reporte enviado al cliente")
+                                else:
+                                    st.error(f"Error: {response.text}")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+            
+            with col_acc3:
+                if st.button("🗑️ Limpiar"):
+                    st.session_state['reporte_actual'] = None
+                    st.session_state['mostrar_preview'] = False
+                    st.rerun()
 # === PESTAÑA 3: EXCEL ===
 with tab_excel:
     st.subheader("📊 Base de Datos")

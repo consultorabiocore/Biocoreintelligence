@@ -744,6 +744,23 @@ with st.sidebar:
             st.session_state['proyecto_cliente'] = None
             st.rerun()
 
+# --- 4. INTERFAZ (SIDEBAR Y NAVEGACIÓN) ---
+# Esta sección es la que crea la barra lateral y gestiona tu acceso
+
+st.sidebar.markdown('<div class="sidebar-title">🔐 Acceso Admin</div>', unsafe_allow_html=True)
+admin_password = st.sidebar.text_input("Contraseña", type="password", key="admin_key")
+
+if st.sidebar.button("Validar Acceso"):
+    if es_admin(admin_password):
+        st.session_state['admin_mode'] = True
+        st.sidebar.success("✅ Acceso Concedido")
+        st.rerun() # Esto hace que aparezcan las pestañas bloqueadas
+    else:
+        st.sidebar.error("❌ Contraseña de admin incorrecta")
+
+if st.sidebar.button("Cerrar Sesión"):
+    st.session_state['admin_mode'] = False
+    st.rerun()
 
 # --- 9. VERIFICACIÓN DE ACCESO ---
 

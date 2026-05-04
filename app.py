@@ -592,11 +592,11 @@ with tab_informe:
         st.markdown("---")
         
         # Mostrar reporte si existe
-        if st.session_state.get('reporte_actual'):
-            reporte = st.session_state['reporte_actual']
-            proyecto = st.session_state['proyecto_reporte']
-            mes = st.session_state['mes_reporte']
-            anio = st.session_state['anio_reporte']
+        if st.session_state.get('reporte_actual') is not None:
+            reporte = st.session_state.get('reporte_actual')
+            proyecto = st.session_state.get('proyecto_reporte', 'N/A')
+            mes = st.session_state.get('mes_reporte', 'N/A')
+            anio = st.session_state.get('anio_reporte', 2026)
             p_data = st.session_state.get('p_data', {})
             
             st.success("✅ Auditoría generada correctamente")
@@ -606,22 +606,21 @@ with tab_informe:
             # BANNER PRINCIPAL CON ESTADO
             col_banner1, col_banner2 = st.columns([2, 1])
             with col_banner1:
-                banner_text = f"{reporte['estado']}"
-                nivel_text = f"{reporte['nivel']}"
-                proyecto_text = f"{proyecto}"
-                mes_text = f"{mes}"
+                estado_str = str(reporte.get('estado', 'N/A'))
+                nivel_str = str(reporte.get('nivel', 'N/A'))
                 
-                st.markdown("""
+                st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:25px; border-radius:15px; border-left:6px solid #60a5fa;">
-                <h2 style="color: white; margin: 0;">""" + banner_text + """</h2>
-                <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> """ + nivel_text + """</p>
-                <p style="color: #cbd5e1; margin: 5px 0;"><b>Proyecto:</b> """ + proyecto_text + """</p>
-                <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> """ + mes_text + """ """ + str(anio) + """</p>
+                <h2 style="color: white; margin: 0;">{estado_str}</h2>
+                <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> {nivel_str}</p>
+                <p style="color: #cbd5e1; margin: 5px 0;"><b>Proyecto:</b> {proyecto}</p>
+                <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> {mes} {anio}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col_banner2:
-                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+                temp_val = reporte.get('temp', 0)
+                st.metric("Temperatura", f"{float(temp_val):.1f}°C")
             
             st.markdown("")
             
@@ -630,13 +629,17 @@ with tab_informe:
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             
             with col_m1:
-                st.metric("SAVI Actual", f"{reporte['savi_actual']:.4f}")
+                savi_actual = reporte.get('savi_actual', 0)
+                st.metric("SAVI Actual", f"{float(savi_actual):.4f}")
             with col_m2:
-                st.metric("SAVI Base", f"{reporte['savi_base']:.4f}")
+                savi_base = reporte.get('savi_base', 0)
+                st.metric("SAVI Base", f"{float(savi_base):.4f}")
             with col_m3:
-                st.metric("Variación", f"{reporte['variacion']:.1f}%")
+                variacion = reporte.get('variacion', 0)
+                st.metric("Variación", f"{float(variacion):.1f}%")
             with col_m4:
-                st.metric("Año Base", f"{reporte['anio_base']}")
+                anio_base = reporte.get('anio_base', 2017)
+                st.metric("Año Base", f"{anio_base}")
             
             st.markdown("")
             
@@ -644,11 +647,16 @@ with tab_informe:
             st.markdown("### 🔬 Datos Técnicos")
             col_t1, col_t2, col_t3, col_t4 = st.columns(4)
             
+            ndsi = reporte.get('ndsi', 0)
+            ndwi = reporte.get('ndwi', 0)
+            swir = reporte.get('swir', 0)
+            fecha = reporte.get('fecha', 'N/A')
+            
             with col_t1:
                 st.markdown(f"""
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">NDSI (Nieve/Hielo)</p>
-                <p style="margin: 5px 0 0 0; color: #60a5fa; font-size: 1.3em; font-weight: bold;">{reporte['ndsi']:.4f}</p>
+                <p style="margin: 5px 0 0 0; color: #60a5fa; font-size: 1.3em; font-weight: bold;">{float(ndsi):.4f}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -656,7 +664,7 @@ with tab_informe:
                 st.markdown(f"""
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">NDWI (Recursos Hídricos)</p>
-                <p style="margin: 5px 0 0 0; color: #a78bfa; font-size: 1.3em; font-weight: bold;">{reporte['ndwi']:.4f}</p>
+                <p style="margin: 5px 0 0 0; color: #a78bfa; font-size: 1.3em; font-weight: bold;">{float(ndwi):.4f}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -664,7 +672,7 @@ with tab_informe:
                 st.markdown(f"""
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">SWIR (Estabilidad)</p>
-                <p style="margin: 5px 0 0 0; color: #fb923c; font-size: 1.3em; font-weight: bold;">{reporte['swir']:.4f}</p>
+                <p style="margin: 5px 0 0 0; color: #fb923c; font-size: 1.3em; font-weight: bold;">{float(swir):.4f}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -672,7 +680,7 @@ with tab_informe:
                 st.markdown(f"""
                 <div style="background-color:#1e293b; padding:15px; border-radius:10px; text-align: center;">
                 <p style="margin: 0; color: #888; font-size: 0.9em;">Fecha Análisis</p>
-                <p style="margin: 5px 0 0 0; color: #34d399; font-size: 1.1em; font-weight: bold;">{reporte['fecha']}</p>
+                <p style="margin: 5px 0 0 0; color: #34d399; font-size: 1.1em; font-weight: bold;">{fecha}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -680,7 +688,8 @@ with tab_informe:
             
             # MENSAJE TELEGRAM
             st.markdown("### 📨 Notificación a Cliente")
-            st.code(reporte['texto_telegram'])
+            texto_telegram = reporte.get('texto_telegram', 'N/A')
+            st.code(texto_telegram)
             
             st.markdown("")
             
@@ -726,7 +735,7 @@ with tab_informe:
                                     f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendDocument",
                                     data={
                                         "chat_id": p_data.get('telegram_id'),
-                                        "caption": f"📊 Auditoría {proyecto} - {mes} {anio}\n\n{reporte['estado']}"
+                                        "caption": f"📊 Auditoría {proyecto} - {mes} {anio}\n\n{estado_str}"
                                     },
                                     files=files,
                                     timeout=30

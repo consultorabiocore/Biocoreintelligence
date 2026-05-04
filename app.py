@@ -118,17 +118,43 @@ def dibujar_mapa_biocore(coordenadas):
     except Exception as e:
         return folium.Map(location=[-33.45, -70.66], zoom_start=4)
 
+# === OBTENER COORDENADAS CORRECTAMENTE ===
+def obtener_coordenadas_correctamente(p):
+    """Obtiene las coordenadas del proyecto desde Supabase con manejo robusto"""
+    raw_coords = p.get('Coordenadas')
+    
+    if raw_coords is None or raw_coords == '' or raw_coords == 'null':
+        raise ValueError('Coordenadas vacías en la base de datos')
+    
+    if isinstance(raw_coords, list):
+        return raw_coords
+    
+    if isinstance(raw_coords, str):
+        try:
+            coords = json.loads(raw_coords)
+            return coords
+        except json.JSONDecodeError:
+            try:
+                coords = eval(raw_coords)
+                return coords
+            except:
+                raise ValueError(f'No se pudo parsear coordenadas: {raw_coords}')
+    
+    if isinstance(raw_coords, dict):
+        if 'coordinates' in raw_coords:
+            return raw_coords['coordinates']
+        elif 'type' in raw_coords and raw_coords['type'] == 'Polygon':
+            return raw_coords.get('coordinates', [])[0]
+    
+    raise ValueError(f'Formato de coordenadas no reconocido: {type(raw_coords)}')
+
 # === GENERADOR DE GRÁFICOS ===
 def generar_graficos(indices_historicos):
-    """
-    Genera gráficos profesionales para incluir en PDF
-    indices_historicos: dict con histórico de índices
-    """
+    """Genera gráficos profesionales para incluir en PDF"""
     try:
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.patch.set_facecolor('white')
         
-        # Preparar datos
         fechas = list(range(len(indices_historicos.get('savi', [0]))))
         
         # SAVI
@@ -173,7 +199,6 @@ def generar_graficos(indices_historicos):
         
         plt.tight_layout()
         
-        # Guardar a archivo temporal
         temp_dir = tempfile.gettempdir()
         img_path = os.path.join(temp_dir, 'grafico_biocore.png')
         plt.savefig(img_path, format='png', dpi=300, bbox_inches='tight', facecolor='white')
@@ -191,7 +216,7 @@ def generar_graficos(indices_historicos):
 def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
     """MINERÍA - Basado en NDWI (recursos hídricos)"""
     
-    if savi < 0.01:  # Zona desértica
+    if savi < 0.01:
         if ndwi_actual < 0.10:
             estado = "🟢 BAJO CONTROL"
             nivel = "NORMAL"
@@ -356,7 +381,7 @@ def evaluar_bosque(savi_actual, savi_base, variacion_savi, ndwi):
                 f"ACCIÓN URGENTE: Restauración ecológica + riego."
             )
         else:
-            estado = "���� PRECAUCIÓN"
+            estado = "🟡 PRECAUCIÓN"
             nivel = "MODERADO"
             color = (200, 100, 0)
             diagnostico = (
@@ -492,43 +517,59 @@ def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variac
 # ============================================================================
 
 def generar_reporte_total(p):
-    """Genera reporte completo con lógica por tipo de proyecto"""
+    """Genera reporte completo con validación de coordenadas"""
     try:
-        raw_coords = p.get('Coordenadas')
-        if raw_coords is None:
-            return {'error': 'Coordenadas vacías', 'tipo': 'error'}
+        raw_coords = obtener_coordenadas_correctamente(p)
+        
+        if not raw_coords or len(raw_coords) == 0:
+            return {
+                'error': 'Coordenadas vacías después de parseo',
+                'tipo': 'error'
+            }
 
-        if isinstance(raw_coords, str):
-            raw_coords = json.loads(raw_coords)
-
+        if not isinstance(raw_coords[0], (list, tuple)):
+            return {
+                'error': 'Formato de coordenadas inválido',
+                'tipo': 'error'
+            }
+        
         geom = ee.Geometry.Polygon(raw_coords)
 
     except Exception as e:
-        return {'error': f'Error en geometría: {str(e)}', 'tipo': 'error'}
+        return {
+            'error': f'Error en geometría: {str(e)}',
+            'tipo': 'error'
+        }
 
     # === SENTINEL 2 - ACTUAL ===
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-        .filterBounds(geom)\
-        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
-        .sort('system:time_start', False)\
-        .first()
-
-    if s2 is None:
-        return {'error': 'No hay imágenes disponibles', 'tipo': 'error'}
-
     try:
+        s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+            .filterBounds(geom)\
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+            .sort('system:time_start', False)\
+            .first()
+
+        if s2 is None:
+            return {
+                'error': 'No hay imágenes Sentinel-2 disponibles',
+                'tipo': 'error'
+            }
+
         timestamp_ms = s2.get('system:time_start').getInfo()
         f_rep = datetime.fromtimestamp(timestamp_ms/1000).strftime('%d/%m/%Y') if timestamp_ms else "N/A"
-    except:
-        f_rep = "N/A"
+    except Exception as e:
+        return {
+            'error': f'Error obteniendoimágenes: {str(e)}',
+            'tipo': 'error'
+        }
 
     # === TEMPERATURA ===
-    temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
-        .filterBounds(geom)\
-        .sort('system:time_start', False)\
-        .first()
-
     try:
+        temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
+            .filterBounds(geom)\
+            .sort('system:time_start', False)\
+            .first()
+
         temp_dict = temp_img.select('LST_Day_1km').multiply(0.02).subtract(273.15)\
             .reduceRegion(ee.Reducer.mean(), geom, 1000).getInfo()
         temp_val = float(temp_dict.get('LST_Day_1km', 0))
@@ -549,54 +590,68 @@ def generar_reporte_total(p):
         
         return img.addBands([savi, ndsi, swir, ndvi, ndwi])
 
-    img_now = calcular_idx(s2)
-    
-    region_stats = img_now.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=geom,
-        scale=30,
-        maxPixels=1e9
-    ).getInfo()
-
-    def safe_float(value, default=0.0):
-        if value is None:
-            return default
-        try:
-            return float(value)
-        except:
-            return default
-
-    savi_now = safe_float(region_stats.get('savi'), 0.0)
-    ndsi_now = safe_float(region_stats.get('ndsi'), 0.0)
-    ndwi_now = safe_float(region_stats.get('ndwi'), 0.0)
-    swir_now = safe_float(region_stats.get('swir'), 0.0)
-    ndvi_now = safe_float(region_stats.get('ndvi'), 0.0)
-
-    # === LÍNEA BASE ===
-    anio_base = p.get('anio_linea_base', 2017)
-    
-    s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-        .filterBounds(geom)\
-        .filterDate(f'{anio_base}-01-01', f'{anio_base}-12-31')\
-        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
-        .sort('CLOUDY_PIXEL_PERCENTAGE')\
-        .first()
-
-    if s2_base is not None:
-        img_base = calcular_idx(s2_base)
-        base_stats = img_base.reduceRegion(
+    try:
+        img_now = calcular_idx(s2)
+        
+        region_stats = img_now.reduceRegion(
             reducer=ee.Reducer.mean(),
             geometry=geom,
             scale=30,
             maxPixels=1e9
         ).getInfo()
 
-        savi_base = safe_float(base_stats.get('savi'), savi_now)
-        ndsi_base = safe_float(base_stats.get('ndsi'), ndsi_now)
-        ndwi_base = safe_float(base_stats.get('ndwi'), ndwi_now)
-        swir_base = safe_float(base_stats.get('swir'), swir_now)
-        ndvi_base = safe_float(base_stats.get('ndvi'), ndvi_now)
-    else:
+        def safe_float(value, default=0.0):
+            if value is None:
+                return default
+            try:
+                return float(value)
+            except:
+                return default
+
+        savi_now = safe_float(region_stats.get('savi'), 0.0)
+        ndsi_now = safe_float(region_stats.get('ndsi'), 0.0)
+        ndwi_now = safe_float(region_stats.get('ndwi'), 0.0)
+        swir_now = safe_float(region_stats.get('swir'), 0.0)
+        ndvi_now = safe_float(region_stats.get('ndvi'), 0.0)
+
+    except Exception as e:
+        return {
+            'error': f'Error calculando índices: {str(e)}',
+            'tipo': 'error'
+        }
+
+    # === LÍNEA BASE ===
+    anio_base = p.get('anio_linea_base', 2017)
+    
+    try:
+        s2_base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+            .filterBounds(geom)\
+            .filterDate(f'{anio_base}-01-01', f'{anio_base}-12-31')\
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+            .sort('CLOUDY_PIXEL_PERCENTAGE')\
+            .first()
+
+        if s2_base is not None:
+            img_base = calcular_idx(s2_base)
+            base_stats = img_base.reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=geom,
+                scale=30,
+                maxPixels=1e9
+            ).getInfo()
+
+            savi_base = safe_float(base_stats.get('savi'), savi_now)
+            ndsi_base = safe_float(base_stats.get('ndsi'), ndsi_now)
+            ndwi_base = safe_float(base_stats.get('ndwi'), ndwi_now)
+            swir_base = safe_float(base_stats.get('swir'), swir_now)
+            ndvi_base = safe_float(base_stats.get('ndvi'), ndvi_now)
+        else:
+            savi_base = savi_now
+            ndsi_base = ndsi_now
+            ndwi_base = ndwi_now
+            swir_base = swir_now
+            ndvi_base = ndvi_now
+    except:
         savi_base = savi_now
         ndsi_base = ndsi_now
         ndwi_base = ndwi_now
@@ -641,7 +696,7 @@ def generar_reporte_total(p):
         estado = "🟡 ESTADO NO DEFINIDO"
         nivel = "DESCONOCIDO"
         color_estado = (150, 150, 0)
-        diagnostico_detallado = "Tipo no reconocido"
+        diagnostico_detallado = "Tipo de proyecto no reconocido"
 
     # === MENSAJE TELEGRAM ===
     texto_telegram = f"""
@@ -662,7 +717,7 @@ def generar_reporte_total(p):
 🌡️ Temperatura: {temp_val:.1f}°C
 
 📈 VARIACIONES:
-  • SAVI: {variacion_savi:+.1f}%
+  ��� SAVI: {variacion_savi:+.1f}%
   • NDSI: {variacion_ndsi:+.1f}%
   • NDWI: {variacion_ndwi:+.1f}%
   • NDVI: {variacion_ndvi:+.1f}%
@@ -726,28 +781,23 @@ def generar_pdf_profesional(reporte_data, img_path, proyecto_nombre, tipo_proyec
     pdf.set_fill_color(20, 50, 80)
     pdf.rect(0, 0, 210, 55, 'F')
     
-    # Título
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", "B", 20)
     pdf.set_xy(10, 8)
     pdf.cell(0, 12, clean("AUDITORÍA DE CUMPLIMIENTO AMBIENTAL"), ln=1)
     
-    # Subtítulo
     pdf.set_font("helvetica", "B", 14)
     pdf.set_xy(10, 22)
     pdf.cell(0, 8, clean(f"PROYECTO: {proyecto_nombre.upper()}"), ln=1)
     
-    # Tipo de proyecto
     pdf.set_font("helvetica", "I", 11)
     pdf.set_xy(10, 31)
     pdf.cell(0, 6, clean(f"Tipo: {tipo_proyecto}"), ln=1)
     
-    # Responsable
     pdf.set_font("helvetica", "I", 10)
     pdf.set_xy(10, 38)
     pdf.cell(0, 6, clean("Responsable Técnica: Loreto Campos Carrasco | BioCore Intelligence"), ln=1)
     
-    # Fecha y análisis
     pdf.set_font("helvetica", "", 9)
     pdf.set_xy(10, 45)
     pdf.cell(0, 4, clean(f"Fecha de Análisis: {reporte_data.get('fecha', 'N/A')} | Año Base: {reporte_data.get('anio_base', 2017)}"), ln=1)
@@ -766,7 +816,6 @@ def generar_pdf_profesional(reporte_data, img_path, proyecto_nombre, tipo_proyec
     pdf.set_font("helvetica", "B", 11)
     pdf.cell(0, 7, clean("DIAGNÓSTICO TÉCNICO"), ln=1)
     
-    # Texto del diagnóstico
     pdf.set_font("helvetica", "", 9.5)
     pdf.set_xy(10, 82)
     pdf.multi_cell(190, 5, clean(reporte_data['diagnostico_completo']), border=1)
@@ -780,14 +829,12 @@ def generar_pdf_profesional(reporte_data, img_path, proyecto_nombre, tipo_proyec
     pdf.set_font("helvetica", "B", 9)
     pdf.set_text_color(255, 255, 255)
     
-    # Header tabla
     pdf.set_fill_color(40, 80, 120)
     pdf.cell(50, 6, clean("Índice"), border=1, fill=True)
     pdf.cell(40, 6, clean("Actual"), border=1, fill=True)
     pdf.cell(40, 6, clean("Base"), border=1, fill=True)
     pdf.cell(60, 6, clean("Variación"), border=1, fill=True, ln=1)
     
-    # Datos tabla
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("helvetica", "", 9)
     
@@ -968,18 +1015,23 @@ if not st.session_state.get('authenticated'):
 
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
-    tab1, tab_informe, tab_excel, tab_config = st.tabs([
+    tab1, tab_informe, tab_excel, tab_clientes, tab_soporte, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
-        "📊 Base Datos", 
-        "⚙️ Configuración"
+        "📊 Base Datos",
+        "👥 Gestión de Clientes",
+        "💬 Soporte",
+        "📖 Guía"
     ])
 else:
-    tab1, tab_informe, tab_excel, tab_config = st.tabs([
+    tab1, tab_informe, tab_excel, tab_soporte, tab_historial, tab_config, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos", 
-        "⚙️ Configuración"
+        "💬 Soporte",
+        "📨 Mi Historial",
+        "⚙️ Configuración",
+        "📖 Guía"
     ])
 
 # === PESTAÑA 1: VIGILANCIA ===
@@ -1002,8 +1054,12 @@ with tab1:
             col_mapa, col_reporte = st.columns([2.5, 1])
 
             with col_mapa:
-                m_obj = dibujar_mapa_biocore(p['Coordenadas'])
-                folium_static(m_obj, width=850, height=500)
+                try:
+                    coords = obtener_coordenadas_correctamente(p)
+                    m_obj = dibujar_mapa_biocore(coords)
+                    folium_static(m_obj, width=850, height=500)
+                except Exception as e:
+                    st.error(f"Error al dibujar mapa: {str(e)}")
 
             with col_reporte:
                 if st.button("🚀 Ejecutar Reporte", key=f"vigilancia_btn_{p_idx}"):
@@ -1013,7 +1069,6 @@ with tab1:
                         if reporte.get('tipo') != 'error':
                             st.session_state['reporte_actual'] = reporte
                             
-                            # Banner de estado
                             estado_color = '#10b981' if 'CONTROL' in reporte['estado'] else '#f97316' if 'PRECAUCIÓN' in reporte['estado'] else '#ef4444'
                             st.markdown(f"""
                             <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left:6px solid {estado_color};">
@@ -1022,7 +1077,6 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Velocímetro SAVI
                             fig = go.Figure(go.Indicator(
                                 mode="gauge+number",
                                 value=reporte['savi_actual'],
@@ -1040,7 +1094,6 @@ with tab1:
                             fig.update_layout(height=350, font={'size': 12})
                             st.plotly_chart(fig, use_container_width=True)
                             
-                            # Métricas
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 
@@ -1054,6 +1107,8 @@ with tab1:
                             st.success(reporte['diagnostico_completo'])
                         else:
                             st.error(reporte.get('error', 'Error desconocido'))
+    else:
+        st.warning("No hay proyectos disponibles")
 
 # === PESTAÑA 2: AUDITORÍAS ===
 with tab_informe:
@@ -1063,7 +1118,7 @@ with tab_informe:
         proyectos_list = supabase.table("usuarios").select("Proyecto,Tipo").execute().data
         proyectos_dict = {p['Proyecto']: p.get('Tipo', 'MINERIA') for p in proyectos_list}
     except:
-        proyectos_dict = {'Pascua Lama': 'MINERIA'}
+        proyectos_dict = {}
     
     if st.session_state.get('admin_mode'):
         proyectos_disponibles = list(proyectos_dict.keys())
@@ -1090,17 +1145,14 @@ with tab_informe:
                         st.session_state['proyecto_reporte'] = proyecto_seleccionado
                         st.session_state['mes_reporte'] = mes
                         st.session_state['p_data'] = p
-                        
-                        # Mostrar resumen
-                        st.success("✅ Auditoría generada exitosamente")
+                        st.success("✅ Auditoría generada")
                     else:
-                        st.error(reporte.get('error', 'Error'))
+                        st.error(reporte.get('error'))
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
         
         st.markdown("---")
         
-        # Mostrar reporte si existe
         if st.session_state.get('reporte_actual') is not None:
             reporte = st.session_state.get('reporte_actual')
             proyecto = st.session_state.get('proyecto_reporte', 'N/A')
@@ -1109,7 +1161,6 @@ with tab_informe:
             
             st.subheader("📊 Reporte Generado")
             
-            # Banner principal
             estado_color = '#10b981' if 'CONTROL' in reporte['estado'] else '#f97316' if 'PRECAUCIÓN' in reporte['estado'] else '#ef4444'
             st.markdown(f"""
             <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:25px; border-radius:15px; border-left:6px solid {estado_color};">
@@ -1122,7 +1173,6 @@ with tab_informe:
             
             st.markdown("")
             
-            # Índices en columnas
             col_i1, col_i2, col_i3, col_i4 = st.columns(4)
             
             with col_i1:
@@ -1139,7 +1189,6 @@ with tab_informe:
             
             st.markdown("")
             
-            # Diagnóstico
             st.info(reporte['diagnostico_completo'])
             
             st.markdown("### 📨 Mensaje Telegram")
@@ -1147,21 +1196,16 @@ with tab_informe:
             
             st.markdown("")
             
-            # Botones de acción
             col_a1, col_a2, col_a3 = st.columns(3)
             
             with col_a1:
                 if st.button("📥 Descargar PDF Completo", key="btn_pdf_audit"):
                     with st.spinner("Generando PDF..."):
                         try:
-                            # Generar gráficos
                             img_path = generar_graficos(reporte.get('indices_historicos', {}))
-                            
-                            # Generar PDF
                             tipo_proyecto = proyectos_dict.get(proyecto, 'MINERIA')
                             pdf = generar_pdf_profesional(reporte, img_path, proyecto, tipo_proyecto)
                             
-                            # Descargar
                             pdf_bytes = pdf.output(dest='S').encode('latin-1')
                             st.download_button(
                                 label="📥 Descargar PDF",
@@ -1170,56 +1214,21 @@ with tab_informe:
                                 mime="application/pdf",
                                 key="download_pdf_btn"
                             )
-                            st.success("✅ PDF listo para descargar")
+                            st.success("✅ PDF listo")
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
             
             with col_a2:
                 if st.button("🖨️ Ver Vista Previa", key="btn_preview"):
-                    st.markdown("### 📄 Vista Previa del Reporte")
+                    st.markdown("### 📄 Vista Previa")
                     st.markdown(f"**Proyecto:** {proyecto}")
                     st.markdown(f"**Tipo:** {proyectos_dict.get(proyecto, 'N/A')}")
-                    st.markdown(f"**Fecha:** {reporte['fecha']}")
                     st.markdown(f"**Estado:** {reporte['estado']}")
                     st.markdown(f"**Diagnóstico:** {reporte['diagnostico_completo']}")
-            
-            with col_a3:
-                if st.session_state.get('admin_mode'):
-                    if st.button("📤 Enviar a Cliente", key="btn_send_audit"):
-                        with st.spinner("Enviando..."):
-                            try:
-                                img_path = generar_graficos(reporte.get('indices_historicos', {}))
-                                tipo_proyecto = proyectos_dict.get(proyecto, 'MINERIA')
-                                pdf = generar_pdf_profesional(reporte, img_path, proyecto, tipo_proyecto)
-                                
-                                pdf_bytes = pdf.output(dest='S').encode('latin-1')
-                                
-                                # Enviar por Telegram si existe ID
-                                if p_data.get('telegram_id'):
-                                    try:
-                                        response = requests.post(
-                                            f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage",
-                                            data={
-                                                "chat_id": p_data.get('telegram_id'),
-                                                "text": reporte['texto_telegram'],
-                                                "parse_mode": "Markdown"
-                                            },
-                                            timeout=10
-                                        )
-                                        if response.status_code == 200:
-                                            st.success("✅ Reporte enviado por Telegram")
-                                        else:
-                                            st.warning(f"Aviso: {response.status_code}")
-                                    except:
-                                        pass
-                                
-                                st.success("✅ Auditoría procesada")
-                            except Exception as e:
-                                st.error(f"Error: {str(e)}")
 
-# === PESTAÑA 3: BASE DE DATOS ===
+# === PESTAÑA 3: EXCEL ===
 with tab_excel:
-    st.subheader("📊 Base de Datos de Proyectos")
+    st.subheader("📊 Base de Datos")
     
     if st.session_state.get('admin_mode'):
         try:
@@ -1227,34 +1236,326 @@ with tab_excel:
             if res.data:
                 df = pd.DataFrame(res.data)
                 st.dataframe(df, use_container_width=True)
+                
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Descargar CSV",
+                    data=csv,
+                    file_name="usuarios.csv",
+                    mime="text/csv"
+                )
             else:
                 st.info("No hay datos")
         except Exception as e:
             st.error(f"Error: {e}")
     else:
-        st.info("Acceso restringido a administradores")
+        proyecto_cliente = st.session_state.get('proyecto_cliente')
+        try:
+            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).execute()
+            if res.data:
+                df = pd.DataFrame(res.data)
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.info("No hay reportes")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
-# === PESTAÑA 4: CONFIGURACIÓN ===
-with tab_config:
-    st.title("⚙️ Configuración")
+# === PESTAÑA 4: GESTIÓN DE CLIENTES (SOLO ADMIN) ===
+if st.session_state.get('admin_mode'):
+    with tab_clientes:
+        st.subheader("👥 Gestión de Clientes")
+        
+        tab_nuevo, tab_editar, tab_eliminar = st.tabs(["➕ Nuevo Cliente", "✏️ Editar", "🗑️ Eliminar"])
+        
+        with tab_nuevo:
+            st.markdown("### Registrar nuevo cliente")
+            
+            with st.form("form_nuevo_cliente"):
+                proyecto = st.text_input("Nombre del Proyecto")
+                tipo = st.selectbox("Tipo de Proyecto", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
+                coordenadas = st.text_area("Coordenadas (JSON format)", 
+                                           placeholder='[[lon1, lat1], [lon2, lat2], [lon3, lat3], [lon1, lat1]]')
+                anio_base = st.number_input("Año de Línea Base", value=2017, min_value=2000)
+                email_cliente = st.text_input("Email del cliente")
+                telegram_id = st.text_input("ID Telegram (opcional)")
+                password_cliente = st.text_input("Contraseña cliente", type="password")
+                
+                if st.form_submit_button("✅ Registrar Cliente"):
+                    try:
+                        # Validar coordenadas
+                        coords_parsed = json.loads(coordenadas)
+                        
+                        # Hashear contraseña
+                        pwd_hash = hash_password(password_cliente)
+                        
+                        # Insertar en Supabase
+                        data = {
+                            "Proyecto": proyecto,
+                            "Tipo": tipo,
+                            "Coordenadas": json.dumps(coords_parsed),
+                            "anio_linea_base": anio_base,
+                            "email_cliente": email_cliente,
+                            "telegram_id": telegram_id,
+                            "password_cliente": pwd_hash
+                        }
+                        
+                        supabase.table("usuarios").insert(data).execute()
+                        st.success(f"✅ Cliente {proyecto} registrado exitosamente")
+                    except json.JSONDecodeError:
+                        st.error("❌ Coordenadas con formato JSON inválido")
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
+        
+        with tab_editar:
+            st.markdown("### Editar cliente existente")
+            
+            try:
+                res = supabase.table("usuarios").select("Proyecto").execute()
+                proyectos_lista = [p['Proyecto'] for p in res.data]
+            except:
+                proyectos_lista = []
+            
+            proyecto_editar = st.selectbox("Selecciona proyecto", proyectos_lista, key="edit_proyecto")
+            
+            if st.button("Cargar datos", key="btn_cargar_datos"):
+                try:
+                    res = supabase.table("usuarios").select("*").eq("Proyecto", proyecto_editar).execute()
+                    if res.data:
+                        cliente = res.data[0]
+                        
+                        with st.form("form_editar_cliente"):
+                            tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"],
+                                              index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(cliente.get('Tipo', 'MINERIA')))
+                            email = st.text_input("Email", value=cliente.get('email_cliente', ''))
+                            telegram = st.text_input("Telegram ID", value=cliente.get('telegram_id', ''))
+                            anio_base = st.number_input("Año base", value=cliente.get('anio_linea_base', 2017))
+                            
+                            if st.form_submit_button("💾 Guardar cambios"):
+                                update_data = {
+                                    "Tipo": tipo,
+                                    "email_cliente": email,
+                                    "telegram_id": telegram,
+                                    "anio_linea_base": anio_base
+                                }
+                                supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto_editar).execute()
+                                st.success("✅ Cliente actualizado")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+        
+        with tab_eliminar:
+            st.markdown("### Eliminar cliente")
+            st.warning("⚠️ Esta acción no se puede deshacer")
+            
+            try:
+                res = supabase.table("usuarios").select("Proyecto").execute()
+                proyectos_lista = [p['Proyecto'] for p in res.data]
+            except:
+                proyectos_lista = []
+            
+            proyecto_eliminar = st.selectbox("Selecciona proyecto", proyectos_lista, key="del_proyecto")
+            
+            if st.button("🗑️ Eliminar", key="btn_eliminar"):
+                supabase.table("usuarios").delete().eq("Proyecto", proyecto_eliminar).execute()
+                st.success(f"✅ {proyecto_eliminar} eliminado")
+                st.rerun()
+
+# === PESTAÑA SOPORTE ===
+with tab_soporte:
+    st.title("💬 Soporte BioCore Intelligence")
     
-    if st.session_state.get('admin_mode'):
-        st.info("📊 Panel administrativo")
-    else:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📞 Contacto Directo")
+        st.markdown("""
+        **Responsable Técnica:** Loreto Campos Carrasco
+        
+        📧 Email: consultorabiocore@gmail.com
+        
+        📱 Teléfono: +56 9 XXXX XXXX
+        
+        ⏰ Disponibilidad: Lunes a Viernes, 8:00 - 18:00
+        """)
+    
+    with col2:
+        st.subheader("🔧 Problemas Comunes")
+        with st.expander("❓ ¿Cómo genero un reporte?"):
+            st.write("""
+1. Ve a la pestaña **'Vigilancia'**
+2. Haz click en **'Ejecutar Reporte'**
+3. Espera el análisis (2-3 minutos)
+4. Visualiza el velocímetro y métricas
+            """)
+        
+        with st.expander("❓ ¿Cuánto cuesta?"):
+            st.write("Consulta directamente con el equipo de ventas")
+        
+        with st.expander("❓ ¿Qué es un índice espectral?"):
+            st.write("Son medidas derivadas de imágenes satelitales que indican características ambientales")
+
+# === PESTAÑA HISTORIAL (CLIENTE) ===
+if not st.session_state.get('admin_mode'):
+    with tab_historial:
+        st.title("📨 Mi Historial de Reportes")
+        
+        proyecto_cliente = st.session_state.get('proyecto_cliente')
+        st.subheader(f"Reportes de {proyecto_cliente}")
+        
+        try:
+            res = supabase.table("historial_reportes").select("*").eq("proyecto", proyecto_cliente).order("created_at", desc=True).execute()
+            
+            if res.data:
+                for idx, reporte in enumerate(res.data):
+                    with st.expander(f"📊 {reporte.get('created_at', 'N/A')[:10]} - {reporte.get('proyecto')}"):
+                        col_info1, col_info2 = st.columns(2)
+                        with col_info1:
+                            st.write(f"**SAVI:** {reporte.get('savi', 'N/A')}")
+                            st.write(f"**NDSI:** {reporte.get('ndsi', 'N/A')}")
+                        with col_info2:
+                            st.write(f"**NDWI:** {reporte.get('ndwi', 'N/A')}")
+                            st.write(f"**Temp:** {reporte.get('temp', 'N/A')}")
+                        st.write(f"**Estado:** {reporte.get('estado', 'N/A')}")
+            else:
+                st.info("No hay reportes aún")
+        except Exception as e:
+            st.error(f"Error: {e}")
+    
+    # === PESTAÑA CONFIGURACIÓN (CLIENTE) ===
+    with tab_config:
+        st.title("⚙️ Mi Configuración")
+        
         cliente_data = st.session_state.get('cliente_data', {})
         
-        with st.form("form_config"):
+        with st.form("form_config_cliente"):
             st.markdown("### 📅 Preferencias de Reportes")
             
             frecuencia = st.radio("Frecuencia de envío:",
                                  ["Diaria", "Semanal", "Mensual"],
                                  index=0 if cliente_data.get('frecuencia', 'Diaria') == 'Diaria' else 1)
             
-            hora = st.time_input("Hora de envío", 
-                                value=time(8, 0))
+            hora = st.time_input("Hora de envío", value=time(8, 0))
             
             if st.form_submit_button("💾 Guardar Preferencias"):
                 st.success("✅ Preferencias guardadas")
+
+# === PESTAÑA GUÍA ===
+with tab_guia:
+    st.title("📖 Guía Completa del Sistema")
+    
+    tab_intro, tab_indices, tab_faq = st.tabs([
+        "🎯 Introducción",
+        "📊 Índices Espectrales",
+        "❓ Preguntas Frecuentes"
+    ])
+    
+    with tab_intro:
+        st.markdown("""
+        ## 🌍 ¿Qué es BioCore Intelligence?
+        
+        BioCore Intelligence es una plataforma avanzada de **vigilancia ambiental satelital** 
+        que utiliza datos de sensores de Earth Engine para monitorear en tiempo real.
+        
+        ### 🎯 Objetivos
+        - ✅ Monitoreo ambiental en tiempo real
+        - ✅ Detección temprana de cambios
+        - ✅ Cumplimiento normativo
+        - ✅ Reportes profesionales
+        - ✅ Análisis multispectral de alta precisión
+        
+        ### 🛰️ Satélites utilizados
+        - **Sentinel-2:** Imágenes multiespectrales de 10-60m resolución
+        - **MODIS:** Datos de temperatura de tierra
+        - **Landsat:** Datos históricos de complemento
+        
+        ### 📋 Tipos de Proyectos Soportados
+        1. **MINERIA** - Monitoreo de estabilidad de taludes y recursos hídricos
+        2. **GLACIAR** - Vigilancia de cobertura de nieve/hielo
+        3. **BOSQUE** - Protección de cobertura vegetal
+        4. **HUMEDAL** - Control de ciclo hidrológico
+        5. **AGRICOLA** - Seguimiento de vigor de cultivos
+        """)
+    
+    with tab_indices:
+        st.markdown("""
+        ## 📊 Índices Espectrales
+        
+        ### 🌱 SAVI (Soil-Adjusted Vegetation Index)
+        - **Rango:** -0.5 a 1.5
+        - **Interpretación:** Vigor de vegetación ajustado por tipo de suelo
+        - **Uso:** Detecta estrés en plantas y cobertura vegetal
+        - **Thresholds:**
+          - > 0.40: Vegetación densa y saludable
+          - 0.25-0.40: Vegetación moderada
+          - < 0.25: Vegetación degradada o ausente
+        
+        ### ❄️ NDSI (Normalized Difference Snow Index)
+        - **Rango:** -1 a 1
+        - **Interpretación:** Detección de nieve e hielo
+        - **Uso:** Monitoreo de glaciares y cobertura nival
+        - **Thresholds:**
+          - > 0.50: Cobertura de nieve/hielo extensa
+          - 0.35-0.50: Cobertura intermedia
+          - < 0.35: Cobertura crítica o ausencia
+        
+        ### 💧 NDWI (Normalized Difference Water Index)
+        - **Rango:** -1 a 1
+        - **Interpretación:** Contenido de agua en suelo y vegetación
+        - **Uso:** Detecta estrés hídrico y humedad
+        - **Thresholds:**
+          - > 0.40: Humedad alta
+          - 0.20-0.40: Humedad normal
+          - < 0.20: Estrés hídrico severo
+        
+        ### 🌳 NDVI (Normalized Difference Vegetation Index)
+        - **Rango:** -1 a 1
+        - **Interpretación:** Vigor general de vegetación
+        - **Uso:** Complemento a SAVI para análisis de biomasa
+        - **Thresholds:**
+          - > 0.70: Vegetación muy densa
+          - 0.50-0.70: Vegetación densa
+          - 0.20-0.50: Vegetación moderada
+          - < 0.20: Vegetación escasa
+        
+        ### 🌡️ SWIR (Short-Wave Infrared)
+        - **Rango:** 0 a 1
+        - **Interpretación:** Humedad y mineralogia del sustrato
+        - **Uso:** Detecta cambios en composición del suelo
+        """)
+    
+    with tab_faq:
+        st.markdown("""
+        ## ❓ Preguntas Frecuentes
+        
+        ### ¿Con qué frecuencia recibo reportes?
+        > Según tu configuración: Diaria, Semanal o Mensual
+        
+        ### ¿A qué hora me llegan?
+        > A la hora que especificaste en tu configuración
+        
+        ### ¿Qué significa SAVI?
+        > Soil-Adjusted Vegetation Index. Mide la salud de la vegetación ajustado por el tipo de suelo
+        
+        ### ¿Cuánto tiempo tarda un reporte?
+        > Entre 2-3 minutos dependiendo de la cobertura nubosa
+        
+        ### ¿Qué hago si sale "ALERTA CRÍTICA"?
+        > Contacta inmediatamente al equipo técnico para inspección de terreno
+        
+        ### ¿Los datos son confiables?
+        > Sí, utilizamos datos de satélites de agencias espaciales internacionales
+        
+        ### ¿Puedo compartir mis reportes?
+        > Sí, puedes descargar en PDF y compartir con autoridades
+        
+        ### ¿Qué es una "Línea Base"?
+        > Datos históricos de referencia (usualmente 2017) para comparar cambios
+        
+        ### ¿Por qué algunos reportes salen en 0?
+        > Puede ser por cobertura nubosa o que el índice sea naturalmente bajo en esa zona
+        
+        ### ¿Cómo se actualizan los datos?
+        > Automáticamente cada vez que Sentinel-2 captura nuevas imágenes (cada 5 días)
+        """)
 
 st.markdown("---")
 st.markdown("""

@@ -422,60 +422,15 @@ with st.sidebar:
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
     # Logo y Título
-    col_logo, col_titulo = st.columns([1, 2])
+    col_logo = st.columns(1)[0]
     with col_logo:
-        if os.path.exists("logo_biocore.jpg"):
-            st.image("logo_biocore.jpg", width=150)
+        if os.path.exists("logo_biocore.png"):
+            st.image("logo_biocore.png", width=250)
     
-    with col_titulo:
-        st.markdown("""
-        <h1 style="margin-top: 30px;">BioCore Intelligence</h1>
-        <p style="font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital</p>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Información sobre el sistema
-    col_info1, col_info2, col_info3 = st.columns(3)
-    with col_info1:
-        st.markdown("""
-        ### 🛰️ Vigilancia Satelital
-        Monitoreo en tiempo real con Sentinel-2 y MODIS
-        """)
-    with col_info2:
-        st.markdown("""
-        ### 📊 Análisis Inteligente
-        Índices espectrales: SAVI, NDSI, NDWI
-        """)
-    with col_info3:
-        st.markdown("""
-        ### 📋 Reportes Profesionales
-        Auditorías técnicas automatizadas
-        """)
-    
-    st.markdown("---")
-    
-    # Mostrar mapa de demostración
-    try:
-        proyectos = supabase.table("usuarios").select("*").execute().data
-        if proyectos:
-            st.subheader("📍 Proyectos Activos")
-            
-            cols = st.columns(min(len(proyectos), 2))
-            for idx, p in enumerate(proyectos[:6]):
-                with cols[idx % 2]:
-                    st.markdown(f"""
-                    <div style="background-color: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <b>📌 {p['Proyecto']}</b><br>
-                    Tipo: {p.get('Tipo', 'N/A')}<br>
-                    Titular: {p.get('titular', 'N/A')}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    m_obj = dibujar_mapa_biocore(p['Coordenadas'])
-                    folium_static(m_obj, width=350, height=300)
-    except:
-        pass
+    st.markdown("""
+    <h1 style="text-align: center; margin-top: 30px;">BioCore Intelligence</h1>
+    <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital</p>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -492,20 +447,21 @@ if not st.session_state.get('authenticated'):
 
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
-    tab1, tab_informe, tab_excel, tab_admin, tab_soporte, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_config, tab_soporte, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos", 
-        "⚙️ Admin", 
+        "⚙️ Configuración", 
         "💬 Soporte", 
         "📖 Guía"
     ])
 else:
-    tab1, tab_informe, tab_excel, tab_soporte, tab_historial, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_soporte, tab_config, tab_historial, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos", 
         "💬 Soporte",
+        "⚙️ Configuración",
         "📨 Mi Historial",
         "📖 Guía"
     ])
@@ -662,9 +618,47 @@ with tab_informe:
                                         mime="application/pdf"
                                     )
                             
-                            if st.session_state.get('admin_mode'):
-                                with col_acc2:
-                                    if st.button("📤 Enviar a Cliente"):
+                            with col_acc2:
+                                if st.button("👁️ Ver Preview Reporte"):
+                                    st.session_state['mostrar_preview'] = True
+                            
+                            with col_acc3:
+                                if st.button("🗑️ Descartar"):
+                                    st.session_state['preview_pdf'] = None
+                                    st.session_state['mostrar_preview'] = False
+                                    st.rerun()
+                            
+                            # MOSTRAR PREVIEW DEL REPORTE
+                            if st.session_state.get('mostrar_preview'):
+                                st.markdown("---")
+                                st.subheader("📊 Vista Previa del Reporte que Recibe el Cliente")
+                                
+                                col_prev1, col_prev2, col_prev3 = st.columns(3)
+                                with col_prev1:
+                                    st.metric("SAVI Actual", f"{reporte['savi_actual']:.4f}")
+                                with col_prev2:
+                                    st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+                                with col_prev3:
+                                    st.metric("Variación", f"{reporte['variacion']:.1f}%")
+                                
+                                st.markdown(f"""
+                                <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left:5px solid #60a5fa;">
+                                <h3>🎯 Estado: {reporte['estado']}</h3>
+                                <p><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
+                                <p><b>SAVI Base ({reporte['anio_base']}):</b> {reporte['savi_base']:.4f}</p>
+                                <p><b>SAVI Actual:</b> {reporte['savi_actual']:.4f}</p>
+                                <p><b>NDSI:</b> {reporte['ndsi']:.4f}</p>
+                                <p><b>NDWI:</b> {reporte['ndwi']:.4f}</p>
+                                <p><b>SWIR:</b> {reporte['swir']:.4f}</p>
+                                <p><b>Fecha del Análisis:</b> {reporte['fecha']}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                st.markdown("### 📨 Mensaje Telegram a Enviar:")
+                                st.code(reporte['texto_telegram'])
+                                
+                                if st.session_state.get('admin_mode'):
+                                    if st.button("📤 Confirmar Envío a Cliente"):
                                         try:
                                             with open(pdf_path, "rb") as f:
                                                 files = {'document': (f"auditoria.pdf", f.read())}
@@ -678,16 +672,11 @@ with tab_informe:
                                                     timeout=30
                                                 )
                                                 if response.status_code == 200:
-                                                    st.success("✅ Enviado a cliente")
+                                                    st.success("✅ Reporte enviado al cliente")
                                                 else:
                                                     st.error(f"Error: {response.text}")
                                         except Exception as e:
                                             st.error(f"Error: {str(e)}")
-                                
-                                with col_acc3:
-                                    if st.button("🗑️ Descartar"):
-                                        st.session_state['preview_pdf'] = None
-                                        st.rerun()
                         else:
                             st.warning(f"Sin datos para {mes}/{anio}")
                 except Exception as e:
@@ -713,12 +702,13 @@ with tab_excel:
         except Exception as e:
             st.error(f"Error: {e}")
 
-# === PESTAÑA ADMIN ===
-if st.session_state.get('admin_mode'):
-    with tab_admin:
-        st.title("⚙️ Panel de Admin")
-        
-        tab_clientes, tab_config = st.tabs(["👥 Clientes", "⚙️ Config"])
+# === PESTAÑA CONFIGURACIÓN ===
+with tab_config:
+    st.title("⚙️ Configuración")
+    
+    if st.session_state.get('admin_mode'):
+        # VISTA ADMIN
+        tab_clientes, tab_gestor = st.tabs(["👥 Clientes", "📊 Gestor"])
         
         with tab_clientes:
             st.subheader("📋 Clientes Registrados")
@@ -744,9 +734,56 @@ if st.session_state.get('admin_mode'):
                                 st.session_state[f"edit_cliente_{idx}"] = True
                     
                     st.divider()
+                    
+                    # MOSTRAR FORMULARIO DE EDICIÓN SI ESTÁ ACTIVADO
+                    for idx, cliente in enumerate(res.data):
+                        if st.session_state.get(f"edit_cliente_{idx}"):
+                            st.subheader(f"✏️ Editando: {cliente['Proyecto']}")
+                            
+                            with st.form(f"edit_form_{idx}"):
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    titular = st.text_input("Titular", value=cliente.get('titular', ''))
+                                    tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"], 
+                                                       index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(cliente.get('Tipo', 'MINERIA')))
+                                    telegram_id = st.text_input("Telegram ID", value=cliente.get('telegram_id', ''))
+                                
+                                with col2:
+                                    anio_lb = st.number_input("Año Base", value=cliente.get('anio_linea_base', 2017), min_value=2010, max_value=2026)
+                                    frecuencia = st.selectbox("Frecuencia de Reportes", ["Diaria", "Semanal"], 
+                                                             index=0 if cliente.get('frecuencia_reportes', 'Diaria') == 'Diaria' else 1)
+                                    hora_envio = st.time_input("⏰ Hora de Envío", value=datetime.strptime(cliente.get('hora_envio', '08:00'), '%H:%M').time())
+                                
+                                col_act1, col_act2 = st.columns(2)
+                                with col_act1:
+                                    if st.form_submit_button("💾 Guardar Cambios"):
+                                        try:
+                                            cliente_update = {
+                                                "id": cliente.get('id'),
+                                                "titular": titular,
+                                                "Tipo": tipo,
+                                                "telegram_id": telegram_id,
+                                                "anio_linea_base": int(anio_lb),
+                                                "frecuencia_reportes": frecuencia,
+                                                "hora_envio": hora_envio.strftime("%H:%M")
+                                            }
+                                            supabase.table("usuarios").upsert(cliente_update).execute()
+                                            st.success("✅ Cambios guardados")
+                                            st.session_state[f"edit_cliente_{idx}"] = False
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Error: {str(e)}")
+                                
+                                with col_act2:
+                                    if st.form_submit_button("❌ Cancelar"):
+                                        st.session_state[f"edit_cliente_{idx}"] = False
+                                        st.rerun()
+            
             except Exception as e:
                 st.error(f"Error: {e}")
             
+            st.divider()
             st.markdown("### ➕ Nuevo Cliente")
             
             with st.form("form_nuevo_cliente", clear_on_submit=True):
@@ -801,8 +838,48 @@ if st.session_state.get('admin_mode'):
                         except Exception as e:
                             st.error(f"Error: {str(e)}")
         
-        with tab_config:
-            st.info("⚙️ Configuración del sistema")
+        with tab_gestor:
+            st.info("📊 Gestión del sistema")
+    
+    else:
+        # VISTA CLIENTE
+        st.subheader(f"Mis Configuraciones - {st.session_state.get('proyecto_cliente')}")
+        
+        cliente_data = st.session_state.get('cliente_data', {})
+        
+        with st.form("form_config_cliente"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 📅 Frecuencia de Reportes")
+                frecuencia = st.radio("Selecciona con qué frecuencia deseas recibir reportes:",
+                                     ["Diaria", "Semanal"],
+                                     index=0 if cliente_data.get('frecuencia_reportes', 'Diaria') == 'Diaria' else 1)
+            
+            with col2:
+                st.markdown("### ⏰ Hora de Envío")
+                hora_actual = cliente_data.get('hora_envio', '08:00')
+                hora_obj = datetime.strptime(hora_actual, '%H:%M').time()
+                hora_envio = st.time_input("¿A qué hora deseas recibir los reportes?", value=hora_obj)
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.form_submit_button("💾 Guardar Configuración"):
+                    try:
+                        proyecto = st.session_state.get('proyecto_cliente')
+                        update_data = {
+                            "Proyecto": proyecto,
+                            "frecuencia_reportes": frecuencia,
+                            "hora_envio": hora_envio.strftime("%H:%M")
+                        }
+                        supabase.table("usuarios").upsert(update_data).execute()
+                        st.success("✅ Configuración guardada")
+                        st.session_state['cliente_data'] = {**cliente_data, 
+                                                           "frecuencia_reportes": frecuencia,
+                                                           "hora_envio": hora_envio.strftime("%H:%M")}
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
 
 # === PESTAÑA SOPORTE ===
 with tab_soporte:

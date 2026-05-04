@@ -88,15 +88,16 @@ def verificar_credenciales_usuario(proyecto, password):
 
 
 def es_admin(contraseña_admin):
-    """Verifica si es el admin (contraseña maestra)"""
+    """Verifica si es el admin (contraseña maestra) con la ruta correcta"""
     try:
-        # Buscamos correctamente dentro del diccionario 'auth'
+        # El código original buscaba en la raíz, pero el TOML tiene [auth]
         contraseña_admin_hash = st.secrets["auth"]["admin_password_hash"]
     except:
-        # Si falla el secreto, usa este por defecto
-        contraseña_admin_hash = hash_password("biocore2024admin")
-        
-    return hash_password(contraseña_admin) == contraseña_admin_hash
+        # Respaldo por si no encuentra el secreto
+        contraseña_admin_hash = hashlib.sha256("biocore2024admin".encode()).hexdigest()
+    
+    return hashlib.sha256(contraseña_admin.encode()).hexdigest() == contraseña_admin_hash
+
 
 # === PROTOCOLO DE VALIDACIÓN DE LÍNEA BASE ESPECTRAL ===
 

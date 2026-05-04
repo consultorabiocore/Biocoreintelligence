@@ -367,6 +367,7 @@ if 'authenticated' not in st.session_state:
     st.session_state['proyecto_cliente'] = None
     st.session_state['preview_pdf'] = None
     st.session_state['mostrar_preview'] = False
+    st.session_state['reporte_actual'] = None
 
 # === SIDEBAR ===
 with st.sidebar:
@@ -419,24 +420,13 @@ with st.sidebar:
             st.session_state['proyecto_cliente'] = None
             st.session_state['preview_pdf'] = None
             st.session_state['mostrar_preview'] = False
+            st.session_state['reporte_actual'] = None
             st.rerun()
 
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
-# === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
-    # Logo y Título centrado
     st.markdown("""
-    <div style="text-align: center;">
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if os.path.exists("logo_biocore.png"):
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.image("logo_biocore.png", width=150)
-    
-    st.markdown("""
-    <h1 style="text-align: center; margin-top: 10px;">BioCore Intelligence</h1>
+    <h1 style="text-align: center; margin-top: 30px;">BioCore Intelligence</h1>
     <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital</p>
     """, unsafe_allow_html=True)
     
@@ -512,7 +502,7 @@ with tab1:
         proyectos_mostrar = [p for p in proyectos if p.get('Proyecto') == proyecto_cliente]
 
     if proyectos_mostrar:
-        for p in proyectos_mostrar:
+        for p_idx, p in enumerate(proyectos_mostrar):
             st.markdown(f"### 📍 {p['Proyecto']}")
 
             col_mapa, col_reporte = st.columns([2.5, 1])
@@ -522,7 +512,7 @@ with tab1:
                 folium_static(m_obj, width=850, height=500)
 
             with col_reporte:
-                if st.button("🚀 Ejecutar Reporte", key=f"btn_{p['Proyecto']}"):
+                if st.button("🚀 Ejecutar Reporte", key=f"vigilancia_btn_{p_idx}"):
                     with st.spinner("Analizando..."):
                         reporte = generar_reporte_total(p)
                         
@@ -571,7 +561,6 @@ with tab1:
                             
                             st.success(reporte['estado'])
 
-# === PESTAÑA 2: AUDITORÍAS ===
 # === PESTAÑA 2: AUDITORÍAS ===
 with tab_informe:
     st.subheader("📋 Generador de Auditorías")
@@ -708,7 +697,7 @@ with tab_informe:
             col_acc1, col_acc2, col_acc3 = st.columns(3)
             
             with col_acc1:
-                if st.button("📥 Generar PDF", key="btn_pdf"):
+                if st.button("📥 Generar PDF", key="btn_pdf_audit"):
                     with st.spinner("Generando PDF..."):
                         try:
                             pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
@@ -731,7 +720,7 @@ with tab_informe:
             
             with col_acc2:
                 if st.session_state.get('admin_mode'):
-                    if st.button("📤 Enviar a Cliente", key="btn_send"):
+                    if st.button("📤 Enviar a Cliente", key="btn_send_audit"):
                         try:
                             pdf = generar_pdf_profesional(proyecto, proyectos_dict.get(proyecto, 'MINERIA'), reporte, None)
                             
@@ -758,10 +747,11 @@ with tab_informe:
                             st.error(f"Error: {str(e)}")
             
             with col_acc3:
-                if st.button("🗑️ Limpiar", key="btn_clear"):
+                if st.button("🗑️ Limpiar", key="btn_clear_audit"):
                     st.session_state['reporte_actual'] = None
                     st.session_state['mostrar_preview'] = False
                     st.rerun()
+
 # === PESTAÑA 3: EXCEL ===
 with tab_excel:
     st.subheader("📊 Base de Datos")
@@ -828,10 +818,10 @@ with tab_config:
                                 col1, col2 = st.columns(2)
                                 
                                 with col1:
-                                    titular = st.text_input("Titular", value=cliente.get('titular', ''))
+                                    titular = st.text_input("Titular", value=cliente.get('titular', ''), key=f"titular_{idx}")
                                     tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"], 
                                                        index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(cliente.get('Tipo', 'MINERIA')), key=f"tipo_{idx}")
-                                    telegram_id = st.text_input("Telegram ID", value=str(cliente.get('telegram_id', '')))
+                                    telegram_id = st.text_input("Telegram ID", value=str(cliente.get('telegram_id', '')), key=f"tg_{idx}")
                                 
                                 with col2:
                                     anio_lb = st.number_input("Año Base", value=int(cliente.get('anio_linea_base', 2017)), min_value=2010, max_value=2026, key=f"anio_{idx}")
@@ -879,16 +869,16 @@ with tab_config:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    titular = st.text_input("Titular")
-                    nombre_proyecto = st.text_input("Proyecto")
-                    tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
-                    anio_lb = st.number_input("Año Base", value=2017, min_value=2010, max_value=2026)
+                    titular = st.text_input("Titular", key="new_titular")
+                    nombre_proyecto = st.text_input("Proyecto", key="new_proyecto")
+                    tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"], key="new_tipo")
+                    anio_lb = st.number_input("Año Base", value=2017, min_value=2010, max_value=2026, key="new_anio")
                 
                 with col2:
-                    telegram_id = st.text_input("Telegram ID")
-                    password_cliente = st.text_input("Contraseña", type="password")
-                    password_confirm = st.text_input("Confirmar", type="password")
-                    coords_json = st.text_area("Coordenadas (JSON)", height=80)
+                    telegram_id = st.text_input("Telegram ID", key="new_tg")
+                    password_cliente = st.text_input("Contraseña", type="password", key="new_pwd")
+                    password_confirm = st.text_input("Confirmar", type="password", key="new_pwd_conf")
+                    coords_json = st.text_area("Coordenadas (JSON)", height=80, key="new_coords")
                 
                 col_freq1, col_freq2 = st.columns(2)
                 with col_freq1:
@@ -943,7 +933,7 @@ with tab_config:
                 st.markdown("### 📅 Frecuencia de Reportes")
                 frecuencia = st.radio("Selecciona con qué frecuencia deseas recibir reportes:",
                                      ["Diaria", "Semanal"],
-                                     index=0 if cliente_data.get('frecuencia_reportes', 'Diaria') == 'Diaria' else 1)
+                                     index=0 if cliente_data.get('frecuencia_reportes', 'Diaria') == 'Diaria' else 1, key="client_freq")
             
             with col2:
                 st.markdown("### ⏰ Hora de Envío")
@@ -952,11 +942,11 @@ with tab_config:
                     hora_obj = datetime.strptime(hora_actual, '%H:%M').time()
                 else:
                     hora_obj = time(8, 0)
-                hora_envio = st.time_input("¿A qué hora deseas recibir los reportes?", value=hora_obj)
+                hora_envio = st.time_input("¿A qué hora deseas recibir los reportes?", value=hora_obj, key="client_hora")
             
             col_btn1, col_btn2 = st.columns(2)
             with col_btn1:
-                if st.form_submit_button("💾 Guardar Configuración"):
+                if st.form_submit_button("💾 Guardar Configuración", key="btn_save_config"):
                     try:
                         proyecto = st.session_state.get('proyecto_cliente')
                         update_data = {
@@ -1011,11 +1001,11 @@ with tab_soporte:
         
         st.subheader("🐛 Reportar Problema")
         with st.form("form_soporte"):
-            nombre_reporte = st.text_input("Tu nombre")
-            email_reporte = st.text_input("Tu email")
-            problema = st.text_area("Describe el problema", height=100)
+            nombre_reporte = st.text_input("Tu nombre", key="soporte_nombre")
+            email_reporte = st.text_input("Tu email", key="soporte_email")
+            problema = st.text_area("Describe el problema", height=100, key="soporte_problema")
             
-            if st.form_submit_button("📬 Enviar Reporte"):
+            if st.form_submit_button("📬 Enviar Reporte", key="btn_soporte"):
                 st.success("✅ Reporte enviado a consultorabiocore@gmail.com")
                 st.balloons()
 
@@ -1032,7 +1022,7 @@ if not st.session_state.get('admin_mode'):
             
             if res.data:
                 for idx, reporte in enumerate(res.data):
-                    with st.expander(f"📊 {reporte.get('created_at', 'N/A')[:10]} - {reporte.get('proyecto', 'N/A')}"):
+                    with st.expander(f"📊 {reporte.get('created_at', 'N/A')[:10]} - {reporte.get('proyecto', 'N/A')}", expanded=False):
                         col_info1, col_info2 = st.columns(2)
                         with col_info1:
                             st.write(f"**SAVI:** {reporte.get('savi', 'N/A')}")

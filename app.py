@@ -399,14 +399,14 @@ ANOMALÍA DETECTADA - Fuera de patrón esperado
             color = (200, 50, 0)
             diagnostico = f"""
 Tipo de Terreno: {tipo_terreno}
-SAVI Base: {savi_base_corr:.4f} → Actual: {savi_corr:.4f}
+SAVI Base: {savi_base_corr:.4f} -> Actual: {savi_corr:.4f}
 Cambio: {validacion_savi['delta_rel']:.1f}% ({validacion_savi['razon']})
 
 Recomendación: Evaluación ecológica inmediata.
             """
             nivel = "CRÍTICO"
         else:
-            estado = "✓ BAJO CONTROL: COBERTURA VEGETAL ESTABLE"
+            estado = "BAJO CONTROL: COBERTURA VEGETAL ESTABLE"
             color = (50, 150, 0)
             diagnostico = f"Cobertura vegetal dentro de parámetros normales."
             nivel = "NORMAL"
@@ -416,14 +416,14 @@ Recomendación: Evaluación ecológica inmediata.
             estado = "🔴 ALERTA CRÍTICA: PÉRDIDA DE COBERTURA NIVAL"
             color = (200, 0, 0)
             diagnostico = f"""
-NDSI Base: {ndsi_base_corr:.4f} → Actual: {ndsi_corr:.4f}
+NDSI Base: {ndsi_base_corr:.4f} -> Actual: {ndsi_corr:.4f}
 {validacion_ndsi['razon']}
 
 ACCIÓN REQUERIDA: Inspección inmediata.
             """
             nivel = "CRÍTICO"
         else:
-            estado = "✓ BAJO CONTROL: CRIOSFERA ESTABLE"
+            estado = "BAJO CONTROL: CRIOSFERA ESTABLE"
             color = (0, 100, 0)
             diagnostico = f"Cobertura de nieve/hielo dentro de norma histórica."
             nivel = "NORMAL"
@@ -435,13 +435,13 @@ ACCIÓN REQUERIDA: Inspección inmediata.
             diagnostico = f"{validacion_ndwi['razon']}"
             nivel = "MODERADO"
         else:
-            estado = "✓ BAJO CONTROL: RECURSOS HÍDRICOS ESTABLES"
+            estado = "BAJO CONTROL: RECURSOS HÍDRICOS ESTABLES"
             color = (0, 150, 0)
             diagnostico = "Humedad dentro de parámetros esperados."
             nivel = "NORMAL"
     
     else:
-        estado = "✓ BAJO CONTROL"
+        estado = "BAJO CONTROL"
         color = (0, 150, 0)
         diagnostico = "Sistema en operación normal."
         nivel = "NORMAL"
@@ -678,7 +678,14 @@ def generar_pdf_profesional(df, proyecto_nombre, tipo_proyecto, img_path, report
     return pdf
 
 
-# --- 7. SIDEBAR CON LOGO Y AUTENTICACIÓN ---
+# --- 7. INICIALIZAR SESSION STATE ---
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+    st.session_state['admin_mode'] = False
+    st.session_state['proyecto_cliente'] = None
+
+
+# --- 8. SIDEBAR CON LOGO Y AUTENTICACIÓN ---
 
 with st.sidebar:
     # Logo
@@ -733,22 +740,19 @@ with st.sidebar:
             st.rerun()
 
 
-# --- 8. VERIFICACIÓN DE ACCESO ---
+# --- 9. VERIFICACIÓN DE ACCESO ---
 
 if not st.session_state.get('authenticated'):
     st.warning("⚠️ Debes iniciar sesión para acceder a BioCore Intelligence")
     st.stop()
 
 
-# --- 9. INTERFAZ STREAMLIT ---
+# --- 10. INTERFAZ STREAMLIT ---
 
-tab1, tab_informe, tab_excel, tab_admin, tab_guia = st.tabs([
-    "🛰️ Vigilancia",
-    "📋 Auditorías",
-    "📊 Base Datos",
-    "⚙️ Admin",
-    "📖 Guía Protocolo"
-])
+tab_names = ["🛰️ Vigilancia", "📋 Auditorías", "📊 Base Datos", "⚙️ Admin", "📖 Guía Protocolo"]
+tab_list = st.tabs(tab_names)
+
+tab1, tab_informe, tab_excel, tab_admin, tab_guia = tab_list
 
 # PESTAÑA 1: VIGILANCIA
 with tab1:
@@ -758,10 +762,8 @@ with tab1:
         proyectos = []
 
     if st.session_state.get('admin_mode'):
-        # Admin ve todos los proyectos
         proyectos_mostrar = proyectos
     else:
-        # Cliente solo ve su proyecto
         proyecto_cliente = st.session_state.get('proyecto_cliente')
         proyectos_mostrar = [p for p in proyectos if p.get('Proyecto') == proyecto_cliente]
 
@@ -781,7 +783,6 @@ with tab1:
                         reporte = generar_reporte_total(p)
                         
                         if reporte.get('tipo') != 'error':
-                            # Telegram
                             try:
                                 requests.post(
                                     f"https://api.telegram.org/bot{st.secrets['telegram']['token']}/sendMessage",
@@ -796,7 +797,6 @@ with tab1:
                             except Exception as e:
                                 st.warning(f"⚠️ Telegram: {e}")
 
-                            # Métricas
                             st.metric(
                                 label=f"SAVI vs {reporte['anio_base']}",
                                 value=f"{reporte['savi_actual']:.4f}",
@@ -859,7 +859,6 @@ with tab_informe:
                             
                             img_path, _ = generar_graficos(df_mes)
                             
-                            # Logo de consultora
                             logo_consultora = st.secrets.get("logo_consultora_path", "logo_consultora.jpg")
                             
                             pdf = generar_pdf_profesional(df_mes, proyecto, proyectos_dict[proyecto], 
@@ -955,28 +954,26 @@ with tab_guia:
     else:
         st.title("📖 Guía del Protocolo de Validación de Línea Base Espectral")
         
-        st.markdown("""
-## 📚 Introducción
-
+        with st.expander("📚 1. Introducción", expanded=True):
+            st.markdown("""
 El **Protocolo de Validación de Línea Base Espectral** es un sistema avanzado que distingue entre:
 - **Cambios reales** (degradación, contaminación, etc.)
 - **Ruido de sensor** (variaciones naturales en zonas áridas/minerales)
-
----
-
-## 🎯 1. Clasificación Automática del Terreno
-
-El sistema clasifica automáticamente cada zona basándose en la **línea base histórica**:
-
-| Clasificación | Criterio | Características |
-|---|---|---|
-| **MINERAL_ARIDO** | SAVI < 0.10 | Sin vegetación, ruido de sensor permitido |
-| **VEGETADO** | SAVI ≥ 0.30 | Bosques, cultivos, ecosistemas frágiles |
-| **CRIOSFERA** | NDSI ≥ 0.35 | Glaciares, nieve permanente |
-| **HIDRICO** | NDWI ≥ 0.20 | Lagos, humedales, ríos |
-
----
-
-## 🔍 2. Reglas de Validación
-
-### **Regla 1: Diferencia Absoluta Mínima (Regla de Oro)**
+            """)
+        
+        with st.expander("🎯 2. Clasificación Automática del Terreno"):
+            df_terrenos = pd.DataFrame({
+                'Clasificación': ['MINERAL_ARIDO', 'VEGETADO', 'CRIOSFERA', 'HIDRICO'],
+                'Criterio': ['SAVI < 0.10', 'SAVI >= 0.30', 'NDSI >= 0.35', 'NDWI >= 0.20'],
+                'Características': [
+                    'Sin vegetación, ruido permitido',
+                    'Bosques, cultivos, frágiles',
+                    'Glaciares, nieve permanente',
+                    'Lagos, humedales, ríos'
+                ]
+            })
+            st.dataframe(df_terrenos, use_container_width=True)
+        
+        with st.expander("🔍 3. Reglas de Validación"):
+            st.markdown("""
+### Regla 1: Diferencia Absoluta Mínima (Regla de Oro)

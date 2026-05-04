@@ -1438,38 +1438,41 @@ with tab1:
                             """, unsafe_allow_html=True)
                             
                             # ===== VELOCÍMETRO MEJORADO AQUÍ =====
-                            fig_gauge = go.Figure(go.Indicator(
-                                mode="gauge+number+delta",
-                                value=reporte['savi_actual'],
-                                number={'suffix': ''},
-                                title={'text': "SAVI - Vigor de Vegetación"},
-                                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base', 'relative': False},
-                                gauge={
-                                    'axis': {'range': [0, 0.8], 'thickness': 0.2, 'tickwidth': 1},
-                                    'bar': {'color': "#1e40af", 'line': {'color': "darkblue", 'width': 2}},
-                                    'borderwidth': 2,
-                                    'bordercolor': "#333",
-                                    'steps': [
-                                        {'range': [0, 0.15], 'color': "#fee2e2", 'thickness': 0.15},
-                                        {'range': [0.15, 0.35], 'color': "#fef3c7", 'thickness': 0.15},
-                                        {'range': [0.35, 0.8], 'color': "#dcfce7", 'thickness': 0.15}
-                                    ],
-                                    'threshold': {
-                                        'line': {'color': "black", 'width': 4},
-                                        'thickness': 0.8,
-                                        'value': reporte['savi_actual']
-                                    }
-                                }
-                            ))
-                            fig_gauge.update_layout(
-                                height=420,
-                                font={'size': 14, 'family': 'Arial'},
-                                margin=dict(l=20, r=20, t=100, b=20),
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                plot_bgcolor='rgba(0,0,0,0)'
-                            )
-                            st.plotly_chart(fig_gauge, use_container_width=True)
-                            
+# ===== VELOCÍMETRO MEJORADO AQUÍ =====
+fig_gauge = go.Figure(go.Indicator(
+    mode="gauge+number+delta",
+    value=reporte['savi_actual'],
+    number={'suffix': ''},
+    title={'text': "SAVI - Vigor de Vegetación"},
+    delta={'reference': reporte['savi_base'], 'suffix': ' vs Base', 'relative': False},
+    gauge={
+        'axis': {
+            'range': [0, 0.8],
+            'tickfont': {'size': 12}
+        },
+        'bar': {'color': "#1e40af"},
+        'borderwidth': 2,
+        'bordercolor': "#333",
+        'steps': [
+            {'range': [0, 0.15], 'color': "#fee2e2"},
+            {'range': [0.15, 0.35], 'color': "#fef3c7"},
+            {'range': [0.35, 0.8], 'color': "#dcfce7"}
+        ],
+        'threshold': {
+            'line': {'color': "black", 'width': 4},
+            'thickness': 0.75,
+            'value': reporte['savi_actual']
+        }
+    }
+))
+fig_gauge.update_layout(
+    height=420,
+    font={'size': 14, 'family': 'Arial'},
+    margin=dict(l=20, r=20, t=100, b=20),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)'
+)
+st.plotly_chart(fig_gauge, use_container_width=True)
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 

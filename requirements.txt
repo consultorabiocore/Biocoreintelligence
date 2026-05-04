@@ -14,3 +14,4 @@ streamlit-folium
 requests
 supabase
 plotly
+fpdf2==2.7.0

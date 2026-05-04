@@ -424,6 +424,8 @@ with st.sidebar:
             st.rerun()
 
 # === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
+
+# === PANTALLA DE BIENVENIDA PARA NO AUTENTICADOS ===
 if not st.session_state.get('authenticated'):
     st.markdown("""
     <h1 style="text-align: center; margin-top: 30px;">BioCore Intelligence</h1>
@@ -432,31 +434,18 @@ if not st.session_state.get('authenticated'):
     
     st.markdown("---")
     
-    # Mostrar mapa de demostración
-    try:
-        proyectos = supabase.table("usuarios").select("*").execute().data
-        if proyectos:
-            st.subheader("📍 Proyectos Activos")
-            
-            cols = st.columns(min(len(proyectos), 2))
-            for idx, p in enumerate(proyectos[:6]):
-                with cols[idx % 2]:
-                    st.markdown(f"""
-                    <div style="background-color: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <b>📌 {p['Proyecto']}</b><br>
-                    Tipo: {p.get('Tipo', 'N/A')}<br>
-                    Titular: {p.get('titular', 'N/A')}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    m_obj = dibujar_mapa_biocore(p['Coordenadas'])
-                    folium_static(m_obj, width=350, height=300)
-    except:
-        pass
+    # Mapa de demostración genérico (sin datos privados)
+    st.subheader("📍 Zona de Vigilancia")
+    demo_map = folium.Map(
+        location=[-33.45, -70.66],
+        zoom_start=4,
+        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        attr='Google Satellite'
+    )
+    folium_static(demo_map, width=1200, height=400)
     
     st.markdown("---")
     
-    # Footer
     st.markdown("""
     <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px;">
     <h3>🔐 Acceso Restringido</h3>
@@ -466,7 +455,6 @@ if not st.session_state.get('authenticated'):
     """, unsafe_allow_html=True)
     
     st.stop()
-
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
     tab1, tab_informe, tab_excel, tab_config, tab_soporte, tab_guia = st.tabs([
@@ -838,16 +826,26 @@ with tab_config:
                                 with col_act1:
                                     if st.form_submit_button("💾 Guardar Cambios", key=f"save_{idx}"):
                                         try:
-                                            cliente_update = {
-                                                "Proyecto": cliente.get('Proyecto'),
-                                                "titular": titular,
-                                                "Tipo": tipo,
-                                                "telegram_id": telegram_id,
-                                                "anio_linea_base": int(anio_lb),
-                                                "frecuencia_reportes": frecuencia,
-                                                "hora_envio": hora_envio.strftime("%H:%M")
-                                            }
-                                            supabase.table("usuarios").upsert(cliente_update).execute()
+                                            # Obtener el ID real del cliente para actualizar correctamente
+                                            cliente_id = cliente.get('id')
+                                            
+                                            if cliente_id:
+                                                # Actualizar usando el ID como clave primaria
+                                                cliente_update = {
+                                                    "id": cliente_id,
+                                                    "Proyecto": cliente.get('Proyecto'),
+                                                    "titular": titular,
+                                                    "Tipo": tipo,
+                                                    "telegram_id": telegram_id,
+                                                    "anio_linea_base": int(anio_lb),
+                                                    "frecuencia_reportes": frecuencia,
+                                                    "hora_envio": hora_envio.strftime("%H:%M")
+                                                }
+                                                supabase.table("usuarios").update(cliente_update).eq("id", cliente_id).execute()
+                                            else:
+                                                st.error("Error: No se encontró el ID del cliente")
+                                                raise Exception("ID no disponible")
+                                            
                                             st.success("✅ Cambios guardados")
                                             st.session_state[f"edit_cliente_{idx}"] = False
                                             st.rerun()

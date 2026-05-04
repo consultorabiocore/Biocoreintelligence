@@ -606,10 +606,13 @@ with tab_informe:
             # BANNER PRINCIPAL CON ESTADO
             col_banner1, col_banner2 = st.columns([2, 1])
             with col_banner1:
+                estado_html = reporte['estado']
+                nivel_html = reporte['nivel']
+                
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:25px; border-radius:15px; border-left:6px solid #60a5fa;">
-                <h2 style="color: white; margin: 0;">{reporte['estado']}</h2>
-                <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> {reporte['nivel']}</p>
+                <h2 style="color: white; margin: 0;">{estado_html}</h2>
+                <p style="color: #cbd5e1; margin: 10px 0 0 0;"><b>Nivel de Riesgo:</b> {nivel_html}</p>
                 <p style="color: #cbd5e1; margin: 5px 0;"><b>Proyecto:</b> {proyecto}</p>
                 <p style="color: #cbd5e1; margin: 5px 0;"><b>Período:</b> {mes} {anio}</p>
                 </div>

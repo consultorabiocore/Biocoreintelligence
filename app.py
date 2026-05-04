@@ -503,7 +503,7 @@ with tab_informe:
                     pdf.set_font("helvetica", "B", 18)
                     pdf.set_xy(60, 15)
                     pdf.cell(0, 10,
-                             f"AUDITOR��A AMBIENTAL: {proyecto_sel.upper()}",
+                             f"AUDITORÍA AMBIENTAL: {proyecto_sel.upper()}",
                              align="L", ln=1)
 
                     es_alerta = ndsi_val < 0.35
@@ -555,4 +555,21 @@ with tab_admin:
         with c1:
             titular = st.text_input("👤 Nombre del Titular")
             nombre_proy = st.text_input("🚀 Nombre del Proyecto")
-            anio_lb_input = st.number_input("📅 Año
+            anio_lb_input = st.number_input("📅 Año Línea Base", value=2017)
+        with c2:
+            telegram_id = st.text_input("📱 ID Telegram")
+            coords = st.text_input("📍 Coordenadas")
+            hora_envio = st.time_input("⏰ Hora de Envío", value=datetime.time(8, 0))
+
+        if st.form_submit_button("💾 Guardar en BioCore Cloud"):
+            nuevo_p = {
+                "titular": titular,
+                "Proyecto": nombre_proy,
+                "anio_linea_base": anio_lb_input,
+                "telegram_id": telegram_id,
+                "Coordenadas": coords,
+                "hora_envio": hora_envio.strftime("%H:%M")
+            }
+            supabase.table("usuarios").upsert(nuevo_p).execute()
+            st.success(f"✅ {nombre_proy} guardado correctamente.")
+            st.balloons()

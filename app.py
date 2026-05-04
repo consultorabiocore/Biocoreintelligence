@@ -1261,6 +1261,7 @@ with tab_excel:
             st.error(f"Error: {e}")
 
 # === PESTAÑA 4: GESTIÓN DE CLIENTES (SOLO ADMIN) ===
+
 if st.session_state.get('admin_mode'):
     with tab_clientes:
         st.subheader("👥 Gestión de Clientes")
@@ -1271,93 +1272,133 @@ if st.session_state.get('admin_mode'):
             st.markdown("### Registrar nuevo cliente")
             
             with st.form("form_nuevo_cliente"):
-                proyecto = st.text_input("Nombre del Proyecto")
-                tipo = st.selectbox("Tipo de Proyecto", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
-                coordenadas = st.text_area("Coordenadas (JSON format)", 
-                                           placeholder='[[lon1, lat1], [lon2, lat2], [lon3, lat3], [lon1, lat1]]')
-                anio_base = st.number_input("Año de Línea Base", value=2017, min_value=2000)
-                email_cliente = st.text_input("Email del cliente")
-                telegram_id = st.text_input("ID Telegram (opcional)")
-                password_cliente = st.text_input("Contraseña cliente", type="password")
+                proyecto = st.text_input("Nombre del Proyecto *")
+                tipo = st.selectbox("Tipo de Proyecto *", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"])
+                coordenadas = st.text_area("Coordenadas (JSON format) *", 
+                                           placeholder='[[lon1, lat1], [lon2, lat2], [lon3, lat3], [lon1, lat1]]',
+                                           height=100)
+                anio_base = st.number_input("Año de Línea Base", value=2015, min_value=2000)
+                email = st.text_input("Email del cliente")
+                telegram = st.text_input("ID Telegram (opcional)")
+                password_cliente = st.text_input("Contraseña cliente *", type="password")
                 
                 if st.form_submit_button("✅ Registrar Cliente"):
-                    try:
-                        # Validar coordenadas
-                        coords_parsed = json.loads(coordenadas)
-                        
-                        # Hashear contraseña
-                        pwd_hash = hash_password(password_cliente)
-                        
-                        # Insertar en Supabase
-                        data = {
-                            "Proyecto": proyecto,
-                            "Tipo": tipo,
-                            "Coordenadas": json.dumps(coords_parsed),
-                            "anio_linea_base": anio_base,
-                            "email_cliente": email_cliente,
-                            "telegram_id": telegram_id,
-                            "password_cliente": pwd_hash
-                        }
-                        
-                        supabase.table("usuarios").insert(data).execute()
-                        st.success(f"✅ Cliente {proyecto} registrado exitosamente")
-                    except json.JSONDecodeError:
-                        st.error("❌ Coordenadas con formato JSON inválido")
-                    except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
+                    # Validaciones
+                    if not proyecto or not tipo or not coordenadas or not password_cliente:
+                        st.error("❌ Completa todos los campos requeridos (*)")
+                    else:
+                        try:
+                            # Validar coordenadas
+                            coords_parsed = json.loads(coordenadas)
+                            
+                            # Verificar que sea formato correcto
+                            if not isinstance(coords_parsed, list) or len(coords_parsed) < 3:
+                                raise ValueError("Mínimo 3 coordenadas requeridas")
+                            
+                            # Hashear contraseña
+                            pwd_hash = hash_password(password_cliente)
+                            
+                            # ✅ NOMBRES EXACTOS DE COLUMNAS
+                            nuevo_registro = {
+                                "Proyecto": proyecto,
+                                "Tipo": tipo,
+                                "Coordenadas": json.dumps(coords_parsed),
+                                "email_cliente": email if email else None,
+                                "password_cliente": pwd_hash,
+                                "id_telegram": telegram if telegram else None,
+                                "ano_linea_base": int(anio_base)
+                            }
+                            
+                            supabase.table("usuarios").insert(nuevo_registro).execute()
+                            st.success(f"✅ Cliente {proyecto} registrado exitosamente")
+                            st.balloons()
+                        except json.JSONDecodeError:
+                            st.error("❌ Coordenadas con formato JSON inválido. Revisa el formato.")
+                        except ValueError as ve:
+                            st.error(f"❌ Error de validación: {str(ve)}")
+                        except Exception as e:
+                            st.error(f"❌ Error al registrar: {str(e)}")
         
         with tab_editar:
             st.markdown("### Editar cliente existente")
             
             try:
                 res = supabase.table("usuarios").select("Proyecto").execute()
-                proyectos_lista = [p['Proyecto'] for p in res.data]
+                proyectos_lista = [p['Proyecto'] for p in res.data] if res.data else []
             except:
                 proyectos_lista = []
             
-            proyecto_editar = st.selectbox("Selecciona proyecto", proyectos_lista, key="edit_proyecto")
-            
-            if st.button("Cargar datos", key="btn_cargar_datos"):
-                try:
-                    res = supabase.table("usuarios").select("*").eq("Proyecto", proyecto_editar).execute()
-                    if res.data:
-                        cliente = res.data[0]
-                        
-                        with st.form("form_editar_cliente"):
-                            tipo = st.selectbox("Tipo", ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"],
-                                              index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(cliente.get('Tipo', 'MINERIA')))
-                            email = st.text_input("Email", value=cliente.get('email_cliente', ''))
-                            telegram = st.text_input("Telegram ID", value=cliente.get('telegram_id', ''))
-                            anio_base = st.number_input("Año base", value=cliente.get('anio_linea_base', 2017))
+            if proyectos_lista:
+                proyecto_editar = st.selectbox("Selecciona proyecto", proyectos_lista, key="edit_proyecto")
+                
+                if st.button("Cargar datos", key="btn_cargar_datos"):
+                    try:
+                        res = supabase.table("usuarios").select("*").eq("Proyecto", proyecto_editar).execute()
+                        if res.data:
+                            cliente = res.data[0]
                             
-                            if st.form_submit_button("💾 Guardar cambios"):
-                                update_data = {
-                                    "Tipo": tipo,
-                                    "email_cliente": email,
-                                    "telegram_id": telegram,
-                                    "anio_linea_base": anio_base
-                                }
-                                supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto_editar).execute()
-                                st.success("✅ Cliente actualizado")
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                            with st.form("form_editar_cliente"):
+                                tipo = st.selectbox(
+                                    "Tipo", 
+                                    ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"],
+                                    index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(cliente.get('Tipo', 'MINERIA'))
+                                )
+                                email = st.text_input("Email", value=cliente.get('email_cliente', '') or '')
+                                telegram = st.text_input("Telegram ID", value=cliente.get('id_telegram', '') or '')
+                                anio_base = st.number_input("Año base", value=cliente.get('ano_linea_base', 2015))
+                                
+                                cambiar_pwd = st.checkbox("¿Cambiar contraseña?")
+                                if cambiar_pwd:
+                                    nueva_pwd = st.text_input("Nueva contraseña", type="password", key="new_pwd")
+                                else:
+                                    nueva_pwd = None
+                                
+                                if st.form_submit_button("💾 Guardar cambios"):
+                                    try:
+                                        # ✅ NOMBRES EXACTOS DE COLUMNAS
+                                        update_data = {
+                                            "Tipo": tipo,
+                                            "email_cliente": email if email else None,
+                                            "id_telegram": telegram if telegram else None,
+                                            "ano_linea_base": int(anio_base)
+                                        }
+                                        
+                                        if cambiar_pwd and nueva_pwd:
+                                            update_data["password_cliente"] = hash_password(nueva_pwd)
+                                        
+                                        supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto_editar).execute()
+                                        st.success("✅ Cliente actualizado correctamente")
+                                    except Exception as e:
+                                        st.error(f"Error: {str(e)}")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+            else:
+                st.warning("No hay proyectos registrados")
         
         with tab_eliminar:
             st.markdown("### Eliminar cliente")
-            st.warning("⚠️ Esta acción no se puede deshacer")
+            st.warning("⚠️ Esta acción **NO SE PUEDE DESHACER**")
             
             try:
                 res = supabase.table("usuarios").select("Proyecto").execute()
-                proyectos_lista = [p['Proyecto'] for p in res.data]
+                proyectos_lista = [p['Proyecto'] for p in res.data] if res.data else []
             except:
                 proyectos_lista = []
             
-            proyecto_eliminar = st.selectbox("Selecciona proyecto", proyectos_lista, key="del_proyecto")
-            
-            if st.button("🗑️ Eliminar", key="btn_eliminar"):
-                supabase.table("usuarios").delete().eq("Proyecto", proyecto_eliminar).execute()
-                st.success(f"✅ {proyecto_eliminar} eliminado")
-                st.rerun()
+            if proyectos_lista:
+                proyecto_eliminar = st.selectbox("Selecciona proyecto a eliminar", proyectos_lista, key="del_proyecto")
+                
+                # Confirmación adicional
+                if st.checkbox(f"Confirmo que deseo eliminar '{proyecto_eliminar}' permanentemente"):
+                    if st.button("🗑️ ELIMINAR DEFINITIVAMENTE", key="btn_eliminar"):
+                        try:
+                            supabase.table("usuarios").delete().eq("Proyecto", proyecto_eliminar).execute()
+                            st.success(f"✅ {proyecto_eliminar} ha sido eliminado")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+            else:
+                st.warning("No hay proyectos para eliminar")
 
 # === PESTAÑA SOPORTE ===
 with tab_soporte:

@@ -975,5 +975,9 @@ El **Protocolo de Validación de Línea Base Espectral** es un sistema avanzado 
             st.dataframe(df_terrenos, use_container_width=True)
         
         with st.expander("🔍 3. Reglas de Validación"):
-            st.markdown("""
+            st.markdown(""")
+        
+        st.markdown("---")
+        st.info("📞 Para ajustar parámetros específicos, contacta al equipo de BioCore")
+
 ### Regla 1: Diferencia Absoluta Mínima (Regla de Oro)

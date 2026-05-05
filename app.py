@@ -1599,29 +1599,34 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.ln(5)
     
     # SECCIÓN 9: RECOMENDACIONES
-    # SECCIÓN 9: RECOMENDACIONES
+        # SECCIÓN 9: RECOMENDACIONES
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "9. RECOMENDACIONES") # Eliminado ln=1
+    pdf.cell(0, 10, "9. RECOMENDACIONES")
+    pdf.ln(10)
     
     nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
     tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
     
-    # ... (Tu diccionario de recomendaciones_por_tipo se mantiene igual) ...
-    
-    recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, 'Sin recomendaciones')
+    # Aseguramos que recom_text siempre tenga un valor inicial
+    recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, "No hay recomendaciones específicas para este nivel.")
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
-    recomendaciones_lista = recom_text.split('\n')
-    for idx, recom in enumerate(recomendaciones_lista, 1):
-        if recom.strip():
-            # En la nueva versión de FPDF, multi_cell maneja el cursor automáticamente
-            pdf.multi_cell(0, 6, f"{idx}. {clean(recom.strip())}") 
     
-    pdf.ln(5)
+    # Dividimos el texto en líneas
+    recomendaciones_lista = recom_text.split('\n')
+    
+    # Usamos un bucle limpio para evitar el error de variable local
+    for idx, r in enumerate(recomendaciones_lista, 1):
+        texto_limpio = r.strip()
+        if texto_limpio:
+            # Importante: usamos 'r' o 'texto_limpio', no 'recom' si da conflicto
+            pdf.multi_cell(0, 6, f"{idx}. {clean(texto_limpio)}")
+    
+    pdf.ln(10)
     
     # NOTA TERRENO
     pdf.set_font("helvetica", "B", 10)
@@ -1631,29 +1636,29 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 7)
     pdf.set_text_color(80, 80, 80)
-    nota = (
+    nota_texto = (
         "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones con resolución de 10-30 metros. "
-        "Se recomienda realizar inspecciones en terreno periódicamente..."
+        "Se recomienda realizar inspecciones en terreno periódicamente para validar observaciones satelitales."
     )
-    pdf.multi_cell(0, 3, clean(nota))
+    pdf.multi_cell(0, 4, clean(nota_texto))
     
-    # FIRMA
+    pdf.ln(20)
+    
+    # FIRMA (Asegúrate de que esté dentro de la función antes del return)
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C")
-    pdf.ln(5)
+    pdf.cell(0, 5, "Loreto Campos Carrasco", align="C")
+    pdf.ln(6)
     
     pdf.set_font("helvetica", "I", 9)
-    pdf.cell(0, 4, clean("Directora Técnica - BioCore Intelligence"), align="C")
-    pdf.ln(4)
+    pdf.cell(0, 4, "Directora Técnica - BioCore Intelligence", align="C")
+    pdf.ln(5)
     
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(100, 100, 100)
-    fecha_emision = datetime.now().strftime("%d de %B de %Y")
-    pdf.cell(0, 4, f"Fecha de emisión: {fecha_emision}", align="C")
-    
-    # MUY IMPORTANTE: Asegúrate de que este return tenga la misma sangría (espacios) 
-    # que el inicio de la función 'def' para que esté DENTRO de ella.
+    fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+    pdf.cell(0, 4, f"Fecha de emisión: {fecha_hoy}", align="C")
+
     return pdf
 
 # === INICIALIZAR SESSION STATE ===

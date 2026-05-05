@@ -1090,7 +1090,6 @@ class AuditoriaPDF(FPDF):
         self.set_text_color(128, 128, 128)
         self.cell(0, 10, f"Página {self.page_no()}", align="C")
 
-
 def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     """Genera PDF profesional con diagnóstico dinámico según tipo de proyecto"""
     
@@ -1134,7 +1133,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_font("helvetica", "B", 12)
     
     estado_texto = reporte_data.get('estado', 'ESTADO DESCONOCIDO').replace('🟢', '').replace('🟡', '').replace('🔴', '').strip()
-    pdf.cell(0, 10, clean(f"  ESTADO: {estado_texto}"), ln=1, fill=True)
+    pdf.cell(0, 10, clean(f"ESTADO: {estado_texto}"), ln=1, fill=True)
     
     pdf.set_font("helvetica", "", 10)
     pdf.set_text_color(0, 0, 0)
@@ -1153,15 +1152,33 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_fill_color(r, g, b)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", "B", 10)
-    pdf.cell(0, 8, clean(f"  Nivel de Riesgo: {nivel}"), ln=1, fill=True)
+    pdf.cell(0, 8, clean(f"Nivel de Riesgo: {nivel}"), ln=1, fill=True)
     
     pdf.set_text_color(0, 0, 0)
     pdf.ln(3)
     
-    # ===== SECCIÓN 3: ÍNDICES ESPECTRALES =====
+    # ===== SECCIÓN 3: SIGNOS DE DEGRADACIÓN AMBIENTAL =====
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "3. ÍNDICES ESPECTRALES", ln=1)
+    pdf.cell(0, 10, "3. INDICADORES DE DEGRADACIÓN AMBIENTAL DETECTADOS", ln=1)
+    
+    pdf.set_font("helvetica", "", 9)
+    pdf.set_text_color(0, 0, 0)
+    
+    signos_degradacion = generar_signos_degradacion(reporte_data)
+    for signo in signos_degradacion:
+        pdf.set_font("helvetica", "B", 9)
+        pdf.cell(8, 6, signo['icono'])
+        pdf.set_font("helvetica", "", 9)
+        pdf.multi_cell(0, 4, clean(signo['texto']), ln=1)
+        pdf.ln(2)
+    
+    pdf.ln(3)
+    
+    # ===== SECCIÓN 4: ÍNDICES ESPECTRALES =====
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(20, 50, 80)
+    pdf.cell(0, 10, "4. ÍNDICES ESPECTRALES", ln=1)
     
     pdf.set_font("helvetica", "B", 9)
     pdf.set_fill_color(40, 80, 120)
@@ -1204,23 +1221,25 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.cell(col_widths[4], 10, "Temperatura LST", border=1)
     pdf.ln(15)
     
-    # ===== SECCIÓN 4: DIAGNÓSTICO =====
+    # ===== SECCIÓN 5: DIAGNÓSTICO =====
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "4. DIAGNÓSTICO TÉCNICO", ln=1)
+    pdf.cell(0, 10, "5. DIAGNÓSTICO TÉCNICO", ln=1)
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     diagnostico = reporte_data.get('diagnostico_completo', 'Sin diagnóstico disponible')
     pdf.multi_cell(0, 5, clean(diagnostico), border=1)
     
-    # ===== SECCIÓN 5: GRÁFICOS =====
+    pdf.ln(3)
+    
+    # ===== SECCIÓN 6: GRÁFICOS =====
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, "5. ANÁLISIS ESPECTRAL - SERIE TEMPORAL", ln=1)
+        pdf.cell(0, 10, "6. ANÁLISIS ESPECTRAL - SERIE TEMPORAL", ln=1)
         pdf.ln(5)
         
         try:
@@ -1230,39 +1249,39 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
             pdf.set_text_color(200, 0, 0)
             pdf.cell(0, 10, f"Error al insertar gráfico: {str(e)}", ln=1)
     
-    # ===== SECCIÓN 6: RECOMENDACIONES =====
+    # ===== SECCIÓN 7: RECOMENDACIONES =====
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "6. RECOMENDACIONES Y ACCIONES", ln=1)
+    pdf.cell(0, 10, "7. RECOMENDACIONES Y ACCIONES", ln=1)
     pdf.ln(5)
     
     nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
     tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
     
-    # Recomendaciones contextualizadas
+    # Recomendaciones contextualizadas (SIN hardcoding de '?')
     recomendaciones_por_tipo = {
         'NORMAL': {
-            'MINERIA': "✓ Mantener vigilancia mensual de recursos hídricos\n✓ Documentar estabilidad de taludes\n✓ Continuar riego de vegetación perimetral",
-            'GLACIAR': "✓ Continuar monitoreo de balance de masa\n✓ Registrar datos de cobertura nival\n✓ Preparar estudios glaciológicos anuales",
-            'BOSQUE': "✓ Mantener protección forestal\n✓ Documentar regeneración natural\n✓ Prevención estándar de incendios",
-            'HUMEDAL': "✓ Confirmar ciclo hidrológico sostenible\n✓ Monitoreo de flora hidrófila\n✓ Cumplimiento Decreto de Humedales verificado",
-            'AGRICOLA': "✓ Continuar riego estándar\n✓ Mantener programa de nutrición\n✓ Próxima evaluación en 30 días"
+            'MINERIA': "Mantener vigilancia mensual de recursos hídricos.\nDocumentar estabilidad de taludes.\nContinuar riego de vegetación perimetral.",
+            'GLACIAR': "Continuar monitoreo de balance de masa.\nRegistrar datos de cobertura nival.\nPreparar estudios glaciológicos anuales.",
+            'BOSQUE': "Mantener protección forestal.\nDocumentar regeneración natural.\nPrevención estándar de incendios.",
+            'HUMEDAL': "Confirmar ciclo hidrológico sostenible.\nMonitoreo de flora hidrófila.\nCumplimiento Decreto de Humedales verificado.",
+            'AGRICOLA': "Continuar riego estándar.\nMantener programa de nutrición.\nPróxima evaluación en 30 días."
         },
         'MODERADO': {
-            'MINERIA': "⚠ Aumentar frecuencia de monitoreo a semanal\n⚠ Inspección terrestre de drenaje\n⚠ Posible acumulación anómala detectada",
-            'GLACIAR': "⚠ Evaluación glaciológica inmediata\n⚠ Monitoreo diario de temperatura\n⚠ Registrar cambios de cobertura nival",
-            'BOSQUE': "⚠ Plan de restauración forestal\n⚠ Intensificar vigilancia de incendios\n⚠ Análisis fitosanitario urgente",
-            'HUMEDAL': "⚠ Plan de restauración hidrológica\n⚠ Protección legal de ecosistema\n⚠ Monitoreo continuo requerido",
-            'AGRICOLA': "⚠ Riego aumentado a cada 3 días\n⚠ Análisis de suelo urgente\n⚠ Tratamiento fitosanitario recomendado"
+            'MINERIA': "Aumentar frecuencia de monitoreo a semanal.\nInspección terrestre de drenaje.\nPosible acumulación anómala detectada.",
+            'GLACIAR': "Evaluación glaciológica inmediata.\nMonitoreo diario de temperatura.\nRegistrar cambios de cobertura nival.",
+            'BOSQUE': "Plan de restauración forestal.\nIntensificar vigilancia de incendios.\nAnálisis fitosanitario urgente.",
+            'HUMEDAL': "Plan de restauración hidrológica.\nProtección legal de ecosistema.\nMonitoreo continuo requerido.",
+            'AGRICOLA': "Riego aumentado a cada 3 días.\nAnálisis de suelo urgente.\nTratamiento fitosanitario recomendado."
         },
         'CRÍTICO': {
-            'MINERIA': "🔴 EMERGENCIA: Contactar SMA/DGA INMEDIATAMENTE\n🔴 Monitoreo 24/7 de drenaje\n🔴 Implementar medidas de contención de agua",
-            'GLACIAR': "🔴 EMERGENCIA: Estudios glaciológicos de emergencia\n🔴 Avalúo técnico de riesgos\n🔴 Evaluación ambiental estratégica urgente",
-            'BOSQUE': "🔴 EMERGENCIA: Sistemas anti-incendio de emergencia\n🔴 Restauración ecológica inmediata\n🔴 Evaluación ambiental urgente (SEA)",
-            'HUMEDAL': "🔴 EMERGENCIA: Contactar SMA/DGA/Ramsar INMEDIATAMENTE\n🔴 Plan de restauración de emergencia\n🔴 Evaluación ambiental estratégica urgente",
-            'AGRICOLA': "🔴 EMERGENCIA: Riego de emergencia INMEDIATO\n🔴 Inspección veterinaria fitosanitaria urgente\n🔴 Consultor especialista requerido"
+            'MINERIA': "EMERGENCIA: Contactar SMA/DGA INMEDIATAMENTE.\nMonitoreo 24/7 de drenaje.\nImplementar medidas de contención de agua.",
+            'GLACIAR': "EMERGENCIA: Estudios glaciológicos de emergencia.\nAvaluó técnico de riesgos.\nEvaluación ambiental estratégica urgente.",
+            'BOSQUE': "EMERGENCIA: Sistemas anti-incendio de emergencia.\nRestauración ecológica inmediata.\nEvaluación ambiental urgente (SEA).",
+            'HUMEDAL': "EMERGENCIA: Contactar SMA/DGA/Ramsar INMEDIATAMENTE.\nPlan de restauración de emergencia.\nEvaluación ambiental estratégica urgente.",
+            'AGRICOLA': "EMERGENCIA: Riego de emergencia INMEDIATO.\nInspección fitosanitaria urgente.\nConsultor especialista requerido."
         }
     }
     
@@ -1271,11 +1290,44 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(0, 4, clean(recom_text))
     
-    # ===== SECCIÓN 7: FIRMA Y FECHA =====
-    pdf.ln(10)
+    # Agregar un número para cada recomendación
+    recomendaciones_lista = recom_text.split('\n')
+    for idx, recom in enumerate(recomendaciones_lista, 1):
+        if recom.strip():
+            pdf.cell(5, 6, f"{idx}.")
+            pdf.multi_cell(0, 6, clean(recom.strip()), ln=1)
+    
+    pdf.ln(5)
+    
+    # ===== NOTA IMPORTANTE: VIGILANCIA EN TERRENO =====
+    pdf.set_font("helvetica", "B", 10)
+    pdf.set_text_color(139, 0, 0)
+    pdf.cell(0, 8, "NOTA IMPORTANTE - VERIFICACIÓN EN TERRENO", ln=1)
+    
+    pdf.set_font("helvetica", "", 7)
+    pdf.set_text_color(80, 80, 80)
+    
+    nota_terreno = (
+        "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones basadas en "
+        "datos remotos con una resolución de 10-30 metros. Se recomienda ENCARECIDAMENTE realizar "
+        "inspecciones en terreno periódicamente para validar las observaciones satelitales, "
+        "especialmente en zonas críticas o con cambios significativos detectados. "
+        "La observación directa permite identificar:\n"
+        "- Calidad real del suelo y vegetación\n"
+        "- Presencia de contaminación o depósitos anómalos\n"
+        "- Infraestructura no visible por satélite\n"
+        "- Cambios localizados o fenómenos puntuales\n\n"
+        "La combinación de análisis satelital + inspección terrestre garantiza una evaluación ambiental completa."
+    )
+    
+    pdf.multi_cell(0, 3, clean(nota_terreno))
+    
+    pdf.ln(8)
+    
+    # ===== SECCIÓN 8: FIRMA Y FECHA =====
     pdf.set_font("helvetica", "B", 11)
+    pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
     
     pdf.set_font("helvetica", "I", 9)
@@ -1286,8 +1338,115 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     fecha_emision = datetime.now().strftime("%d de %B de %Y")
     pdf.cell(0, 4, f"Fecha de emisión: {fecha_emision}", align="C", ln=1)
     
+    pdf.ln(3)
+    pdf.set_font("helvetica", "I", 7)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 3, "Este reporte es de caracter confidencial y uso exclusivo del cliente.", align="C")
+    
     return pdf
 
+
+# ============================================================================
+# FUNCIÓN AUXILIAR: GENERAR SIGNOS DE DEGRADACIÓN DINÁMICAMENTE
+# ============================================================================
+
+def generar_signos_degradacion(reporte_data):
+    """Genera lista dinámica de signos de degradación según los valores del reporte"""
+    
+    signos = []
+    
+    savi = reporte_data.get('savi_actual', 0)
+    ndwi = reporte_data.get('ndwi', 0)
+    ndsi = reporte_data.get('ndsi', 0)
+    ndvi = reporte_data.get('ndvi', 0)
+    temp = reporte_data.get('temp', 0)
+    variacion_savi = reporte_data.get('variacion', 0)
+    variacion_ndwi = reporte_data.get('variacion_ndwi', 0)
+    variacion_ndsi = reporte_data.get('variacion_ndsi', 0)
+    tipo = reporte_data.get('tipo', 'GENERAL').upper()
+    
+    # 1. PÉRDIDA DE VEGETACIÓN
+    if savi < 0.15:
+        signos.append({
+            'icono': '🔴',
+            'texto': f'PÉRDIDA DE VEGETACIÓN: SAVI bajo ({savi:.3f}). Indica exposición de suelo o degradación severa.'
+        })
+    elif savi < 0.25 and variacion_savi < -10:
+        signos.append({
+            'icono': '🟡',
+            'texto': f'ESTRÉS VEGETAL MODERADO: SAVI de {savi:.3f} con caída de {variacion_savi:.1f}%. Posible plagas, sequía o uso forestal.'
+        })
+    
+    # 2. DESECACIÓN / ESTRÉS HÍDRICO
+    if ndwi < 0.15:
+        signos.append({
+            'icono': '🔴',
+            'texto': f'ESTRÉS HÍDRICO SEVERO: NDWI bajo ({ndwi:.4f}). Indica desecación, erosión o sequía extrema.'
+        })
+    elif ndwi < 0.25 and variacion_ndwi < -15:
+        signos.append({
+            'icono': '🟡',
+            'texto': f'PÉRDIDA HÍDRICA ACELERADA: NDWI de {ndwi:.4f} con caída de {variacion_ndwi:.1f}%. Requiere atención urgente.'
+        })
+    
+    # 3. RETRACCIÓN GLACIAL / CRIÓSFERA
+    if tipo == 'GLACIAR' and ndsi < 0.20:
+        signos.append({
+            'icono': '🔴',
+            'texto': f'RETRACCIÓN GLACIAL CRÍTICA: NDSI de {ndsi:.3f} (bajo umbral 0.20). Exposición de roca desnuda o suelo mineral.'
+        })
+    elif tipo == 'GLACIAR' and variacion_ndsi < -15:
+        signos.append({
+            'icono': '🟡',
+            'texto': f'RETRACCIÓN ACELERADA: NDSI con caída de {variacion_ndsi:.1f}%. Cambios climáticos o fusión anómala.'
+        })
+    
+    # 4. TEMPERATURA ELEVADA
+    if temp > 25:
+        signos.append({
+            'icono': '🔥',
+            'texto': f'TEMPERATURA ANÓMALAMENTE ELEVADA: {temp:.1f}°C. Indica estrés térmico, fusión acelerada o actividad térmica anómala.'
+        })
+    elif temp > 15 and tipo == 'GLACIAR':
+        signos.append({
+            'icono': '⚠️',
+            'texto': f'TEMPERATURA MODERADAMENTE ELEVADA: {temp:.1f}°C. En zonas de criósfera, acelera procesos de fusión.'
+        })
+    
+    # 5. EXPOSICIÓN DE SUELO (NDVI bajo)
+    if ndvi < 0.10:
+        signos.append({
+            'icono': '🔴',
+            'texto': f'SUELO EXPUESTO: NDVI extremadamente bajo ({ndvi:.3f}). Roca desnuda, arena, arcilla o depósito mineral.'
+        })
+    elif ndvi < 0.25:
+        signos.append({
+            'icono': '⚠️',
+            'texto': f'BAJA COBERTURA VEGETAL: NDVI de {ndvi:.3f}. Terreno con vegetación escasa o en restauración.'
+        })
+    
+    # 6. ACUMULACIÓN ANÓMALA (para minería)
+    if tipo == 'MINERIA' and ndwi > 0.25 and savi < 0.05:
+        signos.append({
+            'icono': '🟡',
+            'texto': f'POSIBLE ACUMULACIÓN DE AGUA ANÓMALA: NDWI elevado ({ndwi:.4f}) en zona árida (SAVI {savi:.3f}). Inspección recomendada.'
+        })
+    
+    # 7. ALTERACIÓN DE RELIEVE
+    if tipo == 'MINERIA' and variacion_ndvi > 20:
+        signos.append({
+            'icono': '⚠️',
+            'texto': f'CAMBIO ABRUPTO DE ESTRUCTURA: NDVI con variación de {variacion_ndvi:+.1f}%. Posible actividad de movimiento de tierra.'
+        })
+    
+    # Si no hay signos críticos
+    if not signos:
+        signos.append({
+            'icono': '✅',
+            'texto': 'PARÁMETROS NORMALES: Los índices espectrales se encuentran dentro de rangos esperados para el tipo de proyecto. Continuar monitoreo rutinario.'
+        })
+    
+    return signos
 
 # === INICIALIZAR SESSION STATE ===
 if 'authenticated' not in st.session_state:

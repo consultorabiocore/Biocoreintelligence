@@ -582,9 +582,6 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
 # ============================================================================
 # MÓDULO 2C: OBTENER INFORMACIÓN CONAF
 # ============================================================================
-# ============================================================================
-# MÓDULO 2C: OBTENER INFORMACIÓN CONAF (CORREGIDO)
-# ============================================================================
 
 def obtener_informacion_conaf(geom, tipo_proyecto):
     """Obtiene información CONAF sobre tipo de bosque"""
@@ -1578,7 +1575,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         cambio_temp = temp_min_final - temp_min_inicio
         
         pdf.set_font("helvetica", "B", 10)
-        pdf.cell(0, 6, "Temperatura Mínima:", ln=1)
+        pdf.cell(0, 6, "Temperatura Mínima:")
+        pdf.ln(6)
         pdf.set_font("helvetica", "", 9)
         pdf.multi_cell(0, 4, 
             f"Cambio: {cambio_temp:+.2f}°C en 20 años. "
@@ -1591,7 +1589,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         
         pdf.ln(3)
         pdf.set_font("helvetica", "B", 10)
-        pdf.cell(0, 6, "Precipitación Anual:", ln=1)
+        pdf.cell(0, 6, "Precipitación Anual:")
+        pdf.ln(6)
         pdf.set_font("helvetica", "", 9)
         pdf.multi_cell(0, 4, 
             f"Cambio: {cambio_prec:+.1f}% en 20 años. "

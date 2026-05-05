@@ -181,7 +181,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 ╔════════════════════════════════════════════════════════════╗
 ║        🛰️  VIGILANCIA AMBIENTAL EN TIEMPO REAL 🛰️         ║
 ║                    BIOCORE INTELLIGENCE                   ║
-╚════════════════════════════════════════════════════════════╝
+╚════════════════════��═══════════════════════════════════════╝
 
 📍 PROYECTO: {proyecto}
 📊 TIPO: {tipo}
@@ -295,7 +295,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 └ Temperatura: {temp:.1f}°C | Incendios: {'✅ Sin riesgo' if incendios == 0 else f'⚠️ Riesgo'}
 └ Cumplimiento: {'✅ Decreto de Humedales verificado' if ndwi > 0.30 else '🔴 VIOLACIÓN SMA/DGA INMEDIATA'}
 
-═══════════════════════════════════════════════════════════════"""
+══════════════════���════════════════════════════════════════════"""
 
     elif tipo == 'AGRICOLA':
         diagnostico = f"""
@@ -329,7 +329,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 Los parámetros se mantienen dentro de la {'varianza histórica permitida' if nivel == 'NORMAL' else 'zona de alerta'}.
 
 Responsable: Loreto Campos Carrasco | BioCore Intelligence © 2026
-════════════════════════��══════════════════════════════════════
+════════════════════════════════════════════════════════════════
 """
 
     return encabezado + diagnostico + conclusion
@@ -1437,42 +1437,42 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # ===== VELOCÍMETRO MEJORADO AQUÍ =====
-# ===== VELOCÍMETRO MEJORADO AQUÍ =====
-fig_gauge = go.Figure(go.Indicator(
-    mode="gauge+number+delta",
-    value=reporte['savi_actual'],
-    number={'suffix': ''},
-    title={'text': "SAVI - Vigor de Vegetación"},
-    delta={'reference': reporte['savi_base'], 'suffix': ' vs Base', 'relative': False},
-    gauge={
-        'axis': {
-            'range': [0, 0.8],
-            'tickfont': {'size': 12}
-        },
-        'bar': {'color': "#1e40af"},
-        'borderwidth': 2,
-        'bordercolor': "#333",
-        'steps': [
-            {'range': [0, 0.15], 'color': "#fee2e2"},
-            {'range': [0.15, 0.35], 'color': "#fef3c7"},
-            {'range': [0.35, 0.8], 'color': "#dcfce7"}
-        ],
-        'threshold': {
-            'line': {'color': "black", 'width': 4},
-            'thickness': 0.75,
-            'value': reporte['savi_actual']
-        }
-    }
-))
-fig_gauge.update_layout(
-    height=420,
-    font={'size': 14, 'family': 'Arial'},
-    margin=dict(l=20, r=20, t=100, b=20),
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)'
-)
-st.plotly_chart(fig_gauge, use_container_width=True)
+                            # ===== VELOCÍMETRO MEJORADO =====
+                            fig_gauge = go.Figure(go.Indicator(
+                                mode="gauge+number+delta",
+                                value=reporte['savi_actual'],
+                                number={'suffix': ''},
+                                title={'text': "SAVI - Vigor de Vegetación"},
+                                delta={'reference': reporte['savi_base'], 'suffix': ' vs Base', 'relative': False},
+                                gauge={
+                                    'axis': {
+                                        'range': [0, 0.8],
+                                        'tickfont': {'size': 12}
+                                    },
+                                    'bar': {'color': "#1e40af"},
+                                    'borderwidth': 2,
+                                    'bordercolor': "#333",
+                                    'steps': [
+                                        {'range': [0, 0.15], 'color': "#fee2e2"},
+                                        {'range': [0.15, 0.35], 'color': "#fef3c7"},
+                                        {'range': [0.35, 0.8], 'color': "#dcfce7"}
+                                    ],
+                                    'threshold': {
+                                        'line': {'color': "black", 'width': 4},
+                                        'thickness': 0.75,
+                                        'value': reporte['savi_actual']
+                                    }
+                                }
+                            ))
+                            fig_gauge.update_layout(
+                                height=420,
+                                font={'size': 14, 'family': 'Arial'},
+                                margin=dict(l=20, r=20, t=100, b=20),
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)'
+                            )
+                            st.plotly_chart(fig_gauge, use_container_width=True)
+                            
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("SAVI", f"{reporte['savi_actual']:.4f}", 

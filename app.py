@@ -1370,9 +1370,9 @@ class AuditoriaPDF(FPDF):
         self.set_xy(10, 5)
         self.cell(0, 12, "REPORTE DE AUDITORÍA AMBIENTAL", ln=1)
         
-                self.set_font("helvetica", "I", 10)
+        self.set_font("helvetica", "I", 10)
         self.set_xy(10, 18)
-        self.cell(0, 5, "BioCore Intelligence") # Comillas y paréntesis cerrados
+        self.cell(0, 5, "BioCore Intelligence")
 
         self.ln(15)
     

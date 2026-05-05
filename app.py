@@ -1599,6 +1599,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.ln(5)
     
     # SECCIÓN 9: RECOMENDACIONES
+        # SECCIÓN 9: RECOMENDACIONES
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
@@ -1606,27 +1607,27 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.cell(0, 10, "9. RECOMENDACIONES")
     pdf.ln(10)
     
-    nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
-    tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
+    # 1. Obtener datos con valores por defecto
+    nivel_riesgo_actual = reporte_data.get('nivel', 'NORMAL')
+    tipo_proy_actual = reporte_data.get('tipo', 'GENERAL')
     
-    # Obtenemos el texto de recomendaciones
-    recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, "Sin recomendaciones específicas.")
+    # 2. Buscar el texto en el diccionario
+    texto_recomendaciones = recomendaciones_por_tipo.get(nivel_riesgo_actual, {}).get(tipo_proy_actual, "Sin recomendaciones específicas para este caso.")
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     
-    # Dividimos por saltos de línea para listar
-    lista_de_recom = recom_text.split('\n')
-    
-    for i, linea in enumerate(lista_de_recom, 1):
-        texto_item = linea.strip()
-        if texto_item:
-            # Usamos 'texto_item' directamente para evitar el error de 'recom is not defined'
-            pdf.multi_cell(0, 6, f"{i}. {clean(texto_item)}")
+    # 3. Procesar las líneas (usamos 'linea_recom' en lugar de 'recom' para evitar conflictos)
+    lista_lineas = texto_recomendaciones.split('\n')
+    for num, linea_recom in enumerate(lista_lineas, 1):
+        item_limpio = linea_recom.strip()
+        if item_limpio:
+            # Aquí usamos 'item_limpio', NO 'recom'
+            pdf.multi_cell(0, 6, f"{num}. {clean(item_limpio)}")
     
     pdf.ln(10)
     
-    # NOTA TERRENO
+    # --- NOTA DE TERRENO ---
     pdf.set_font("helvetica", "B", 10)
     pdf.set_text_color(139, 0, 0)
     pdf.cell(0, 8, "NOTA: VERIFICACIÓN EN TERRENO RECOMENDADA")
@@ -1634,15 +1635,15 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 7)
     pdf.set_text_color(80, 80, 80)
-    aviso_terreno = (
+    parrafo_nota = (
         "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones con resolución de 10-30 metros. "
         "Se recomienda realizar inspecciones en terreno periódicamente para validar observaciones satelitales."
     )
-    pdf.multi_cell(0, 4, clean(aviso_terreno))
+    pdf.multi_cell(0, 4, clean(parrafo_nota))
     
     pdf.ln(20)
     
-    # FIRMA
+    # --- SECCIÓN DE FIRMA ---
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 5, "Loreto Campos Carrasco", align="C")
@@ -1654,10 +1655,10 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(100, 100, 100)
-    fecha_hoy = datetime.now().strftime("%d/%m/%Y")
-    pdf.cell(0, 4, f"Fecha de emisión: {fecha_hoy}", align="C")
+    fecha_actual = datetime.now().strftime("%d/%m/%Y")
+    pdf.cell(0, 4, f"Fecha de emisión: {fecha_actual}", align="C")
 
-    # FINAL: El return debe estar alineado con el inicio de la función
+    # Retornar el objeto PDF al final de la función
     return pdf
 
 # === INICIALIZAR SESSION STATE ===

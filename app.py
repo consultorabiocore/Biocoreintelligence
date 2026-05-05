@@ -1485,7 +1485,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     signos = generar_signos_degradacion(reporte_data)
     for signo in signos:
         pdf.cell(8, 6, clean(signo['icono']))
-        pdf.multi_cell(0, 4, clean(signo['texto']), ln=1)
+        pdf.multi_cell(0, 4, clean(signo['texto']))
         pdf.ln(2)
     
     pdf.ln(3)

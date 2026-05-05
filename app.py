@@ -576,6 +576,9 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
 # ============================================================================
 # MÓDULO 2C: OBTENER INFORMACIÓN CONAF
 # ============================================================================
+# ============================================================================
+# MÓDULO 2C: OBTENER INFORMACIÓN CONAF (CORREGIDO)
+# ============================================================================
 
 def obtener_informacion_conaf(geom, tipo_proyecto):
     """Obtiene información CONAF sobre tipo de bosque"""
@@ -624,7 +627,8 @@ def obtener_informacion_conaf(geom, tipo_proyecto):
                 info_conaf['tipo_bosque'] = clases_bosque[clasificacion]['tipo']
                 info_conaf['densidad'] = clases_bosque[clasificacion]['densidad']
             
-            area_bosque = bosques.eq(90).or(bosques.eq(100)).reduceRegion(
+            # AQUÍ ESTÁ LA CORRECCIÓN: Usar .Or() en lugar de .or()
+            area_bosque = bosques.eq(90).Or(bosques.eq(100)).reduceRegion(
                 ee.Reducer.sum(),
                 geom,
                 30
@@ -643,7 +647,6 @@ def obtener_informacion_conaf(geom, tipo_proyecto):
         pass
     
     return info_conaf
-
 
 # ============================================================================
 # MÓDULO 3: EVALUACIÓN POR TIPO DE PROYECTO

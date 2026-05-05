@@ -380,15 +380,19 @@ def agregar_datos_sar_y_fuegos(reporte_base, geom):
 # ============================================================================
 # MÓDULO 2: GENERADOR DE GRÁFICOS PROFESIONALES MEJORADO
 # ============================================================================
-
 def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
-    """Genera gráficos profesionales contextualizados por tipo de proyecto"""
+    """Genera gráficos profesionales contextualizados por tipo de proyecto, validando dimensiones."""
     try:
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.patch.set_facecolor('white')
-        
-        fechas = list(range(len(indices_historicos.get('savi', [0]))))
-        
+
+        # La cantidad más grande de datos en todos los índices
+        max_len = 0
+        for k, v in indices_historicos.items():
+            if isinstance(v, list):
+                max_len = max(max_len, len(v))
+        fechas = list(range(max_len))
+
         if tipo_proyecto == 'GLACIAR':
             config = [
                 (0, 0, 'ndsi', 'NDSI - Cobertura de Nieve/Hielo', '#3498db', '▼ Bajo = Retracción'),
@@ -431,43 +435,45 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
                 (1, 0, 'ndvi', 'NDVI', '#2ecc71', ''),
                 (1, 1, 'temp', 'Temperatura', '#e74c3c', ''),
             ]
-        
+
         for row, col, indice, titulo, color, subtitulo in config:
             ax = axes[row, col]
-            
-            if indice in indices_historicos and len(indices_historicos[indice]) > 0:
-                valores = indices_historicos[indice]
-                
-                ax.plot(fechas, valores, color=color, marker='o', linewidth=2.5, markersize=8)
-                ax.fill_between(fechas, valores, alpha=0.3, color=color)
-                ax.set_title(titulo, fontweight='bold', fontsize=12)
-                ax.set_ylabel('Valor', fontsize=10)
-                ax.set_xlabel('Tiempo (años)', fontsize=9)
-                ax.grid(True, alpha=0.3, linestyle='--')
-                
-                if subtitulo:
-                    ax.text(0.02, 0.98, subtitulo, transform=ax.transAxes, 
-                           fontsize=9, verticalalignment='top',
-                           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+            valores = indices_historicos.get(indice, [])
+            if isinstance(valores, list) and len(valores) > 0:
+                min_len = min(len(fechas), len(valores))
+                if min_len == 0:
+                    ax.text(0.5, 0.5, 'Sin datos disponibles',
+                            ha='center', va='center', transform=ax.transAxes,
+                            fontsize=11, style='italic', color='gray')
+                else:
+                    x = fechas[:min_len]
+                    y = valores[:min_len]
+                    ax.plot(x, y, color=color, marker='o', linewidth=2.5, markersize=8)
+                    ax.fill_between(x, y, alpha=0.3, color=color)
+                    ax.set_title(titulo, fontweight='bold', fontsize=12)
+                    ax.set_ylabel('Valor', fontsize=10)
+                    ax.set_xlabel('Tiempo (años)', fontsize=9)
+                    ax.grid(True, alpha=0.3, linestyle='--')
+                    if subtitulo:
+                        ax.text(0.02, 0.98, subtitulo, transform=ax.transAxes, 
+                            fontsize=9, verticalalignment='top',
+                            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
             else:
                 ax.text(0.5, 0.5, 'Sin datos disponibles', 
-                       ha='center', va='center', transform=ax.transAxes,
-                       fontsize=11, style='italic', color='gray')
+                        ha='center', va='center', transform=ax.transAxes,
+                        fontsize=11, style='italic', color='gray')
                 ax.set_title(titulo, fontweight='bold', fontsize=12)
                 ax.grid(True, alpha=0.2)
-        
+
         plt.tight_layout()
-        
         temp_dir = tempfile.gettempdir()
         img_path = os.path.join(temp_dir, f'grafico_biocore_{tipo_proyecto.lower()}.png')
         plt.savefig(img_path, format='png', dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
-        
         return img_path
     except Exception as e:
         st.error(f"Error en gráficos: {e}")
         return None
-
 
 # ============================================================================
 # MÓDULO 2B: OBTENER HISTÓRICO DE 20 AÑOS
@@ -1895,13 +1901,34 @@ with tab_informe:
                 key="audit_rango")
         
         with col3:
-            mes_sel = st.selectbox("📅 Mes", 
-                ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
-                key="audit_mes")
+            # Filtra meses solo hasta el actual si es el año actual
+            meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+            # mes actual para UX mejorada
+            try:
+                mes_actual = datetime.now().month
+                # a continuación, en col4, determinamos el año
+                mes_sel_val = None
+            except:
+                mes_actual = 12
+            mes_sel = st.selectbox("📅 Mes", meses, key="audit_mes")
         
         with col4:
-            anio_sel = st.number_input("📆 Año", value=2026, min_value=2020, max_value=2030, key="audit_anio")
+            # Construye opciones del año según historial real
+            try:
+                res_history = supabase.table("historial_reportes").select("fecha_analisis,created_at").eq("proyecto", proyecto_sel).execute()
+                if res_history.data:
+                    df_hist = pd.DataFrame(res_history.data)
+                    fechas_hist = pd.to_datetime(df_hist['fecha_analisis'].fillna(df_hist['created_at']), errors='coerce')
+                    anios_validos = sorted({f.year for f in fechas_hist.dropna() if f.year <= datetime.now().year})
+                    if anios_validos:
+                        anio_sel = st.selectbox("📆 Año", options=anios_validos, index=len(anios_validos)-1, key="audit_anio")
+                    else:
+                        anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
+                else:
+                    anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
+            except Exception:
+                anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
         
         rango_dias_map = {
             "Últimos 7 días": 7,
@@ -1944,7 +1971,7 @@ with tab_informe:
             reporte = st.session_state['reporte_actual']
             proyecto = st.session_state.get('proyecto_audit', 'N/A')
             mes = st.session_state.get('mes_audit', 'N/A')
-            anio = st.session_state.get('anio_audit', 2026)
+            anio = st.session_state.get('anio_audit', datetime.now().year)
             proyecto_data = st.session_state.get('proyecto_data', {})
             
             st.info("📋 **VISTA PREVIA DEL REPORTE**")
@@ -1990,11 +2017,16 @@ with tab_informe:
                                 reporte.get('indices_historicos', {}),
                                 reporte.get('tipo', 'GENERAL')
                             )
-                            
                             pdf = generar_pdf_auditoria_dinamico(proyecto_data, reporte, img_path)
-                            
-                            pdf_bytes = pdf.output(dest='S').encode('latin-1')
-                            
+
+                            result = pdf.output(dest='S')
+                            if isinstance(result, str):
+                                pdf_bytes = result.encode('latin-1')
+                            elif isinstance(result, (bytes, bytearray)):
+                                pdf_bytes = bytes(result)
+                            else:
+                                raise Exception("Tipo inesperado en la exportación PDF: " + str(type(result)))
+
                             st.download_button(
                                 label="✅ Descargar Auditoría PDF",
                                 data=pdf_bytes,
@@ -2002,10 +2034,9 @@ with tab_informe:
                                 mime="application/pdf",
                                 key="download_btn"
                             )
-                            
+
                             if img_path and os.path.exists(img_path):
                                 os.remove(img_path)
-                            
                             st.success("✅ PDF listo para descargar")
                         except Exception as e:
                             st.error(f"❌ Error al generar PDF: {str(e)}")

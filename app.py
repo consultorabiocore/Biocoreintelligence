@@ -1599,7 +1599,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.ln(5)
     
     # SECCIÓN 9: RECOMENDACIONES
-        # SECCIÓN 9: RECOMENDACIONES
+    # SECCIÓN 9: RECOMENDACIONES
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
@@ -1607,23 +1607,24 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.cell(0, 10, "9. RECOMENDACIONES")
     pdf.ln(10)
     
-    # 1. Obtener datos con valores por defecto
-    nivel_riesgo_actual = reporte_data.get('nivel', 'NORMAL')
-    tipo_proy_actual = reporte_data.get('tipo', 'GENERAL')
+    # 1. Obtener datos con valores seguros por defecto
+    riesgo_val = reporte_data.get('nivel', 'NORMAL')
+    tipo_val = reporte_data.get('tipo', 'GENERAL')
     
-    # 2. Buscar el texto en el diccionario
-    texto_recomendaciones = recomendaciones_por_tipo.get(nivel_riesgo_actual, {}).get(tipo_proy_actual, "Sin recomendaciones específicas para este caso.")
+    # 2. Extraer el texto del diccionario de recomendaciones
+    # Usamos un nombre de variable único: 'texto_final_recom'
+    texto_final_recom = recomendaciones_por_tipo.get(riesgo_val, {}).get(tipo_val, "Sin recomendaciones específicas.")
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     
-    # 3. Procesar las líneas (usamos 'linea_recom' en lugar de 'recom' para evitar conflictos)
-    lista_lineas = texto_recomendaciones.split('\n')
-    for num, linea_recom in enumerate(lista_lineas, 1):
-        item_limpio = linea_recom.strip()
-        if item_limpio:
-            # Aquí usamos 'item_limpio', NO 'recom'
-            pdf.multi_cell(0, 6, f"{num}. {clean(item_limpio)}")
+    # 3. Procesar las líneas de texto
+    lineas_encontradas = texto_final_recom.split('\n')
+    for contador, contenido_linea in enumerate(lineas_encontradas, 1):
+        item_para_pdf = contenido_linea.strip()
+        if item_para_pdf:
+            # AQUÍ ESTÁ EL CAMBIO CLAVE: No usamos la palabra 'recom' para evitar el error
+            pdf.multi_cell(0, 6, f"{contador}. {clean(item_para_pdf)}")
     
     pdf.ln(10)
     
@@ -1635,15 +1636,15 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 7)
     pdf.set_text_color(80, 80, 80)
-    parrafo_nota = (
+    mensaje_nota = (
         "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones con resolución de 10-30 metros. "
         "Se recomienda realizar inspecciones en terreno periódicamente para validar observaciones satelitales."
     )
-    pdf.multi_cell(0, 4, clean(parrafo_nota))
+    pdf.multi_cell(0, 4, clean(mensaje_nota))
     
     pdf.ln(20)
     
-    # --- SECCIÓN DE FIRMA ---
+    # --- FIRMA FINAL ---
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 5, "Loreto Campos Carrasco", align="C")
@@ -1655,11 +1656,12 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(100, 100, 100)
-    fecha_actual = datetime.now().strftime("%d/%m/%Y")
-    pdf.cell(0, 4, f"Fecha de emisión: {fecha_actual}", align="C")
+    fecha_reporte = datetime.now().strftime("%d/%m/%Y")
+    pdf.cell(0, 4, f"Fecha de emisión: {fecha_reporte}", align="C")
 
-    # Retornar el objeto PDF al final de la función
+    # Retornar el objeto PDF terminado
     return pdf
+
 
 # === INICIALIZAR SESSION STATE ===
 if 'authenticated' not in st.session_state:

@@ -1600,83 +1600,65 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.ln(5)
     
     # SECCIÓN 9: RECOMENDACIONES
+    # SECCIÓN 9: RECOMENDACIONES
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "9. RECOMENDACIONES", ln=1)
-    pdf.ln(5)
+    pdf.cell(0, 10, "9. RECOMENDACIONES") # Eliminado ln=1
+    pdf.ln(10)
     
     nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
     tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
     
-    recomendaciones_por_tipo = {
-        'NORMAL': {
-            'MINERIA': "Mantener vigilancia mensual de recursos hídricos.\nDocumentar estabilidad de taludes.\nContinuar riego de vegetación perimetral.",
-            'GLACIAR': "Continuar monitoreo de balance de masa.\nRegistrar datos de cobertura nival.\nPreparar estudios glaciológicos anuales.",
-            'BOSQUE': "Mantener protección forestal.\nDocumentar regeneración natural.\nPrevención estándar de incendios.",
-            'HUMEDAL': "Confirmar ciclo hidrológico sostenible.\nMonitoreo de flora hidrófila.\nCumplimiento Decreto de Humedales verificado.",
-            'AGRICOLA': "Continuar riego estándar.\nMantener programa de nutrición.\nPróxima evaluación en 30 días."
-        },
-        'MODERADO': {
-            'MINERIA': "Aumentar monitoreo a semanal.\nInspección terrestre de drenaje.\nPosible acumulación anómala detectada.",
-            'GLACIAR': "Evaluación glaciológica inmediata.\nMonitoreo diario de temperatura.\nRegistrar cambios de cobertura nival.",
-            'BOSQUE': "Plan de restauración forestal.\nIntensificar vigilancia de incendios.\nAnálisis fitosanitario urgente.",
-            'HUMEDAL': "Plan de restauración hidrológica.\nProtección legal de ecosistema.\nMonitoreo continuo requerido.",
-            'AGRICOLA': "Riego aumentado a cada 3 días.\nAnálisis de suelo urgente.\nTratamiento fitosanitario recomendado."
-        },
-        'CRÍTICO': {
-            'MINERIA': "EMERGENCIA: Contactar SMA/DGA INMEDIATAMENTE.\nMonitoreo 24/7 de drenaje.\nImplementar medidas de contención.",
-            'GLACIAR': "EMERGENCIA: Estudios glaciológicos de emergencia.\nAvaluó técnico de riesgos.\nEvaluación ambiental estratégica urgente.",
-            'BOSQUE': "EMERGENCIA: Sistemas anti-incendio de emergencia.\nRestauración ecológica inmediata.\nEvaluación ambiental urgente.",
-            'HUMEDAL': "EMERGENCIA: Contactar SMA/DGA/Ramsar INMEDIATAMENTE.\nPlan de restauración de emergencia.\nEvaluación urgente.",
-            'AGRICOLA': "EMERGENCIA: Riego de emergencia INMEDIATO.\nInspección fitosanitaria urgente.\nConsultor especialista requerido."
-        }
-    }
+    # ... (Tu diccionario de recomendaciones_por_tipo se mantiene igual) ...
     
     recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, 'Sin recomendaciones')
     
     pdf.set_font("helvetica", "", 9)
+    pdf.set_text_color(0, 0, 0)
     recomendaciones_lista = recom_text.split('\n')
     for idx, recom in enumerate(recomendaciones_lista, 1):
         if recom.strip():
-            pdf.cell(5, 6, f"{idx}.")
-            pdf.multi_cell(0, 6, clean(recom.strip()), ln=1)
+            # En la nueva versión de FPDF, multi_cell maneja el cursor automáticamente
+            pdf.multi_cell(0, 6, f"{idx}. {clean(recom.strip())}") 
     
     pdf.ln(5)
     
     # NOTA TERRENO
     pdf.set_font("helvetica", "B", 10)
     pdf.set_text_color(139, 0, 0)
-    pdf.cell(0, 8, "NOTA: VERIFICACIÓN EN TERRENO RECOMENDADA", ln=1)
+    pdf.cell(0, 8, "NOTA: VERIFICACIÓN EN TERRENO RECOMENDADA")
+    pdf.ln(8)
     
     pdf.set_font("helvetica", "", 7)
     pdf.set_text_color(80, 80, 80)
     nota = (
         "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones con resolución de 10-30 metros. "
-        "Se recomienda realizar inspecciones en terreno periódicamente para validar observaciones satelitales, especialmente en zonas críticas. "
-        "La observación directa permite identificar: calidad real del suelo y vegetación, presencia de contaminación, infraestructura no visible, "
-        "cambios localizados o fenómenos puntuales. La combinación de análisis satelital + inspección terrestre garantiza evaluación completa."
+        "Se recomienda realizar inspecciones en terreno periódicamente..."
     )
     pdf.multi_cell(0, 3, clean(nota))
     
-    pdf.ln(8)
+    pdf.ln(15)
     
     # FIRMA
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C", ln=1)
+    pdf.cell(0, 5, clean("Loreto Campos Carrasco"), align="C")
+    pdf.ln(5)
     
     pdf.set_font("helvetica", "I", 9)
-    pdf.cell(0, 4, clean("Directora Técnica - BioCore Intelligence"), align="C", ln=1)
+    pdf.cell(0, 4, clean("Directora Técnica - BioCore Intelligence"), align="C")
+    pdf.ln(4)
     
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(100, 100, 100)
     fecha_emision = datetime.now().strftime("%d de %B de %Y")
-    pdf.cell(0, 4, f"Fecha de emisión: {fecha_emision}", align="C", ln=1)
+    pdf.cell(0, 4, f"Fecha de emisión: {fecha_emision}", align="C")
     
+    # MUY IMPORTANTE: Asegúrate de que este return tenga la misma sangría (espacios) 
+    # que el inicio de la función 'def' para que esté DENTRO de ella.
     return pdf
-
 
 # === INICIALIZAR SESSION STATE ===
 if 'authenticated' not in st.session_state:

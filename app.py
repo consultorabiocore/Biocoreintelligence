@@ -1543,8 +1543,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     diagnostico = reporte_data.get('diagnostico_completo', 'Sin diagnóstico')
-    pdf.multi_cell(0, 5, clean(diagnostico), border=1)
-    
+    pdf.multi_cell(0, 6, clean(recom.strip()))
+
     # SECCIÓN 7: GRÁFICOS
     if img_path and os.path.exists(img_path):
         pdf.add_page()
@@ -1606,7 +1606,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 10, "9. RECOMENDACIONES") # Eliminado ln=1
-    pdf.ln(10)
     
     nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
     tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
@@ -1638,8 +1637,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         "Se recomienda realizar inspecciones en terreno periódicamente..."
     )
     pdf.multi_cell(0, 3, clean(nota))
-    
-    pdf.ln(15)
     
     # FIRMA
     pdf.set_font("helvetica", "B", 11)

@@ -1599,7 +1599,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.ln(5)
     
     # SECCIÓN 9: RECOMENDACIONES
-        # SECCIÓN 9: RECOMENDACIONES
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
@@ -1610,21 +1609,20 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     nivel_riesgo = reporte_data.get('nivel', 'NORMAL')
     tipo_proyecto = reporte_data.get('tipo', 'GENERAL')
     
-    # Aseguramos que recom_text siempre tenga un valor inicial
-    recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, "No hay recomendaciones específicas para este nivel.")
+    # Obtenemos el texto de recomendaciones
+    recom_text = recomendaciones_por_tipo.get(nivel_riesgo, {}).get(tipo_proyecto, "Sin recomendaciones específicas.")
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     
-    # Dividimos el texto en líneas
-    recomendaciones_lista = recom_text.split('\n')
+    # Dividimos por saltos de línea para listar
+    lista_de_recom = recom_text.split('\n')
     
-    # Usamos un bucle limpio para evitar el error de variable local
-    for idx, r in enumerate(recomendaciones_lista, 1):
-        texto_limpio = r.strip()
-        if texto_limpio:
-            # Importante: usamos 'r' o 'texto_limpio', no 'recom' si da conflicto
-            pdf.multi_cell(0, 6, f"{idx}. {clean(texto_limpio)}")
+    for i, linea in enumerate(lista_de_recom, 1):
+        texto_item = linea.strip()
+        if texto_item:
+            # Usamos 'texto_item' directamente para evitar el error de 'recom is not defined'
+            pdf.multi_cell(0, 6, f"{i}. {clean(texto_item)}")
     
     pdf.ln(10)
     
@@ -1636,15 +1634,15 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "", 7)
     pdf.set_text_color(80, 80, 80)
-    nota_texto = (
+    aviso_terreno = (
         "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones con resolución de 10-30 metros. "
         "Se recomienda realizar inspecciones en terreno periódicamente para validar observaciones satelitales."
     )
-    pdf.multi_cell(0, 4, clean(nota_texto))
+    pdf.multi_cell(0, 4, clean(aviso_terreno))
     
     pdf.ln(20)
     
-    # FIRMA (Asegúrate de que esté dentro de la función antes del return)
+    # FIRMA
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 5, "Loreto Campos Carrasco", align="C")
@@ -1659,6 +1657,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     fecha_hoy = datetime.now().strftime("%d/%m/%Y")
     pdf.cell(0, 4, f"Fecha de emisión: {fecha_hoy}", align="C")
 
+    # FINAL: El return debe estar alineado con el inicio de la función
     return pdf
 
 # === INICIALIZAR SESSION STATE ===

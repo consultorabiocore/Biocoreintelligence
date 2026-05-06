@@ -2703,6 +2703,149 @@ if st.session_state.get('admin_mode'):
                         except Exception as e:
                             st.error(f"❌ Error al registrar: {str(e)}")
 
+        # === EDITAR CLIENTE ===
+        with tab_editar:
+            st.markdown("### Editar cliente existente")
+
+            try:
+                res_clientes = supabase.table("usuarios").select("Proyecto").execute()
+                proyectos_lista = [r["Proyecto"] for r in res_clientes.data] if res_clientes.data else []
+            except Exception as e:
+                st.error(f"Error al cargar clientes: {e}")
+                proyectos_lista = []
+
+            if proyectos_lista:
+                proyecto_sel = st.selectbox("Selecciona el cliente a editar", proyectos_lista, key="sel_editar")
+
+                if proyecto_sel:
+                    try:
+                        res_edit = supabase.table("usuarios").select("*").eq("Proyecto", proyecto_sel).execute()
+                        cliente_edit = res_edit.data[0] if res_edit.data else {}
+                    except Exception as e:
+                        st.error(f"Error al cargar datos: {e}")
+                        cliente_edit = {}
+
+                    if cliente_edit:
+                        with st.form("form_editar_cliente"):
+                            tipo_edit = st.selectbox(
+                                "Tipo de Proyecto",
+                                ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"],
+                                index=["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"].index(
+                                    cliente_edit.get("Tipo", "MINERIA")
+                                ) if cliente_edit.get("Tipo") in ["MINERIA", "GLACIAR", "BOSQUE", "HUMEDAL", "AGRICOLA"] else 0
+                            )
+
+                            coords_raw = cliente_edit.get("Coordenadas", "")
+                            if isinstance(coords_raw, list):
+                                coords_raw = json.dumps(coords_raw)
+
+                            coordenadas_edit = st.text_area(
+                                "Coordenadas (JSON)",
+                                value=coords_raw or "",
+                                height=100
+                            )
+
+                            anio_base_edit = st.number_input(
+                                "Año de Línea Base",
+                                value=int(cliente_edit.get("ano_linea_base", 2015)),
+                                min_value=2000
+                            )
+
+                            email_edit = st.text_input(
+                                "Email del cliente",
+                                value=cliente_edit.get("email_cliente") or ""
+                            )
+
+                            telegram_edit = st.text_input(
+                                "ID Telegram",
+                                value=cliente_edit.get("id_telegram") or ""
+                            )
+
+                            st.markdown("---")
+                            st.markdown("**⏰ Configuración de Reportes Automáticos**")
+                            col_h2, col_f2 = st.columns(2)
+
+                            hora_str = cliente_edit.get("hora_reporte", "08:00") or "08:00"
+                            try:
+                                h2, m2 = map(int, hora_str.split(":"))
+                                hora_default_edit = time(h2, m2)
+                            except:
+                                hora_default_edit = time(8, 0)
+
+                            freq_actual_edit = cliente_edit.get("frecuencia_reporte", "Diario") or "Diario"
+
+                            with col_h2:
+                                hora_edit = st.time_input("Hora de envío", value=hora_default_edit, key="hora_edit")
+                            with col_f2:
+                                frecuencia_edit = st.selectbox(
+                                    "Frecuencia",
+                                    ["Diario", "Semanal"],
+                                    index=0 if freq_actual_edit == "Diario" else 1
+                                )
+
+                            st.markdown("---")
+                            nueva_password = st.text_input(
+                                "Nueva contraseña (dejar en blanco para no cambiar)",
+                                type="password",
+                                key="nueva_pwd_edit"
+                            )
+
+                            if st.form_submit_button("💾 Guardar cambios"):
+                                try:
+                                    update_data = {
+                                        "Tipo": tipo_edit,
+                                        "email_cliente": email_edit if email_edit else None,
+                                        "id_telegram": telegram_edit if telegram_edit else None,
+                                        "ano_linea_base": int(anio_base_edit),
+                                        "hora_reporte": hora_edit.strftime("%H:%M"),
+                                        "frecuencia_reporte": frecuencia_edit,
+                                    }
+
+                                    if coordenadas_edit.strip():
+                                        coords_parsed_edit = json.loads(coordenadas_edit)
+                                        update_data["Coordenadas"] = json.dumps(coords_parsed_edit)
+
+                                    if nueva_password.strip():
+                                        update_data["password_cliente"] = hash_password(nueva_password)
+
+                                    supabase.table("usuarios").update(update_data).eq("Proyecto", proyecto_sel).execute()
+                                    st.success(f"✅ Cliente '{proyecto_sel}' actualizado correctamente")
+                                    st.rerun()
+                                except json.JSONDecodeError:
+                                    st.error("❌ Coordenadas con formato JSON inválido")
+                                except Exception as e:
+                                    st.error(f"❌ Error al actualizar: {str(e)}")
+            else:
+                st.info("No hay clientes registrados")
+
+        # === ELIMINAR CLIENTE ===
+        with tab_eliminar:
+            st.markdown("### Eliminar cliente")
+
+            try:
+                res_del = supabase.table("usuarios").select("Proyecto").execute()
+                proyectos_del = [r["Proyecto"] for r in res_del.data] if res_del.data else []
+            except Exception as e:
+                st.error(f"Error al cargar clientes: {e}")
+                proyectos_del = []
+
+            if proyectos_del:
+                proyecto_del = st.selectbox("Selecciona el cliente a eliminar", proyectos_del, key="sel_eliminar")
+
+                st.warning(f"⚠️ Esta acción eliminará permanentemente al cliente **{proyecto_del}** y todos sus datos.")
+
+                confirmar = st.checkbox("Confirmo que deseo eliminar este cliente", key="check_eliminar")
+
+                if st.button("🗑️ Eliminar Cliente", disabled=not confirmar, key="btn_eliminar"):
+                    try:
+                        supabase.table("usuarios").delete().eq("Proyecto", proyecto_del).execute()
+                        st.success(f"✅ Cliente '{proyecto_del}' eliminado correctamente")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al eliminar: {str(e)}")
+            else:
+                st.info("No hay clientes registrados")
+
 # === PESTAÑA SOPORTE ===
 # === PESTAÑA GUIA (ADMIN) ===
 if st.session_state.get('admin_mode'):

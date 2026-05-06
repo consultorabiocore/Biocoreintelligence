@@ -2297,20 +2297,18 @@ Para ajustes de parámetros, nuevas coordenadas o problemas técnicos, contacta 
 
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
-    tab1, tab_informe, tab_excel, tab_clientes, tab_soporte, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_clientes, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
         "📊 Base Datos",
         "👥 Gestión de Clientes",
-        "💬 Soporte",
         "📖 Guía"
     ])
 else:
-    tab1, tab_informe, tab_excel, tab_soporte, tab_historial, tab_config, tab_guia = st.tabs([
+    tab1, tab_informe, tab_excel, tab_historial, tab_config, tab_guia = st.tabs([
         "🛰️ Vigilancia", 
         "📋 Auditorías", 
-        "📊 Base Datos", 
-        "💬 Soporte",
+        "📊 Base Datos",
         "📨 Mi Historial",
         "⚙️ Configuración",
         "📖 Guía"
@@ -2660,6 +2658,15 @@ if st.session_state.get('admin_mode'):
                 anio_base = st.number_input("Año de Línea Base", value=2015, min_value=2000)
                 email = st.text_input("Email del cliente")
                 telegram = st.text_input("ID Telegram (opcional)")
+                
+                st.markdown("---")
+                st.markdown("**⏰ Configuración de Reportes Automáticos por Telegram**")
+                col_h, col_f = st.columns(2)
+                with col_h:
+                    hora_reporte = st.time_input("Hora de envío", value=time(8, 0))
+                with col_f:
+                    frecuencia_reporte = st.selectbox("Frecuencia", ["Diario", "Semanal"])
+                
                 password_cliente = st.text_input("Contraseña cliente *", type="password")
                 
                 if st.form_submit_button("✅ Registrar Cliente"):
@@ -2681,7 +2688,9 @@ if st.session_state.get('admin_mode'):
                                 "email_cliente": email if email else None,
                                 "password_cliente": pwd_hash,
                                 "id_telegram": telegram if telegram else None,
-                                "ano_linea_base": int(anio_base)
+                                "ano_linea_base": int(anio_base),
+                                "hora_reporte": hora_reporte.strftime("%H:%M"),
+                                "frecuencia_reporte": frecuencia_reporte
                             }
                             
                             supabase.table("usuarios").insert(nuevo_registro).execute()
@@ -2695,26 +2704,6 @@ if st.session_state.get('admin_mode'):
                             st.error(f"❌ Error al registrar: {str(e)}")
 
 # === PESTAÑA SOPORTE ===
-with tab_soporte:
-    st.title("💬 Soporte BioCore Intelligence")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📞 Contacto")
-        st.markdown("""
-        **Responsable:** Loreto Campos Carrasco
-        📧 consultorabiocore@gmail.com
-        ⏰ Lunes-Viernes 8:00-18:00
-        """)
-    
-    with col2:
-        st.subheader("🔧 Problemas Comunes")
-        with st.expander("¿Cómo genero un reporte?"):
-            st.write("Ve a Vigilancia → Ejecutar Reporte")
-        with st.expander("¿Qué es un índice espectral?"):
-            st.write("Son medidas de características ambientales desde satélites")
-
 # === PESTAÑA GUIA (ADMIN) ===
 if st.session_state.get('admin_mode'):
     with tab_guia:
@@ -2745,8 +2734,53 @@ if not st.session_state.get('admin_mode'):
             st.error(f"Error al cargar historial: {e}")
     
     with tab_config:
-        st.title("⚙️ Mi Configuración")
-        st.info("Próximamente...")
+        st.title("⚙️ Mi Configuración de Reportes")
+        proyecto_cliente = st.session_state.get('proyecto_cliente')
+        
+        try:
+            res = supabase.table("usuarios").select("hora_reporte, frecuencia_reporte").eq("Proyecto", proyecto_cliente).execute()
+            if res.data:
+                datos = res.data[0]
+                hora_actual = datos.get('hora_reporte', '08:00') or '08:00'
+                freq_actual = datos.get('frecuencia_reporte', 'Diario') or 'Diario'
+                
+                st.markdown("### 📬 Configuración de Reportes Automáticos por Telegram")
+                st.info("Aquí puedes ver y modificar cuándo quieres recibir tu reporte satelital.")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("🕐 Hora de envío actual", hora_actual)
+                with col2:
+                    st.metric("📅 Frecuencia actual", freq_actual)
+                
+                st.markdown("---")
+                st.markdown("#### ✏️ Modificar preferencias")
+                
+                with st.form("form_config_cliente"):
+                    try:
+                        h, m = map(int, hora_actual.split(":"))
+                        hora_default = time(h, m)
+                    except:
+                        hora_default = time(8, 0)
+                    
+                    nueva_hora = st.time_input("Nueva hora de envío", value=hora_default)
+                    nueva_freq = st.selectbox("Nueva frecuencia", ["Diario", "Semanal"],
+                                              index=0 if freq_actual == "Diario" else 1)
+                    
+                    if st.form_submit_button("💾 Guardar cambios"):
+                        try:
+                            supabase.table("usuarios").update({
+                                "hora_reporte": nueva_hora.strftime("%H:%M"),
+                                "frecuencia_reporte": nueva_freq
+                            }).eq("Proyecto", proyecto_cliente).execute()
+                            st.success("✅ Preferencias actualizadas correctamente")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar: {str(e)}")
+            else:
+                st.warning("No se encontraron datos de configuración")
+        except Exception as e:
+            st.error(f"Error al cargar configuración: {e}")
     
     with tab_guia:
         mostrar_guia()

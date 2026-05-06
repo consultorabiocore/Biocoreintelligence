@@ -1723,11 +1723,14 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         icono = signo['icono']
         r, g, b = colores_signo.get(icono, (80, 80, 80))
         etiqueta = etiquetas_signo.get(icono, '>> ')
+        x_inicio = pdf.get_x()
         pdf.set_font("helvetica", "B", 9)
         pdf.set_text_color(r, g, b)
-        pdf.cell(28, 5, clean(etiqueta))
+        pdf.cell(28, 5, clean(etiqueta), ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
+        # Retroceder a la misma línea pero indentado para el texto
+        pdf.set_xy(x_inicio + 28, pdf.get_y() - 5)
         pdf.multi_cell(0, 5, clean(signo['texto']))
         pdf.ln(1)
     
@@ -1742,41 +1745,40 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_fill_color(40, 80, 120)
     pdf.set_text_color(255, 255, 255)
     
-    col_widths = [35, 30, 30, 30, 40]
-    headers = ["Índice", "Actual", "Línea Base", "Variación", "Interpretación"]
-    
+    col_widths = [35, 30, 30, 30, 45]
+    headers = ["Indice", "Actual", "Linea Base", "Variacion", "Interpretacion"]
+
     for header, width in zip(headers, col_widths):
         pdf.cell(width, 8, header, border=1, align="C", fill=True)
     pdf.ln()
-    
+
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(0, 0, 0)
-    
+
     indices_data = [
-        ("SAVI", reporte_data.get('savi_actual', 0), reporte_data.get('savi_base', 0), 
-         reporte_data.get('variacion', 0), "Vigor de vegetación"),
-        ("NDWI", reporte_data.get('ndwi', 0), reporte_data.get('ndwi_base', 0), 
-         reporte_data.get('variacion_ndwi', 0), "Contenido de agua"),
-        ("NDSI", reporte_data.get('ndsi', 0), reporte_data.get('ndsi_base', 0), 
+        ("SAVI", reporte_data.get('savi_actual', 0), reporte_data.get('savi_base', 0),
+         reporte_data.get('variacion', 0), "Vigor vegetacion"),
+        ("NDWI", reporte_data.get('ndwi', 0), reporte_data.get('ndwi_base', 0),
+         reporte_data.get('variacion_ndwi', 0), "Contenido agua"),
+        ("NDSI", reporte_data.get('ndsi', 0), reporte_data.get('ndsi_base', 0),
          reporte_data.get('variacion_ndsi', 0), "Nieve/Hielo"),
-        ("NDVI", reporte_data.get('ndvi', 0), reporte_data.get('ndvi_base', 0), 
+        ("NDVI", reporte_data.get('ndvi', 0), reporte_data.get('ndvi_base', 0),
          reporte_data.get('variacion_ndvi', 0), "Vigor general"),
     ]
-    
+
     for nombre, actual, base, variacion, interp in indices_data:
         pdf.cell(col_widths[0], 10, nombre, border=1)
         pdf.cell(col_widths[1], 10, f"{float(actual):.4f}", border=1, align="C")
         pdf.cell(col_widths[2], 10, f"{float(base):.4f}", border=1, align="C")
         pdf.cell(col_widths[3], 10, f"{float(variacion):+.1f}%", border=1, align="C")
-        pdf.cell(col_widths[4], 10, interp, border=1)
-        pdf.ln()
-    
+        pdf.cell(col_widths[4], 10, interp, border=1, ln=1)
+
     pdf.cell(col_widths[0], 10, "TEMP", border=1)
-    pdf.cell(col_widths[1], 10, f"{float(reporte_data.get('temp', 0)):.1f}°C", border=1, align="C")
+    pdf.cell(col_widths[1], 10, f"{float(reporte_data.get('temp', 0)):.1f}C", border=1, align="C")
     pdf.cell(col_widths[2], 10, "-", border=1, align="C")
     pdf.cell(col_widths[3], 10, "-", border=1, align="C")
-    pdf.cell(col_widths[4], 10, "Temperatura LST", border=1)
-    pdf.ln(15)
+    pdf.cell(col_widths[4], 10, "Temperatura LST", border=1, ln=1)
+    pdf.ln(10)
     
     # SECCIÓN 6: DIAGNÓSTICO
     pdf.set_font("helvetica", "B", 14)
@@ -1977,8 +1979,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "10. RECOMENDACIONES")
-    pdf.ln(10)
+    pdf.cell(0, 10, "10. RECOMENDACIONES", ln=1)
     
     # 1. Obtener datos con valores seguros por defecto
     riesgo_val = reporte_data.get('nivel', 'NORMAL')
@@ -2004,8 +2005,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     # --- NOTA DE TERRENO ---
     pdf.set_font("helvetica", "B", 10)
     pdf.set_text_color(139, 0, 0)
-    pdf.cell(0, 8, "NOTA: VERIFICACIÓN EN TERRENO RECOMENDADA")
-    pdf.ln(8)
+    pdf.cell(0, 8, "NOTA: VERIFICACIÓN EN TERRENO RECOMENDADA", ln=1)
     
     pdf.set_font("helvetica", "", 7)
     pdf.set_text_color(80, 80, 80)

@@ -1729,14 +1729,16 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
             if pct_perdida > 20:
                 pdf.set_font("helvetica", "B", 9)
                 pdf.set_text_color(220, 50, 50)
-                pdf.multi_cell(0, 5, clean(
+                pdf.set_x(10)
+                pdf.multi_cell(190, 5, clean(
                     f"ALERTA: Se ha perdido el {pct_perdida:.1f}% de la cobertura original "
                     f"desde el año 2000. Requiere evaluación conforme a Ley 20.283."
                 ))
             elif pct_perdida > 5:
                 pdf.set_font("helvetica", "B", 9)
                 pdf.set_text_color(200, 100, 0)
-                pdf.multi_cell(0, 5, clean(
+                pdf.set_x(10)
+                pdf.multi_cell(190, 5, clean(
                     f"PRECAUCION: Pérdida del {pct_perdida:.1f}% de cobertura detectada "
                     f"desde el año 2000. Monitoreo reforzado recomendado."
                 ))
@@ -1867,7 +1869,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     diagnostico = reporte_data.get('diagnostico_completo', 'Sin diagnóstico')
-    pdf.multi_cell(0, 6, clean(diagnostico.strip()))
+    pdf.set_x(10)
+    pdf.multi_cell(190, 6, clean(diagnostico.strip()))
 
     # SECCIÓN 7: SENTINEL-1 SAR
     pdf.ln(5)
@@ -1877,7 +1880,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
 
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(0, 5, clean(
+    pdf.set_x(10)
+    pdf.multi_cell(190, 5, clean(
         "Sentinel-1 opera en banda C (5.4 GHz) con polarizacion VV. "
         "A diferencia de sensores opticos, atraviesa nubes y lluvia, "
         "siendo el unico dato disponible en dias de alta nubosidad."
@@ -1940,7 +1944,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
 
     pdf.set_font("helvetica", "I", 8)
     pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, clean(
+    pdf.set_x(10)
+    pdf.multi_cell(190, 4, clean(
         "Nota: Valores tipicos de referencia VV: agua libre < -15 dB | "
         "vegetacion densa -10 a -5 dB | suelo seco/estructuras > -8 dB. "
         "Util como dato independiente en condiciones de nubosidad total."
@@ -1988,7 +1993,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         pdf.cell(0, 7, "Temperatura Media (ERA5-Land ECMWF):", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
-        pdf.multi_cell(0, 5,
+        pdf.set_x(10)
+        pdf.multi_cell(190, 5,
             f"Valor inicial (hace {rango_anios_clima} anos): {temp_min_inicio:.2f}C\n"
             f"Valor reciente: {temp_min_final:.2f}C\n"
             f"Cambio neto: {cambio_temp:+.2f}C\n"
@@ -2006,7 +2012,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         pdf.cell(0, 7, "Temperatura de Referencia - 2m (ERA5-Land):", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
-        pdf.multi_cell(0, 5,
+        pdf.set_x(10)
+        pdf.multi_cell(190, 5,
             f"Valor inicial (hace {rango_anios_clima} anos): {tmax_inicio:.2f}C\n"
             f"Valor reciente: {tmax_final:.2f}C\n"
             f"Cambio neto: {cambio_tmax:+.2f}C\n"
@@ -2024,7 +2031,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         pdf.cell(0, 7, "Precipitacion Anual (ERA5-Land ECMWF):", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
-        pdf.multi_cell(0, 5,
+        pdf.set_x(10)
+        pdf.multi_cell(190, 5,
             f"Precipitacion inicial (hace {rango_anios_clima} anos): {prec_inicio:.1f} mm/ano\n"
             f"Precipitacion reciente: {prec_final:.1f} mm/ano\n"
             f"Cambio relativo: {cambio_prec:+.1f}%\n"
@@ -2037,7 +2045,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         pdf.cell(0, 7, "Estado de datos ERA5-Land:", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(60, 60, 60)
-        pdf.multi_cell(0, 5,
+        pdf.set_x(10)
+        pdf.multi_cell(190, 5,
             "No se pudieron recuperar datos historicos de ERA5-Land para este ciclo de analisis.\n"
             "Esto puede deberse a:\n"
             "  - Rango de tiempo seleccionado menor a 1 ano (ERA5 opera por ano completo)\n"
@@ -2048,7 +2057,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         pdf.ln(3)
         pdf.set_font("helvetica", "I", 8)
         pdf.set_text_color(100, 100, 100)
-        pdf.multi_cell(0, 4,
+        pdf.set_x(10)
+        pdf.multi_cell(190, 4,
             "Nota tecnica: ERA5-Land es el reanálisis climatico de ECMWF con resolución ~9 km.\n"
             "Cubre temperatura 2m y precipitacion acumulada mensual desde 1950 hasta la actualidad.\n"
             "Fuente: ECMWF/ERA5_LAND/MONTHLY_AGGR disponible en Google Earth Engine.")
@@ -2080,7 +2090,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         item_para_pdf = contenido_linea.strip()
         if item_para_pdf:
             # AQUÍ ESTÁ EL CAMBIO CLAVE: No usamos la palabra 'recom' para evitar el error
-            pdf.multi_cell(0, 6, f"{contador}. {clean(item_para_pdf)}")
+            pdf.set_x(10)
+            pdf.multi_cell(190, 6, f"{contador}. {clean(item_para_pdf)}")
     
     pdf.ln(10)
     
@@ -2095,7 +2106,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         "Los índices espectrales satelitales (SAVI, NDWI, NDSI, NDVI) proporcionan estimaciones con resolución de 10-30 metros. "
         "Se recomienda realizar inspecciones en terreno periódicamente para validar observaciones satelitales."
     )
-    pdf.multi_cell(0, 4, clean(mensaje_nota))
+    pdf.set_x(10)
+    pdf.multi_cell(190, 4, clean(mensaje_nota))
     
     pdf.ln(20)
     

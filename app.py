@@ -2584,34 +2584,16 @@ with tab_informe:
                 key="audit_rango")
         
         with col3:
-            # Filtra meses solo hasta el actual si es el año actual
-            meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-            # mes actual para UX mejorada
-            try:
-                mes_actual = datetime.now().month
-                # a continuación, en col4, determinamos el año
-                mes_sel_val = None
-            except:
-                mes_actual = 12
-            mes_sel = st.selectbox("📅 Mes", meses, key="audit_mes")
-        
+            anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
+
         with col4:
-            # Construye opciones del año según historial real
-            try:
-                res_history = supabase.table("historial_reportes").select("fecha_analisis,created_at").eq("proyecto", proyecto_sel).execute()
-                if res_history.data:
-                    df_hist = pd.DataFrame(res_history.data)
-                    fechas_hist = pd.to_datetime(df_hist['fecha_analisis'].fillna(df_hist['created_at']), errors='coerce')
-                    anios_validos = sorted({f.year for f in fechas_hist.dropna() if f.year <= datetime.now().year})
-                    if anios_validos:
-                        anio_sel = st.selectbox("📆 Año", options=anios_validos, index=len(anios_validos)-1, key="audit_anio")
-                    else:
-                        anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
-                else:
-                    anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
-            except Exception:
-                anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
+            meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+            if rango_sel != "Último año":
+                mes_sel = st.selectbox("📅 Mes", meses, index=datetime.now().month - 1, key="audit_mes")
+            else:
+                mes_sel = "Año completo"
+                st.info("📅 Período: Año completo")
         
         rango_dias_map = {
             "Últimos 7 días": 7,

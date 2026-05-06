@@ -1809,15 +1809,15 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_font("helvetica", "B", 9)
     pdf.set_fill_color(40, 80, 120)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(60, 8, "Parametro", border=1, align="C", fill=True)
-    pdf.cell(40, 8, "Valor", border=1, align="C", fill=True)
-    pdf.cell(0,  8, "Interpretacion", border=1, align="C", fill=True)
+    pdf.cell(65, 8, "Parametro",      border=1, align="C", fill=True)
+    pdf.cell(35, 8, "Valor",          border=1, align="C", fill=True)
+    pdf.cell(90, 8, "Interpretacion", border=1, align="C", fill=True)
     pdf.ln()
 
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(60, 8, "Retrodispersion VV (dB)", border=1)
-    pdf.cell(40, 8, f"{sar_vv:.2f} dB", border=1, align="C")
+    pdf.cell(65, 8, "Retrodispersion VV (dB)", border=1)
+    pdf.cell(35, 8, f"{sar_vv:.2f} dB", border=1, align="C")
 
     tipo_sar = reporte_data.get('tipo', 'GENERAL').upper()
     if tipo_sar == 'GLACIAR':
@@ -1845,7 +1845,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         if sar_vv > -8:
             interp_sar = "Estructuras o maquinaria activa"
         else:
-            interp_sar = "Superficie mineral sin actividad aparente"
+            interp_sar = "Superficie mineral sin actividad"
     elif tipo_sar == 'AGRICOLA':
         if sar_vv > -8:
             interp_sar = "Cultivo desarrollado o suelo humedo"
@@ -1854,7 +1854,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     else:
         interp_sar = "Sin interpretacion especifica"
 
-    pdf.cell(0, 8, clean(interp_sar), border=1)
+    pdf.cell(90, 8, clean(interp_sar), border=1)
     pdf.ln(10)
 
     pdf.set_font("helvetica", "I", 8)

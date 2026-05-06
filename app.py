@@ -1540,7 +1540,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     diagnostico = reporte_data.get('diagnostico_completo', 'Sin diagnóstico')
-    pdf.multi_cell(0, 6, clean(recom.strip()))
+    pdf.multi_cell(0, 6, clean(diagnostico.strip()))
 
     # SECCIÓN 7: GRÁFICOS
     if img_path and os.path.exists(img_path):

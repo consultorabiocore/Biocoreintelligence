@@ -1117,7 +1117,7 @@ def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variac
 # MÓDULO 4: GENERADOR DE REPORTE COMPLETO
 # ============================================================================
 
-def generar_reporte_total(p, rango_dias=30):
+def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
     """Genera reporte completo y guarda en Supabase"""
     try:
         raw_coords = obtener_coordenadas_correctamente(p)
@@ -1277,8 +1277,17 @@ def generar_reporte_total(p, rango_dias=30):
 
     # === OBTENER HISTÓRICO SEGÚN RANGO SELECCIONADO ===
     # rango_anios controla cuántos años se grafican Y el título del PDF.
-    # Para rangos < 1 año se usa 1 año mínimo (GEE opera por año completo).
-    rango_anios = max(1, min(20, round(rango_dias / 365))) if rango_dias >= 365 else 1
+    # Para rangos < 1 año (7 días, 2 semanas, 1 mes, 3 meses) se consulta 1 año
+    # de datos GEE (mínimo técnico), pero el TÍTULO muestra el período real elegido.
+    _rangos_anios_map = {
+        "Últimos 7 días": 1, "Últimas 2 semanas": 1, "Último mes": 1,
+        "Últimos 3 meses": 1, "Último año": 1,
+        "Últimos 5 años": 5, "Últimos 10 años": 10,
+        "Últimos 15 años": 15, "Últimos 20 años": 20,
+    }
+    rango_anios = _rangos_anios_map.get(rango_sel, max(1, min(20, round(rango_dias / 365))))
+    # El label que aparece en el PDF es el texto exacto que eligió el cliente
+    rango_label = rango_sel.replace("Últimos ", "").replace("Último ", "").replace("Últimas ", "")
     indices_historicos = obtener_historico_20_anios(geom, p.get('Tipo', 'GENERAL'), rango_anios=rango_anios)
     
     if not any(indices_historicos.values()):
@@ -1353,6 +1362,7 @@ def generar_reporte_total(p, rango_dias=30):
         'diagnostico_completo': diagnostico_detallado,
         'indices_historicos': indices_historicos,
         'rango_anios': rango_anios,
+        'rango_label': rango_label,
         'info_conaf': info_conaf,
         'indices': {
             'savi': savi_now,
@@ -1953,13 +1963,13 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
 
     # SECCIÓN 8: GRÁFICOS — muestra el rango elegido por el cliente
     rango_anios_pdf = reporte_data.get('rango_anios', 20)
-    label_anios = f"{rango_anios_pdf} AÑO{'S' if rango_anios_pdf != 1 else ''}"
+    rango_label_pdf = reporte_data.get('rango_label', f"{rango_anios_pdf} años")
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, f"8. ANÁLISIS ESPECTRAL - {label_anios}", ln=1)
+        pdf.cell(0, 10, f"8. ANÁLISIS ESPECTRAL - {rango_label_pdf.upper()}", ln=1)
         pdf.ln(5)
         
         try:
@@ -1972,7 +1982,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, f"9. ANÁLISIS CLIMÁTICO ERA5-Land - {label_anios}", ln=1)
+    pdf.cell(0, 10, f"9. ANÁLISIS CLIMÁTICO ERA5-Land - {rango_label_pdf.upper()}", ln=1)
     pdf.ln(3)
     
     pdf.set_font("helvetica", "", 9)
@@ -2728,7 +2738,7 @@ with tab_informe:
                         .eq("Proyecto", proyecto_sel)\
                         .execute().data[0]
                     
-                    reporte_data = generar_reporte_total(proyecto_data, rango_dias)
+                    reporte_data = generar_reporte_total(proyecto_data, rango_dias, rango_sel=rango_sel)
                     
                     if reporte_data.get('tipo') == 'error':
                         st.error(f"❌ {reporte_data.get('error', 'Error desconocido')}")

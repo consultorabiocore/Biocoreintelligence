@@ -382,92 +382,126 @@ def agregar_datos_sar_y_fuegos(reporte_base, geom):
 # MÓDULO 2: GENERADOR DE GRÁFICOS PROFESIONALES MEJORADO
 # ============================================================================
 def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
-    """Genera gráficos profesionales contextualizados por tipo de proyecto, validando dimensiones."""
+    """
+    Genera gráficos profesionales contextualizados por tipo de proyecto.
+    Cada serie usa sus años reales (anios_optico, anios_sar, anios_temp, anios_clima).
+    Para MINERÍA, si no hay datos ópticos en un año, se muestra SAR histórico como cuarta gráfica.
+    """
     try:
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.patch.set_facecolor('white')
 
-        # Usar años reales en eje X
-        anio_actual = datetime.now().year
-        max_len = 0
-        for k, v in indices_historicos.items():
-            if isinstance(v, list):
-                max_len = max(max_len, len(v))
-        anio_inicio = anio_actual - max_len + 1
-        fechas = list(range(anio_inicio, anio_actual + 1))
+        # Años reales por fuente
+        anios_optico = indices_historicos.get('anios_optico', [])
+        anios_sar    = indices_historicos.get('anios_sar', [])
+        anios_temp   = indices_historicos.get('anios_temp', [])
+        anios_clima  = indices_historicos.get('anios_clima', [])
 
-        if tipo_proyecto == 'GLACIAR':
-            config = [
-                (0, 0, 'ndsi', 'NDSI - Cobertura de Nieve/Hielo', '#3498db', '▼ Bajo = Retracción'),
-                (0, 1, 'temp', 'Temperatura - LST (°C)', '#e74c3c', '▲ Elevada = Fusión'),
-                (1, 0, 'ndwi', 'NDWI - Recursos Hídricos', '#2980b9', '▲ Agua de deshielo'),
-                (1, 1, 'precipitacion', 'Precipitación Anual (TerraCLIM)', '#0099cc', 'Cambio climático'),
-            ]
-        elif tipo_proyecto == 'MINERIA':
-            config = [
-                (0, 0, 'ndwi', 'NDWI - Monitoreo de Agua', '#3498db', 'Descarta acopio anómalo'),
-                (0, 1, 'swir', 'SWIR - Estabilidad de Taludes', '#7f8c8d', 'Reflectancia mineral'),
-                (1, 0, 'savi', 'SAVI - Vegetación Perimetral', '#27ae60', 'Ley 20.283'),
-                (1, 1, 'temp', 'Temperatura - Actividad Térmica', '#e74c3c', 'Detección de procesos'),
-            ]
-        elif tipo_proyecto == 'BOSQUE':
-            config = [
-                (0, 0, 'savi', 'SAVI - Densidad de Cobertura', '#27ae60', 'Cumplimiento normativo'),
-                (0, 1, 'ndwi', 'NDWI - Estrés Hídrico', '#3498db', 'Riesgo de incendio'),
-                (1, 0, 'ndvi', 'NDVI - Vigor General', '#2ecc71', 'Sanidad forestal'),
-                (1, 1, 'precipitacion', 'Precipitación Anual (TerraCLIM)', '#0099cc', 'Cambio climático'),
-            ]
-        elif tipo_proyecto == 'HUMEDAL':
-            config = [
-                (0, 0, 'ndwi', 'NDWI - Ciclo Hidrológico', '#3498db', 'Estado de saturación'),
-                (0, 1, 'savi', 'SAVI - Flora Hidrófila', '#27ae60', 'Biodiversidad'),
-                (1, 0, 'ndvi', 'NDVI - Productividad', '#2ecc71', 'Salud del ecosistema'),
-                (1, 1, 'temperatura_min', 'Temperatura Mínima (TerraCLIM)', '#e74c3c', 'Variabilidad'),
-            ]
-        elif tipo_proyecto == 'AGRICOLA':
-            config = [
-                (0, 0, 'savi', 'SAVI - Vigor de Cultivo', '#27ae60', 'Rendimiento esperado'),
-                (0, 1, 'ndwi', 'NDWI - Disponibilidad Hídrica', '#3498db', 'Necesidad de riego'),
-                (1, 0, 'ndvi', 'NDVI - Estado Fenológico', '#2ecc71', 'Fase de desarrollo'),
-                (1, 1, 'precipitacion', 'Precipitación Histórica (TerraCLIM)', '#0099cc', 'Tendencia climática'),
-            ]
-        else:
-            config = [
-                (0, 0, 'savi', 'SAVI', '#27ae60', ''),
-                (0, 1, 'ndwi', 'NDWI', '#3498db', ''),
-                (1, 0, 'ndvi', 'NDVI', '#2ecc71', ''),
-                (1, 1, 'temp', 'Temperatura', '#e74c3c', ''),
-            ]
-
-        for row, col, indice, titulo, color, subtitulo in config:
-            ax = axes[row, col]
-            valores = indices_historicos.get(indice, [])
-            if isinstance(valores, list) and len(valores) > 0:
-                min_len = min(len(fechas), len(valores))
-                if min_len == 0:
-                    ax.text(0.5, 0.5, 'Sin datos disponibles',
-                            ha='center', va='center', transform=ax.transAxes,
-                            fontsize=11, style='italic', color='gray')
-                else:
-                    x = fechas[:min_len]
-                    y = valores[:min_len]
-                    ax.plot(x, y, color=color, marker='o', linewidth=2.5, markersize=8)
-                    ax.fill_between(x, y, alpha=0.3, color=color)
-                    ax.set_title(titulo, fontweight='bold', fontsize=12)
-                    ax.set_ylabel('Valor', fontsize=10)
-                    ax.set_xlabel('Año', fontsize=9)
-                    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-                    ax.grid(True, alpha=0.3, linestyle='--')
-                    if subtitulo:
-                        ax.text(0.02, 0.98, subtitulo, transform=ax.transAxes, 
-                            fontsize=9, verticalalignment='top',
+        def plot_serie(ax, x, y, color, titulo, subtitulo, ylabel='Valor'):
+            """Dibuja una serie con sus años reales."""
+            if x and y and len(x) > 0 and len(y) > 0:
+                min_len = min(len(x), len(y))
+                x2, y2 = x[:min_len], y[:min_len]
+                ax.plot(x2, y2, color=color, marker='o', linewidth=2.5, markersize=6)
+                ax.fill_between(x2, y2, alpha=0.25, color=color)
+                ax.set_title(titulo, fontweight='bold', fontsize=11)
+                ax.set_ylabel(ylabel, fontsize=9)
+                ax.set_xlabel('Año', fontsize=9)
+                ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+                ax.tick_params(axis='x', rotation=30)
+                ax.grid(True, alpha=0.3, linestyle='--')
+                if subtitulo:
+                    ax.text(0.02, 0.98, subtitulo, transform=ax.transAxes,
+                            fontsize=8, verticalalignment='top',
                             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+                # Fuente de datos en esquina inferior derecha
+                if any(yr < 2018 for yr in x2):
+                    fuente = 'Fuente: Landsat+S2' if any(yr >= 2018 for yr in x2) else 'Fuente: Landsat'
+                    ax.annotate(fuente, xy=(0.98, 0.03), xycoords='axes fraction',
+                                fontsize=7, ha='right', color='gray')
             else:
-                ax.text(0.5, 0.5, 'Sin datos disponibles', 
+                ax.text(0.5, 0.5, 'Sin datos disponibles',
                         ha='center', va='center', transform=ax.transAxes,
                         fontsize=11, style='italic', color='gray')
-                ax.set_title(titulo, fontweight='bold', fontsize=12)
+                ax.set_title(titulo, fontweight='bold', fontsize=11)
                 ax.grid(True, alpha=0.2)
+
+        # ── Configuración por tipo de proyecto ──────────────────────────────
+        if tipo_proyecto == 'GLACIAR':
+            plot_serie(axes[0,0], anios_optico, indices_historicos.get('ndsi', []),
+                       '#3498db', 'NDSI - Cobertura Nieve/Hielo', '▼ Bajo = Retracción')
+            plot_serie(axes[0,1], anios_temp, indices_historicos.get('temp', []),
+                       '#e74c3c', 'Temperatura LST (°C)', '▲ Elevada = Fusión', '°C')
+            plot_serie(axes[1,0], anios_optico, indices_historicos.get('ndwi', []),
+                       '#2980b9', 'NDWI - Recursos Hídricos', '▲ Agua de deshielo')
+            plot_serie(axes[1,1], anios_clima, indices_historicos.get('precipitacion', []),
+                       '#0099cc', 'Precipitación Anual (TerraClimate)', 'Cambio climático', 'mm/año')
+
+        elif tipo_proyecto == 'MINERIA':
+            plot_serie(axes[0,0], anios_optico, indices_historicos.get('ndwi', []),
+                       '#3498db', 'NDWI - Monitoreo de Agua', 'Descarta acopio anómalo')
+            plot_serie(axes[0,1], anios_optico, indices_historicos.get('swir', []),
+                       '#7f8c8d', 'SWIR - Estabilidad de Taludes', 'Reflectancia mineral')
+            plot_serie(axes[1,0], anios_optico, indices_historicos.get('savi', []),
+                       '#27ae60', 'SAVI - Vegetación Perimetral', 'Ley 20.283')
+            # Cuarto gráfico: SAR histórico (radar disponible desde 2014, cubre años sin óptico)
+            if anios_sar and indices_historicos.get('sar_vv_hist'):
+                plot_serie(axes[1,1], anios_sar, indices_historicos.get('sar_vv_hist', []),
+                           '#e67e22', 'SAR VV - Actividad Radar (Sentinel-1)',
+                           'Estructuras / humedad', 'dB')
+                axes[1,1].annotate('Fuente: Sentinel-1 SAR (desde 2014)',
+                                   xy=(0.98, 0.03), xycoords='axes fraction',
+                                   fontsize=7, ha='right', color='gray')
+            else:
+                plot_serie(axes[1,1], anios_temp, indices_historicos.get('temp', []),
+                           '#e74c3c', 'Temperatura - Actividad Térmica', 'Detección procesos', '°C')
+
+        elif tipo_proyecto == 'BOSQUE':
+            plot_serie(axes[0,0], anios_optico, indices_historicos.get('savi', []),
+                       '#27ae60', 'SAVI - Densidad de Cobertura', 'Cumplimiento normativo')
+            plot_serie(axes[0,1], anios_optico, indices_historicos.get('ndwi', []),
+                       '#3498db', 'NDWI - Estrés Hídrico', 'Riesgo de incendio')
+            plot_serie(axes[1,0], anios_optico, indices_historicos.get('ndvi', []),
+                       '#2ecc71', 'NDVI - Vigor General', 'Sanidad forestal')
+            plot_serie(axes[1,1], anios_clima, indices_historicos.get('precipitacion', []),
+                       '#0099cc', 'Precipitación Anual (TerraClimate)', 'Cambio climático', 'mm/año')
+
+        elif tipo_proyecto == 'HUMEDAL':
+            plot_serie(axes[0,0], anios_optico, indices_historicos.get('ndwi', []),
+                       '#3498db', 'NDWI - Ciclo Hidrológico', 'Estado de saturación')
+            plot_serie(axes[0,1], anios_optico, indices_historicos.get('savi', []),
+                       '#27ae60', 'SAVI - Flora Hidrófila', 'Biodiversidad')
+            plot_serie(axes[1,0], anios_optico, indices_historicos.get('ndvi', []),
+                       '#2ecc71', 'NDVI - Productividad', 'Salud del ecosistema')
+            plot_serie(axes[1,1], anios_clima, indices_historicos.get('temperatura_min', []),
+                       '#e74c3c', 'Temperatura Mínima (TerraClimate)', 'Variabilidad', '°C')
+
+        elif tipo_proyecto == 'AGRICOLA':
+            plot_serie(axes[0,0], anios_optico, indices_historicos.get('savi', []),
+                       '#27ae60', 'SAVI - Vigor de Cultivo', 'Rendimiento esperado')
+            plot_serie(axes[0,1], anios_optico, indices_historicos.get('ndwi', []),
+                       '#3498db', 'NDWI - Disponibilidad Hídrica', 'Necesidad de riego')
+            plot_serie(axes[1,0], anios_optico, indices_historicos.get('ndvi', []),
+                       '#2ecc71', 'NDVI - Estado Fenológico', 'Fase de desarrollo')
+            plot_serie(axes[1,1], anios_clima, indices_historicos.get('precipitacion', []),
+                       '#0099cc', 'Precipitación Histórica (TerraClimate)', 'Tendencia climática', 'mm/año')
+
+        else:
+            plot_serie(axes[0,0], anios_optico, indices_historicos.get('savi', []),
+                       '#27ae60', 'SAVI', '')
+            plot_serie(axes[0,1], anios_optico, indices_historicos.get('ndwi', []),
+                       '#3498db', 'NDWI', '')
+            plot_serie(axes[1,0], anios_optico, indices_historicos.get('ndvi', []),
+                       '#2ecc71', 'NDVI', '')
+            plot_serie(axes[1,1], anios_temp, indices_historicos.get('temp', []),
+                       '#e74c3c', 'Temperatura LST', '', '°C')
+
+        # Título general
+        anio_actual = datetime.now().year
+        fig.suptitle(
+            f'Análisis Espectral Histórico — {anio_actual - 20} a {anio_actual}',
+            fontsize=13, fontweight='bold', y=1.01
+        )
 
         plt.tight_layout()
         temp_dir = tempfile.gettempdir()
@@ -484,110 +518,270 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
 # ============================================================================
 
 def obtener_historico_20_anios(geom, tipo_proyecto):
-    """Obtiene datos históricos de 20 años desde GEE"""
-    
+    """
+    Obtiene datos históricos de 20 años desde GEE.
+    - Sentinel-2: desde 2018 (óptico 10 m)
+    - Landsat 8/9 OLI: 2013-2017 (óptico 30 m, bandas equivalentes)
+    - Landsat 5/7 TM/ETM+: 2006-2012 (óptico 30 m)
+    - Sentinel-1 SAR: disponible desde 2014 (radar, como alternativa cuando no hay óptico)
+    - MODIS LST: todos los años (temperatura)
+    - TerraClimate: todos los años (precipitación y temperatura clima)
+
+    Retorna además 'anios_optico', 'anios_sar', 'anios_temp', 'anios_clima'
+    con los años reales correspondientes a cada lista de datos.
+    """
+
     indices_historicos = {
         'savi': [],
         'ndwi': [],
         'ndvi': [],
         'ndsi': [],
-        'temp': [],
         'swir': [],
+        'temp': [],
         'precipitacion': [],
         'temperatura_min': [],
-        'temperatura_max': []
+        'temperatura_max': [],
+        'sar_vv_hist': [],
+        # Listas de años reales para cada grupo de datos
+        'anios_optico': [],
+        'anios_sar': [],
+        'anios_temp': [],
+        'anios_clima': [],
     }
-    
+
     try:
         anio_actual = datetime.now().year
         anios = list(range(anio_actual - 20, anio_actual + 1))
-        
+
         for anio in anios:
             try:
-                # Sentinel-2 (solo últimos 5-6 años disponibles)
+                optico_ok = False
+
+                # ── SENTINEL-2 (2018 en adelante) ──────────────────────────────
                 if anio >= 2018:
-                    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
-                        .filterBounds(geom)\
-                        .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
-                        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
-                        .median()
-                    
-                    if s2 is not None:
-                        savi = s2.expression(
-                            '((NIR - RED) / (NIR + RED + 0.5)) * (1.5)',
+                    try:
+                        s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+                            .filterBounds(geom)\
+                            .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
+                            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+                            .median()
+
+                        savi_img = s2.expression(
+                            '((NIR - RED) / (NIR + RED + 0.5)) * 1.5',
                             {'NIR': s2.select('B8'), 'RED': s2.select('B4')}
-                        )
-                        ndwi = s2.normalizedDifference(['B8', 'B11'])
-                        ndvi = s2.normalizedDifference(['B8', 'B4'])
-                        ndsi = s2.normalizedDifference(['B3', 'B11'])
-                        swir = s2.select('B11').divide(10000)
-                        
-                        stats = s2.addBands([savi, ndwi, ndvi, ndsi, swir]).reduceRegion(
-                            reducer=ee.Reducer.mean(),
-                            geometry=geom,
-                            scale=30,
-                            maxPixels=1e9
-                        ).getInfo()
-                        
-                        savi_val = float(stats.get('savi') or 0)
-                        ndwi_val = float(stats.get('ndwi') or 0)
-                        ndvi_val = float(stats.get('ndvi') or 0)
-                        ndsi_val = float(stats.get('ndsi') or 0)
-                        swir_val = float(stats.get('swir') or 0)
-                        # Solo agregar si hay al menos un valor real (no imagen vacía)
+                        ).rename('savi')
+                        ndwi_img = s2.normalizedDifference(['B8', 'B11']).rename('ndwi')
+                        ndvi_img = s2.normalizedDifference(['B8', 'B4']).rename('ndvi')
+                        ndsi_img = s2.normalizedDifference(['B3', 'B11']).rename('ndsi')
+                        swir_img = s2.select('B11').divide(10000).rename('swir')
+
+                        stats = s2.addBands([savi_img, ndwi_img, ndvi_img, ndsi_img, swir_img])\
+                            .reduceRegion(
+                                reducer=ee.Reducer.mean(),
+                                geometry=geom,
+                                scale=30,
+                                maxPixels=1e9,
+                                bestEffort=True
+                            ).getInfo()
+
+                        savi_val  = float(stats.get('savi') or 0)
+                        ndwi_val  = float(stats.get('ndwi') or 0)
+                        ndvi_val  = float(stats.get('ndvi') or 0)
+                        ndsi_val  = float(stats.get('ndsi') or 0)
+                        swir_val  = float(stats.get('swir') or 0)
+
                         if any([savi_val, ndwi_val, ndvi_val, ndsi_val, swir_val]):
                             indices_historicos['savi'].append(savi_val)
                             indices_historicos['ndwi'].append(ndwi_val)
                             indices_historicos['ndvi'].append(ndvi_val)
                             indices_historicos['ndsi'].append(ndsi_val)
                             indices_historicos['swir'].append(swir_val)
-                
-                # MODIS Temperatura
-                temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
-                    .filterBounds(geom)\
-                    .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
-                    .select('LST_Day_1km')\
-                    .median()
-                
-                if temp_img is not None:
+                            indices_historicos['anios_optico'].append(anio)
+                            optico_ok = True
+                    except Exception:
+                        pass
+
+                # ── LANDSAT 8 / 9 OLI (2013-2017) ────────────────────────────
+                elif 2013 <= anio <= 2017:
+                    try:
+                        # Landsat 8 Collection 2 SR
+                        ls = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')\
+                            .filterBounds(geom)\
+                            .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
+                            .filter(ee.Filter.lt('CLOUD_COVER', 30))\
+                            .median()
+
+                        # Bandas Landsat 8: B5=NIR, B4=Red, B3=Green, B6=SWIR1
+                        # Escala SR: multiply 0.0000275 - 0.2
+                        ls_scaled = ls.select(['SR_B3','SR_B4','SR_B5','SR_B6'])\
+                            .multiply(0.0000275).add(-0.2)
+
+                        savi_img = ls_scaled.expression(
+                            '((NIR - RED) / (NIR + RED + 0.5)) * 1.5',
+                            {'NIR': ls_scaled.select('SR_B5'), 'RED': ls_scaled.select('SR_B4')}
+                        ).rename('savi')
+                        ndwi_img = ls_scaled.normalizedDifference(['SR_B5', 'SR_B6']).rename('ndwi')
+                        ndvi_img = ls_scaled.normalizedDifference(['SR_B5', 'SR_B4']).rename('ndvi')
+                        ndsi_img = ls_scaled.normalizedDifference(['SR_B3', 'SR_B6']).rename('ndsi')
+                        swir_img = ls_scaled.select('SR_B6').rename('swir')
+
+                        stats = ls_scaled.addBands([savi_img, ndwi_img, ndvi_img, ndsi_img, swir_img])\
+                            .reduceRegion(
+                                reducer=ee.Reducer.mean(),
+                                geometry=geom,
+                                scale=30,
+                                maxPixels=1e9,
+                                bestEffort=True
+                            ).getInfo()
+
+                        savi_val  = float(stats.get('savi') or 0)
+                        ndwi_val  = float(stats.get('ndwi') or 0)
+                        ndvi_val  = float(stats.get('ndvi') or 0)
+                        ndsi_val  = float(stats.get('ndsi') or 0)
+                        swir_val  = float(stats.get('swir') or 0)
+
+                        if any([savi_val, ndwi_val, ndvi_val, ndsi_val, swir_val]):
+                            indices_historicos['savi'].append(savi_val)
+                            indices_historicos['ndwi'].append(ndwi_val)
+                            indices_historicos['ndvi'].append(ndvi_val)
+                            indices_historicos['ndsi'].append(ndsi_val)
+                            indices_historicos['swir'].append(swir_val)
+                            indices_historicos['anios_optico'].append(anio)
+                            optico_ok = True
+                    except Exception:
+                        pass
+
+                # ── LANDSAT 5 / 7 TM/ETM+ (2006-2012) ───────────────────────
+                else:  # anio <= 2012
+                    try:
+                        # Intentar Landsat 7 primero, luego Landsat 5
+                        ls7 = ee.ImageCollection('LANDSAT/LE07/C02/T1_L2')\
+                            .filterBounds(geom)\
+                            .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
+                            .filter(ee.Filter.lt('CLOUD_COVER', 30))\
+                            .median()
+
+                        # Bandas Landsat 7: B4=NIR, B3=Red, B2=Green, B5=SWIR1
+                        ls_scaled = ls7.select(['SR_B2','SR_B3','SR_B4','SR_B5'])\
+                            .multiply(0.0000275).add(-0.2)
+
+                        savi_img = ls_scaled.expression(
+                            '((NIR - RED) / (NIR + RED + 0.5)) * 1.5',
+                            {'NIR': ls_scaled.select('SR_B4'), 'RED': ls_scaled.select('SR_B3')}
+                        ).rename('savi')
+                        ndwi_img = ls_scaled.normalizedDifference(['SR_B4', 'SR_B5']).rename('ndwi')
+                        ndvi_img = ls_scaled.normalizedDifference(['SR_B4', 'SR_B3']).rename('ndvi')
+                        ndsi_img = ls_scaled.normalizedDifference(['SR_B2', 'SR_B5']).rename('ndsi')
+                        swir_img = ls_scaled.select('SR_B5').rename('swir')
+
+                        stats = ls_scaled.addBands([savi_img, ndwi_img, ndvi_img, ndsi_img, swir_img])\
+                            .reduceRegion(
+                                reducer=ee.Reducer.mean(),
+                                geometry=geom,
+                                scale=30,
+                                maxPixels=1e9,
+                                bestEffort=True
+                            ).getInfo()
+
+                        savi_val  = float(stats.get('savi') or 0)
+                        ndwi_val  = float(stats.get('ndwi') or 0)
+                        ndvi_val  = float(stats.get('ndvi') or 0)
+                        ndsi_val  = float(stats.get('ndsi') or 0)
+                        swir_val  = float(stats.get('swir') or 0)
+
+                        if any([savi_val, ndwi_val, ndvi_val, ndsi_val, swir_val]):
+                            indices_historicos['savi'].append(savi_val)
+                            indices_historicos['ndwi'].append(ndwi_val)
+                            indices_historicos['ndvi'].append(ndvi_val)
+                            indices_historicos['ndsi'].append(ndsi_val)
+                            indices_historicos['swir'].append(swir_val)
+                            indices_historicos['anios_optico'].append(anio)
+                            optico_ok = True
+                    except Exception:
+                        pass
+
+                # ── SENTINEL-1 SAR (disponible desde 2014) ────────────────────
+                # Se usa como dato adicional histórico de radar
+                if anio >= 2014:
+                    try:
+                        s1 = ee.ImageCollection('COPERNICUS/S1_GRD')\
+                            .filterBounds(geom)\
+                            .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
+                            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))\
+                            .select('VV')\
+                            .median()
+
+                        sar_stats = s1.reduceRegion(
+                            reducer=ee.Reducer.mean(),
+                            geometry=geom,
+                            scale=10,
+                            maxPixels=1e9,
+                            bestEffort=True
+                        ).getInfo()
+
+                        sar_val = float(sar_stats.get('VV') or 0)
+                        if sar_val != 0:
+                            indices_historicos['sar_vv_hist'].append(sar_val)
+                            indices_historicos['anios_sar'].append(anio)
+                    except Exception:
+                        pass
+
+                # ── MODIS Temperatura LST (todos los años desde 2000) ─────────
+                try:
+                    temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
+                        .filterBounds(geom)\
+                        .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
+                        .select('LST_Day_1km')\
+                        .median()
+
                     temp_stats = temp_img.multiply(0.02).subtract(273.15).reduceRegion(
-                        ee.Reducer.mean(),
-                        geom,
-                        1000
+                        reducer=ee.Reducer.mean(),
+                        geometry=geom,
+                        scale=1000,
+                        maxPixels=1e9,
+                        bestEffort=True
                     ).getInfo()
-                    indices_historicos['temp'].append(float(temp_stats.get('LST_Day_1km', 0)))
-                
-                # TerraCLIM
-                terraclim = ee.ImageCollection('IDAHO_EPSCOR/TERRACLIM')\
-                    .filterBounds(geom)\
-                    .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
-                    .select(['pr', 'tmmn', 'tmmx'])\
-                    .mean()
-                
-                if terraclim is not None:
-                    terraclim_stats = terraclim.reduceRegion(
+
+                    temp_val = float(temp_stats.get('LST_Day_1km') or 0)
+                    if temp_val != 0:
+                        indices_historicos['temp'].append(temp_val)
+                        indices_historicos['anios_temp'].append(anio)
+                except Exception:
+                    pass
+
+                # ── TerraClimate (todos los años desde 1958) ──────────────────
+                try:
+                    terraclim = ee.ImageCollection('IDAHO_EPSCOR/TERRACLIM')\
+                        .filterBounds(geom)\
+                        .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
+                        .select(['pr', 'tmmn', 'tmmx'])\
+                        .mean()
+
+                    tc_stats = terraclim.reduceRegion(
                         reducer=ee.Reducer.mean(),
                         geometry=geom,
                         scale=4638,
                         maxPixels=1e9,
                         bestEffort=True
                     ).getInfo()
-                    
-                    prec = float(terraclim_stats.get('pr', 0) or 0)
-                    indices_historicos['precipitacion'].append(prec * 12)
-                    
-                    # tmmn/tmmx en TerraClimate vienen en décimas de °C (factor 0.1)
-                    tmin_raw = float(terraclim_stats.get('tmmn', 0) or 0)
-                    indices_historicos['temperatura_min'].append(tmin_raw * 0.1)
-                    
-                    tmax_raw = float(terraclim_stats.get('tmmx', 0) or 0)
-                    indices_historicos['temperatura_max'].append(tmax_raw * 0.1)
-                
-            except Exception as e:
+
+                    prec    = float(tc_stats.get('pr',   0) or 0)
+                    tmin_r  = float(tc_stats.get('tmmn', 0) or 0)
+                    tmax_r  = float(tc_stats.get('tmmx', 0) or 0)
+
+                    if any([prec, tmin_r, tmax_r]):
+                        indices_historicos['precipitacion'].append(prec * 12)
+                        indices_historicos['temperatura_min'].append(tmin_r * 0.1)
+                        indices_historicos['temperatura_max'].append(tmax_r * 0.1)
+                        indices_historicos['anios_clima'].append(anio)
+                except Exception:
+                    pass
+
+            except Exception:
                 continue
-        
+
         return indices_historicos
-    
+
     except Exception as e:
         st.warning(f"Error obteniendo histórico: {str(e)}")
         return indices_historicos
@@ -1881,17 +2075,26 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         "Util como dato independiente en condiciones de nubosidad total."
     ))
 
-    # SECCIÓN 8: GRÁFICOS (antes era 7)
+    # SECCIÓN 8: GRÁFICOS HISTÓRICOS MULTI-SATÉLITE
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, "8. ANÁLISIS ESPECTRAL - 20 AÑOS", ln=1)
-        pdf.ln(5)
+        pdf.cell(0, 10, "8. ANALISIS ESPECTRAL HISTORICO - 20 ANOS", ln=1)
+
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(80, 80, 80)
+        pdf.multi_cell(0, 4, clean(
+            "Fuentes de datos opticos: Sentinel-2 SR (2018-presente, 10 m) | "
+            "Landsat 8/9 OLI C2 (2013-2017, 30 m) | Landsat 7 ETM+ C2 (2006-2012, 30 m). "
+            "Radar: Sentinel-1 SAR VV (2014-presente). "
+            "Clima: MODIS MOD11A1 LST (temperatura) | TerraClimate (precipitacion y temperatura min/max)."
+        ))
+        pdf.ln(3)
         
         try:
-            pdf.image(img_path, x=10, y=40, w=190)
+            pdf.image(img_path, x=10, y=pdf.get_y(), w=190)
         except:
             pass
     

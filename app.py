@@ -1349,7 +1349,129 @@ def generar_signos_degradacion(reporte_data):
     
     return signos
 
+# ============================================================================
+# DICCIONARIO DE RECOMENDACIONES POR TIPO Y NIVEL
+# ============================================================================
 
+recomendaciones_por_tipo = {
+    "NORMAL": {
+        "MINERIA": (
+            "Mantener monitoreo satelital mensual de NDWI y NDSI.\n"
+            "Verificar integridad de sistemas de drenaje perimetrales.\n"
+            "Continuar con programa de revegetacion en zonas de borde.\n"
+            "Actualizar Plan de Cierre conforme a normativa vigente."
+        ),
+        "GLACIAR": (
+            "Continuar monitoreo estacional de cobertura (NDSI).\n"
+            "Mantener registros de temperatura y balance de masa.\n"
+            "Coordinar con DGA ante cualquier variacion mayor al 10% en NDSI.\n"
+            "Evitar actividades que generen material particulado en la zona."
+        ),
+        "BOSQUE": (
+            "Mantener vigilancia de incendios durante temporada estival.\n"
+            "Realizar inventario forestal semestral conforme a Ley 20.283.\n"
+            "Controlar presencia de especies invasoras en el perimetro.\n"
+            "Registrar cualquier intervencion antropica en el area."
+        ),
+        "HUMEDAL": (
+            "Monitorear nivel de agua mensualmente.\n"
+            "Registrar avistamientos de fauna para verificar biodiversidad.\n"
+            "Asegurar cumplimiento del Decreto de Humedales Urbanos.\n"
+            "Evitar cualquier obra que altere el flujo hidrico natural."
+        ),
+        "AGRICOLA": (
+            "Continuar plan de riego segun demanda evapotranspirativa.\n"
+            "Monitorear estado fitosanitario de los cultivos semanalmente.\n"
+            "Optimizar uso de fertilizantes basado en analisis de suelo.\n"
+            "Planificar rotacion de cultivos para proxima temporada."
+        ),
+        "GENERAL": (
+            "Mantener monitoreo periodico de los indices espectrales.\n"
+            "Documentar cualquier cambio observado en el area.\n"
+            "Continuar con las buenas practicas ambientales actuales."
+        ),
+    },
+    "MODERADO": {
+        "MINERIA": (
+            "Intensificar monitoreo a frecuencia quincenal.\n"
+            "Revisar sistemas de contencion y drenaje de relaves.\n"
+            "Notificar a SMA si la variacion persiste mas de 30 dias.\n"
+            "Implementar plan de contingencia hidrica preventivo."
+        ),
+        "GLACIAR": (
+            "Solicitar estudio glaciologico complementario urgente.\n"
+            "Notificar a DGA sobre retraccion detectada.\n"
+            "Suspender actividades que puedan generar calor o polvo en la zona.\n"
+            "Aumentar frecuencia de monitoreo a cada 15 dias."
+        ),
+        "BOSQUE": (
+            "Realizar inspeccion en terreno para identificar causa del estres.\n"
+            "Evaluar presencia de plagas o enfermedades forestales con CONAF.\n"
+            "Implementar medidas de control de erosion en zonas degradadas.\n"
+            "Preparar plan de reforestacion de contingencia."
+        ),
+        "HUMEDAL": (
+            "Verificar fuentes de captacion y aporte hidrico al humedal.\n"
+            "Evaluar si existe intervencion antropical aguas arriba.\n"
+            "Contactar a DGA para monitoreo conjunto del caudal.\n"
+            "Documentar cambios con fotografias georreferenciadas."
+        ),
+        "AGRICOLA": (
+            "Aumentar frecuencia de riego de inmediato.\n"
+            "Aplicar analisis foliar para detectar deficiencias nutricionales.\n"
+            "Evaluar uso de mulch o cubiertas para reducir evapotranspiracion.\n"
+            "Revisar sistemas de riego por posibles obstrucciones o fugas."
+        ),
+        "GENERAL": (
+            "Aumentar frecuencia de monitoreo satelital.\n"
+            "Realizar inspeccion en terreno en los proximos 15 dias.\n"
+            "Documentar la situacion y preparar plan de contingencia."
+        ),
+    },
+    "CRITICO": {
+        "MINERIA": (
+            "ACCION INMEDIATA: Notificar a SMA y DGA en un plazo de 24 horas.\n"
+            "Paralizar operaciones en la zona afectada hasta nueva evaluacion.\n"
+            "Contratar empresa especializada para restauracion de suelos.\n"
+            "Implementar plan de contingencia hidrica de emergencia.\n"
+            "Elaborar informe tecnico para autoridades regulatorias."
+        ),
+        "GLACIAR": (
+            "EMERGENCIA: Notificar a DGA y Ministerio del Medio Ambiente de inmediato.\n"
+            "Contratar glaciologo certificado para evaluacion en terreno urgente.\n"
+            "Suspender toda actividad en el area de influencia del glaciar.\n"
+            "Registrar el evento como hallazgo critico ante SMA.\n"
+            "Iniciar protocolo de seguimiento diario hasta estabilizacion."
+        ),
+        "BOSQUE": (
+            "EMERGENCIA: Notificar a CONAF de inmediato ante posible tala ilegal o incendio.\n"
+            "Implementar plan de reforestacion de emergencia conforme a Ley 20.283.\n"
+            "Solicitar declaracion de zona de proteccion a autoridades.\n"
+            "Controlar acceso al area hasta determinar la causa.\n"
+            "Elaborar informe tecnico de dano para presentar a SMA."
+        ),
+        "HUMEDAL": (
+            "EMERGENCIA: Notificar a DGA y SMA de desecacion critica.\n"
+            "Iniciar restauracion hidrologica de emergencia.\n"
+            "Documentar el estado actual como linea base de dano.\n"
+            "Evaluar si se aplica Decreto de Humedales Urbanos o Ramsar.\n"
+            "Contratar especialista en restauracion de ecosistemas acuaticos."
+        ),
+        "AGRICOLA": (
+            "ACCION URGENTE: Implementar riego de emergencia de inmediato.\n"
+            "Evaluar perdida de cosecha y notificar a aseguradora si corresponde.\n"
+            "Aplicar tratamiento fitosanitario de emergencia ante plagas.\n"
+            "Revisar infraestructura de riego en su totalidad.\n"
+            "Consultar con agronomo para plan de recuperacion del cultivo."
+        ),
+        "GENERAL": (
+            "ACCION URGENTE requerida en las proximas 48 horas.\n"
+            "Notificar a las autoridades ambientales competentes.\n"
+            "Realizar inspeccion en terreno de manera inmediata.\n"
+            "Elaborar informe tecnico de la situacion detectada."
+        ),
+    },
+        }
 # ============================================================================
 # MÓDULO 6: GENERADOR DE PDF
 # ============================================================================

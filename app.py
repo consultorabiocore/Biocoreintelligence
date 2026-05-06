@@ -413,7 +413,7 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
                 (0, 0, 'ndsi', 'NDSI - Cobertura de Nieve/Hielo', '#3498db', '▼ Bajo = Retracción'),
                 (0, 1, 'temp', 'Temperatura - LST (°C)', '#e74c3c', '▲ Elevada = Fusión'),
                 (1, 0, 'ndwi', 'NDWI - Recursos Hídricos', '#2980b9', '▲ Agua de deshielo'),
-                (1, 1, 'precipitacion', 'Precipitación Anual (TerraCLIM)', '#0099cc', 'Cambio climático'),
+                (1, 1, 'precipitacion', 'Precipitación Anual (ERA5-Land)', '#0099cc', 'Cambio climático'),
             ]
         elif tipo_proyecto == 'MINERIA':
             config = [
@@ -427,21 +427,21 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
                 (0, 0, 'savi', 'SAVI - Densidad de Cobertura', '#27ae60', 'Cumplimiento normativo'),
                 (0, 1, 'ndwi', 'NDWI - Estrés Hídrico', '#3498db', 'Riesgo de incendio'),
                 (1, 0, 'ndvi', 'NDVI - Vigor General', '#2ecc71', 'Sanidad forestal'),
-                (1, 1, 'precipitacion', 'Precipitación Anual (TerraCLIM)', '#0099cc', 'Cambio climático'),
+                (1, 1, 'precipitacion', 'Precipitación Anual (ERA5-Land)', '#0099cc', 'Cambio climático'),
             ]
         elif tipo_proyecto == 'HUMEDAL':
             config = [
                 (0, 0, 'ndwi', 'NDWI - Ciclo Hidrológico', '#3498db', 'Estado de saturación'),
                 (0, 1, 'savi', 'SAVI - Flora Hidrófila', '#27ae60', 'Biodiversidad'),
                 (1, 0, 'ndvi', 'NDVI - Productividad', '#2ecc71', 'Salud del ecosistema'),
-                (1, 1, 'temperatura_min', 'Temperatura Mínima (TerraCLIM)', '#e74c3c', 'Variabilidad'),
+                (1, 1, 'temperatura_min', 'Temperatura Media (ERA5-Land)', '#e74c3c', 'Variabilidad'),
             ]
         elif tipo_proyecto == 'AGRICOLA':
             config = [
                 (0, 0, 'savi', 'SAVI - Vigor de Cultivo', '#27ae60', 'Rendimiento esperado'),
                 (0, 1, 'ndwi', 'NDWI - Disponibilidad Hídrica', '#3498db', 'Necesidad de riego'),
                 (1, 0, 'ndvi', 'NDVI - Estado Fenológico', '#2ecc71', 'Fase de desarrollo'),
-                (1, 1, 'precipitacion', 'Precipitación Histórica (TerraCLIM)', '#0099cc', 'Tendencia climática'),
+                (1, 1, 'precipitacion', 'Precipitación Histórica (ERA5-Land)', '#0099cc', 'Tendencia climática'),
             ]
         else:
             config = [
@@ -495,9 +495,9 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
 # MÓDULO 2B: OBTENER HISTÓRICO DE 20 AÑOS
 # ============================================================================
 
-def obtener_historico_20_anios(geom, tipo_proyecto):
+def obtener_historico_20_anios(geom, tipo_proyecto, rango_anios=20):
     """
-    Histórico de 20 años con múltiples satélites:
+    Histórico de N años con múltiples satélites:
     - Sentinel-2 SR: 2018-presente (óptico 10 m)
     - Landsat 8/9 OLI C2: 2013-2017 (óptico 30 m)
     - Landsat 7 ETM+ C2: 2006-2012 (óptico 30 m)
@@ -514,7 +514,7 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
     }
     try:
         anio_actual = datetime.now().year
-        anios = list(range(anio_actual - 20, anio_actual + 1))
+        anios = list(range(anio_actual - rango_anios, anio_actual + 1))
         for anio in anios:
             try:
                 # ── SENTINEL-2 (2018+) ──────────────────────────────────────
@@ -1275,8 +1275,10 @@ def generar_reporte_total(p, rango_dias=30):
     variacion_ndsi = calcular_variacion(ndsi_now, ndsi_base)
     variacion_ndvi = calcular_variacion(ndvi_now, ndvi_base)
 
-    # === OBTENER HISTÓRICO DE 20 AÑOS ===
-    indices_historicos = obtener_historico_20_anios(geom, p.get('Tipo', 'GENERAL'))
+    # === OBTENER HISTÓRICO SEGÚN RANGO SELECCIONADO ===
+    # Calcular cuántos años cubrir según rango_dias
+    rango_anios = max(1, min(20, round(rango_dias / 365))) if rango_dias >= 365 else 1
+    indices_historicos = obtener_historico_20_anios(geom, p.get('Tipo', 'GENERAL'), rango_anios=rango_anios)
     
     if not any(indices_historicos.values()):
         indices_historicos = {
@@ -1349,6 +1351,7 @@ def generar_reporte_total(p, rango_dias=30):
         'color_estado': color_estado,
         'diagnostico_completo': diagnostico_detallado,
         'indices_historicos': indices_historicos,
+        'rango_anios': rango_anios,
         'info_conaf': info_conaf,
         'indices': {
             'savi': savi_now,
@@ -1942,13 +1945,15 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         "Util como dato independiente en condiciones de nubosidad total."
     ))
 
-    # SECCIÓN 8: GRÁFICOS (antes era 7)
+    # SECCIÓN 8: GRÁFICOS
+    rango_anios_pdf = reporte_data.get('rango_anios', 20)
+    titulo_historico = f"8. ANÁLISIS ESPECTRAL - {rango_anios_pdf} AÑO{'S' if rango_anios_pdf != 1 else ''}"
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, "8. ANÁLISIS ESPECTRAL - 20 AÑOS", ln=1)
+        pdf.cell(0, 10, titulo_historico, ln=1)
         pdf.ln(5)
         
         try:
@@ -1956,18 +1961,19 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         except:
             pass
     
-    # SECCIÓN 8: CAMBIO CLIMÁTICO
+    # SECCIÓN 9: CAMBIO CLIMÁTICO (ERA5-Land)
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "9. ANÁLISIS DE CAMBIO CLIMÁTICO (TERRACLIM)", ln=1)
+    pdf.cell(0, 10, f"9. ANÁLISIS CLIMÁTICO ERA5-Land ({rango_anios_pdf} AÑOS)", ln=1)
     pdf.ln(3)
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     
     indices_hist = reporte_data.get('indices_historicos', {})
+    rango_anios_clima = reporte_data.get('rango_anios', 20)
     hay_datos_climaticos = False
     
     if len(indices_hist.get('temperatura_min', [])) > 1:
@@ -1978,13 +1984,13 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         
         pdf.set_font("helvetica", "B", 10)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 7, "Temperatura Minima (TerraCLIM):", ln=1)
+        pdf.cell(0, 7, "Temperatura Media (ERA5-Land ECMWF):", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
         pdf.multi_cell(0, 5,
-            f"Valor inicial (hace 20 anos): {temp_min_inicio:.2f}°C\n"
-            f"Valor reciente: {temp_min_final:.2f}°C\n"
-            f"Cambio neto: {cambio_temp:+.2f}°C\n"
+            f"Valor inicial (hace {rango_anios_clima} anos): {temp_min_inicio:.2f}C\n"
+            f"Valor reciente: {temp_min_final:.2f}C\n"
+            f"Cambio neto: {cambio_temp:+.2f}C\n"
             f"Tendencia: {'Calentamiento detectado en el periodo analizado.' if cambio_temp > 0 else 'Enfriamiento detectado en el periodo analizado.'}")
         pdf.ln(5)
     
@@ -1996,14 +2002,14 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         
         pdf.set_font("helvetica", "B", 10)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 7, "Temperatura Maxima (TerraCLIM):", ln=1)
+        pdf.cell(0, 7, "Temperatura de Referencia - 2m (ERA5-Land):", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
         pdf.multi_cell(0, 5,
-            f"Valor inicial (hace 20 anos): {tmax_inicio:.2f}°C\n"
-            f"Valor reciente: {tmax_final:.2f}°C\n"
-            f"Cambio neto: {cambio_tmax:+.2f}°C\n"
-            f"Tendencia: {'Incremento de temperaturas maximas.' if cambio_tmax > 0 else 'Reduccion de temperaturas maximas.'}")
+            f"Valor inicial (hace {rango_anios_clima} anos): {tmax_inicio:.2f}C\n"
+            f"Valor reciente: {tmax_final:.2f}C\n"
+            f"Cambio neto: {cambio_tmax:+.2f}C\n"
+            f"Tendencia: {'Incremento de temperaturas detectado.' if cambio_tmax > 0 else 'Reduccion de temperaturas detectada.'}")
         pdf.ln(5)
     
     if len(indices_hist.get('precipitacion', [])) > 1:
@@ -2014,11 +2020,11 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         
         pdf.set_font("helvetica", "B", 10)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 7, "Precipitacion Anual (TerraCLIM):", ln=1)
+        pdf.cell(0, 7, "Precipitacion Anual (ERA5-Land ECMWF):", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
         pdf.multi_cell(0, 5,
-            f"Precipitacion inicial (hace 20 anos): {prec_inicio:.1f} mm/ano\n"
+            f"Precipitacion inicial (hace {rango_anios_clima} anos): {prec_inicio:.1f} mm/ano\n"
             f"Precipitacion reciente: {prec_final:.1f} mm/ano\n"
             f"Cambio relativo: {cambio_prec:+.1f}%\n"
             f"Tendencia: {'Aumento de precipitaciones en el periodo.' if cambio_prec > 0 else 'Disminucion de precipitaciones en el periodo.'}")
@@ -2027,24 +2033,24 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     if not hay_datos_climaticos:
         pdf.set_font("helvetica", "B", 10)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 7, "Estado de datos TerraCLIM:", ln=1)
+        pdf.cell(0, 7, "Estado de datos ERA5-Land:", ln=1)
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(60, 60, 60)
         pdf.multi_cell(0, 5,
-            "No se pudieron recuperar datos historicos de TerraCLIM para este ciclo de analisis.\n"
+            "No se pudieron recuperar datos historicos de ERA5-Land para este ciclo de analisis.\n"
             "Esto puede deberse a:\n"
-            "  - Alta cobertura de nubes en el periodo de consulta\n"
-            "  - Latencia en la disponibilidad de datos de Google Earth Engine\n"
-            "  - Zona fuera del rango de cobertura del producto IDAHO_EPSCOR/TERRACLIM\n\n"
-            "Recomendacion: Ejecutar nuevamente el reporte en los proximos dias para obtener\n"
-            "el analisis climatico completo de 20 anos.")
+            "  - Rango de tiempo seleccionado menor a 1 ano (ERA5 opera por ano completo)\n"
+            "  - Latencia temporal en Google Earth Engine\n"
+            "  - Zona con datos insuficientes en el producto ECMWF/ERA5_LAND/MONTHLY_AGGR\n\n"
+            "Recomendacion: Para obtener analisis climatico, seleccionar un rango\n"
+            "de al menos 1 ano en la generacion del reporte.")
         pdf.ln(3)
         pdf.set_font("helvetica", "I", 8)
         pdf.set_text_color(100, 100, 100)
         pdf.multi_cell(0, 4,
-            "Nota tecnica: TerraCLIM es un conjunto de datos climaticos globales de alta resolucion (~4 km)\n"
-            "derivado de WorldClim y CRU. Cubre variables como temperatura minima/maxima, precipitacion,\n"
-            "humedad del suelo y evapotranspiración desde 1958 hasta la actualidad.")
+            "Nota tecnica: ERA5-Land es el reanálisis climatico de ECMWF con resolución ~9 km.\n"
+            "Cubre temperatura 2m y precipitacion acumulada mensual desde 1950 hasta la actualidad.\n"
+            "Fuente: ECMWF/ERA5_LAND/MONTHLY_AGGR disponible en Google Earth Engine.")
     
     pdf.ln(5)
     
@@ -2373,7 +2379,7 @@ Esto garantiza que las alertas generadas sean técnicamente sólidas y defendibl
 | **Sentinel-1 SAR** (ESA) | Radar de apertura sintética, atraviesa nubes | 10 m |
 | **MODIS** (NASA) | Temperatura de superficie (LST) | 1 km |
 | **NASA FIRMS** | Detección de focos de incendio activos | 375 m |
-| **TerraCLIM** | Precipitación y temperatura histórica (20 años) | ~4 km |
+| **ERA5-Land** (ECMWF) | Precipitación y temperatura histórica (N años) | ~9 km |
 | **Hansen GFC** | Pérdida forestal acumulada desde el año 2000 | 30 m |
 | **Copernicus LC** | Clasificación de cobertura y uso de suelo | 100 m |
         """)
@@ -2509,7 +2515,7 @@ El reporte PDF generado contiene:
 - **Sección 6:** Diagnóstico técnico detallado
 - **Sección 7:** Monitoreo radar Sentinel-1 SAR
 - **Sección 8:** Gráficos históricos de 20 años
-- **Sección 9:** Análisis de cambio climático (TerraCLIM)
+- **Sección 9:** Análisis climático ERA5-Land (temperatura y precipitación del período)
 - **Sección 10:** Recomendaciones según nivel de riesgo y tipo de proyecto
 
 > El PDF es un documento técnico válido para presentación ante **SMA, DGA y CONAF**.

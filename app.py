@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.ticker as ticker
 from fpdf import FPDF
 import os
 import tempfile
@@ -386,12 +387,14 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.patch.set_facecolor('white')
 
-        # La cantidad más grande de datos en todos los índices
+        # Usar años reales en eje X
+        anio_actual = datetime.now().year
         max_len = 0
         for k, v in indices_historicos.items():
             if isinstance(v, list):
                 max_len = max(max_len, len(v))
-        fechas = list(range(max_len))
+        anio_inicio = anio_actual - max_len + 1
+        fechas = list(range(anio_inicio, anio_actual + 1))
 
         if tipo_proyecto == 'GLACIAR':
             config = [
@@ -452,7 +455,8 @@ def generar_graficos_profesionales(indices_historicos, tipo_proyecto):
                     ax.fill_between(x, y, alpha=0.3, color=color)
                     ax.set_title(titulo, fontweight='bold', fontsize=12)
                     ax.set_ylabel('Valor', fontsize=10)
-                    ax.set_xlabel('Tiempo (años)', fontsize=9)
+                    ax.set_xlabel('Año', fontsize=9)
+                    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
                     ax.grid(True, alpha=0.3, linestyle='--')
                     if subtitulo:
                         ax.text(0.02, 0.98, subtitulo, transform=ax.transAxes, 
@@ -525,11 +529,18 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
                             maxPixels=1e9
                         ).getInfo()
                         
-                        indices_historicos['savi'].append(float(stats.get('savi', 0)))
-                        indices_historicos['ndwi'].append(float(stats.get('ndwi', 0)))
-                        indices_historicos['ndvi'].append(float(stats.get('ndvi', 0)))
-                        indices_historicos['ndsi'].append(float(stats.get('ndsi', 0)))
-                        indices_historicos['swir'].append(float(stats.get('swir', 0)))
+                        savi_val = float(stats.get('savi') or 0)
+                        ndwi_val = float(stats.get('ndwi') or 0)
+                        ndvi_val = float(stats.get('ndvi') or 0)
+                        ndsi_val = float(stats.get('ndsi') or 0)
+                        swir_val = float(stats.get('swir') or 0)
+                        # Solo agregar si hay al menos un valor real (no imagen vacía)
+                        if any([savi_val, ndwi_val, ndvi_val, ndsi_val, swir_val]):
+                            indices_historicos['savi'].append(savi_val)
+                            indices_historicos['ndwi'].append(ndwi_val)
+                            indices_historicos['ndvi'].append(ndvi_val)
+                            indices_historicos['ndsi'].append(ndsi_val)
+                            indices_historicos['swir'].append(swir_val)
                 
                 # MODIS Temperatura
                 temp_img = ee.ImageCollection("MODIS/061/MOD11A1")\
@@ -555,19 +566,22 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
                 
                 if terraclim is not None:
                     terraclim_stats = terraclim.reduceRegion(
-                        ee.Reducer.mean(),
-                        geom,
-                        4638
+                        reducer=ee.Reducer.mean(),
+                        geometry=geom,
+                        scale=4638,
+                        maxPixels=1e9,
+                        bestEffort=True
                     ).getInfo()
                     
-                    prec = float(terraclim_stats.get('pr', 0))
+                    prec = float(terraclim_stats.get('pr', 0) or 0)
                     indices_historicos['precipitacion'].append(prec * 12)
                     
-                    tmin_k = float(terraclim_stats.get('tmmn', 273.15))
-                    indices_historicos['temperatura_min'].append(tmin_k - 273.15)
+                    # tmmn/tmmx en TerraClimate vienen en décimas de °C (factor 0.1)
+                    tmin_raw = float(terraclim_stats.get('tmmn', 0) or 0)
+                    indices_historicos['temperatura_min'].append(tmin_raw * 0.1)
                     
-                    tmax_k = float(terraclim_stats.get('tmmx', 273.15))
-                    indices_historicos['temperatura_max'].append(tmax_k - 273.15)
+                    tmax_raw = float(terraclim_stats.get('tmmx', 0) or 0)
+                    indices_historicos['temperatura_max'].append(tmax_raw * 0.1)
                 
             except Exception as e:
                 continue

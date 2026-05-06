@@ -1270,208 +1270,86 @@ def generar_signos_degradacion(reporte_data):
     # 1. PÉRDIDA DE VEGETACIÓN
     if savi < 0.15:
         signos.append({
-            'icono': '🔴',
+            'icono': '[CRITICO]',
             'texto': f'PÉRDIDA DE VEGETACIÓN: SAVI bajo ({savi:.3f}). Indica exposición de suelo o degradación severa.'
         })
     elif savi < 0.25 and variacion_savi < -10:
         signos.append({
-            'icono': '🟡',
+            'icono': '[ALERTA]',
             'texto': f'ESTRÉS VEGETAL MODERADO: SAVI de {savi:.3f} con caída de {variacion_savi:.1f}%. Posible plagas, sequía o uso forestal.'
         })
     
     # 2. DESECACIÓN
     if ndwi < 0.15:
         signos.append({
-            'icono': '🔴',
+            'icono': '[CRITICO]',
             'texto': f'ESTRÉS HÍDRICO SEVERO: NDWI bajo ({ndwi:.4f}). Indica desecación, erosión o sequía extrema.'
         })
     elif ndwi < 0.25 and variacion_ndwi < -15:
         signos.append({
-            'icono': '🟡',
+            'icono': '[ALERTA]',
             'texto': f'PÉRDIDA HÍDRICA ACELERADA: NDWI de {ndwi:.4f} con caída de {variacion_ndwi:.1f}%. Requiere atención urgente.'
         })
     
     # 3. RETRACCIÓN GLACIAL
     if tipo == 'GLACIAR' and ndsi < 0.20:
         signos.append({
-            'icono': '🔴',
+            'icono': '[CRITICO]',
             'texto': f'RETRACCIÓN GLACIAL CRÍTICA: NDSI de {ndsi:.3f}. Exposición de roca desnuda o suelo mineral.'
         })
     elif tipo == 'GLACIAR' and variacion_ndsi < -15:
         signos.append({
-            'icono': '🟡',
+            'icono': '[ALERTA]',
             'texto': f'RETRACCIÓN ACELERADA: NDSI con caída de {variacion_ndsi:.1f}%. Cambios climáticos detectados.'
         })
     
     # 4. TEMPERATURA
     if temp > 25:
         signos.append({
-            'icono': '🔥',
+            'icono': '[CRITICO]',
             'texto': f'TEMPERATURA ELEVADA: {temp:.1f}°C. Indica estrés térmico o actividad anómala.'
         })
     elif temp > 15 and tipo == 'GLACIAR':
         signos.append({
-            'icono': '⚠️',
+            'icono': '[AVISO]',
             'texto': f'TEMPERATURA MODERADA: {temp:.1f}°C. En criósfera, acelera fusión.'
         })
     
     # 5. EXPOSICIÓN SUELO
     if ndvi < 0.10:
         signos.append({
-            'icono': '🔴',
+            'icono': '[CRITICO]',
             'texto': f'SUELO EXPUESTO: NDVI bajo ({ndvi:.3f}). Roca desnuda, arena o depósito mineral.'
         })
     elif ndvi < 0.25:
         signos.append({
-            'icono': '⚠️',
+            'icono': '[AVISO]',
             'texto': f'BAJA COBERTURA: NDVI de {ndvi:.3f}. Vegetación escasa o en restauración.'
         })
     
     # 6. ACUMULACIÓN ANÓMALA
     if tipo == 'MINERIA' and ndwi > 0.25 and savi < 0.05:
         signos.append({
-            'icono': '🟡',
+            'icono': '[ALERTA]',
             'texto': f'ACUMULACIÓN ANÓMALA: NDWI elevado ({ndwi:.4f}) en zona árida. Inspección recomendada.'
         })
     
     # 7. ALTERACIÓN RELIEVE
     if tipo == 'MINERIA' and variacion_ndvi > 20:
         signos.append({
-            'icono': '⚠️',
+            'icono': '[AVISO]',
             'texto': f'CAMBIO ABRUPTO: NDVI con variación de {variacion_ndvi:+.1f}%. Posible movimiento de tierra.'
         })
     
     if not signos:
         signos.append({
-            'icono': '✅',
+            'icono': '[OK]',
             'texto': 'PARÁMETROS NORMALES: Índices dentro de rangos esperados. Continuar monitoreo rutinario.'
         })
     
     return signos
 
-# ============================================================================
-# DICCIONARIO DE RECOMENDACIONES POR TIPO Y NIVEL
-# ============================================================================
 
-recomendaciones_por_tipo = {
-    "NORMAL": {
-        "MINERIA": (
-            "Mantener monitoreo satelital mensual de NDWI y NDSI.\n"
-            "Verificar integridad de sistemas de drenaje perimetrales.\n"
-            "Continuar con programa de revegetación en zonas de borde.\n"
-            "Actualizar Plan de Cierre conforme a normativa vigente."
-        ),
-        "GLACIAR": (
-            "Continuar monitoreo estacional de cobertura (NDSI).\n"
-            "Mantener registros de temperatura y balance de masa.\n"
-            "Coordinar con DGA ante cualquier variación > 10% en NDSI.\n"
-            "Evitar actividades que generen material particulado en la zona."
-        ),
-        "BOSQUE": (
-            "Mantener vigilancia de incendios durante temporada estival.\n"
-            "Realizar inventario forestal semestral conforme a Ley 20.283.\n"
-            "Controlar presencia de especies invasoras en el perímetro.\n"
-            "Registrar cualquier intervención antrópica en el área."
-        ),
-        "HUMEDAL": (
-            "Monitorear nivel de agua mensualmente.\n"
-            "Registrar avistamientos de fauna para verificar biodiversidad.\n"
-            "Asegurar cumplimiento del Decreto de Humedales Urbanos.\n"
-            "Evitar cualquier obra que altere el flujo hídrico natural."
-        ),
-        "AGRICOLA": (
-            "Continuar plan de riego según demanda evapotranspirativa.\n"
-            "Monitorear estado fitosanitario de los cultivos semanalmente.\n"
-            "Optimizar uso de fertilizantes basado en análisis de suelo.\n"
-            "Planificar rotación de cultivos para próxima temporada."
-        ),
-        "GENERAL": (
-            "Mantener monitoreo periódico de los índices espectrales.\n"
-            "Documentar cualquier cambio observado en el área.\n"
-            "Continuar con las buenas prácticas ambientales actuales."
-        ),
-    },
-    "MODERADO": {
-        "MINERIA": (
-            "Intensificar monitoreo a frecuencia quincenal.\n"
-            "Revisar sistemas de contención y drenaje de relaves.\n"
-            "Notificar a SMA si la variación persiste más de 30 días.\n"
-            "Implementar plan de contingencia hídrica preventivo."
-        ),
-        "GLACIAR": (
-            "Solicitar estudio glaciológico complementario urgente.\n"
-            "Notificar a DGA sobre retracción detectada.\n"
-            "Suspender actividades que puedan generar calor o polvo en la zona.\n"
-            "Aumentar frecuencia de monitoreo a cada 15 días."
-        ),
-        "BOSQUE": (
-            "Realizar inspección en terreno para identificar causa del estrés.\n"
-            "Evaluar presencia de plagas o enfermedades forestales con CONAF.\n"
-            "Implementar medidas de control de erosión en zonas degradadas.\n"
-            "Preparar plan de reforestación de contingencia."
-        ),
-        "HUMEDAL": (
-            "Verificar fuentes de captación y aporte hídrico al humedal.\n"
-            "Evaluar si existe intervención antrópica aguas arriba.\n"
-            "Contactar a DGA para monitoreo conjunto del caudal.\n"
-            "Documentar cambios con fotografías georreferenciadas."
-        ),
-        "AGRICOLA": (
-            "Aumentar frecuencia de riego de inmediato.\n"
-            "Aplicar análisis foliar para detectar deficiencias nutricionales.\n"
-            "Evaluar uso de mulch o cubiertas para reducir evapotranspiración.\n"
-            "Revisar sistemas de riego por posibles obstrucciones o fugas."
-        ),
-        "GENERAL": (
-            "Aumentar frecuencia de monitoreo satelital.\n"
-            "Realizar inspección en terreno en los próximos 15 días.\n"
-            "Documentar la situación y preparar plan de contingencia."
-        ),
-    },
-    "CRÍTICO": {
-        "MINERIA": (
-            "ACCIÓN INMEDIATA: Notificar a SMA y DGA en un plazo de 24 horas.\n"
-            "Paralizar operaciones en la zona afectada hasta nueva evaluación.\n"
-            "Contratar empresa especializada para restauración de suelos.\n"
-            "Implementar plan de contingencia hídrica de emergencia.\n"
-            "Elaborar informe técnico para autoridades regulatorias."
-        ),
-        "GLACIAR": (
-            "EMERGENCIA: Notificar a DGA y Ministerio del Medio Ambiente de inmediato.\n"
-            "Contratar glaciólogo certificado para evaluación en terreno urgente.\n"
-            "Suspender toda actividad en el área de influencia del glaciar.\n"
-            "Registrar el evento como hallazgo crítico ante SMA.\n"
-            "Iniciar protocolo de seguimiento diario hasta estabilización."
-        ),
-        "BOSQUE": (
-            "EMERGENCIA: Notificar a CONAF de inmediato ante posible tala ilegal o incendio.\n"
-            "Implementar plan de reforestación de emergencia conforme a Ley 20.283.\n"
-            "Solicitar declaración de zona de protección a autoridades.\n"
-            "Controlar acceso al área hasta que se determine la causa.\n"
-            "Elaborar informe técnico de daño para presentar a SMA."
-        ),
-        "HUMEDAL": (
-            "EMERGENCIA: Notificar a DGA y SMA de desecación crítica.\n"
-            "Iniciar restauración hidrológica de emergencia.\n"
-            "Documentar el estado actual como línea base de daño.\n"
-            "Evaluar si se aplica Decreto de Humedales Urbanos o Ramsar.\n"
-            "Contratar especialista en restauración de ecosistemas acuáticos."
-        ),
-        "AGRICOLA": (
-            "ACCIÓN URGENTE: Implementar riego de emergencia de inmediato.\n"
-            "Evaluar pérdida de cosecha y notificar a aseguradora si corresponde.\n"
-            "Aplicar tratamiento fitosanitario de emergencia ante plagas.\n"
-            "Revisar infraestructura de riego en su totalidad.\n"
-            "Consultar con agrónomo para plan de recuperación del cultivo."
-        ),
-        "GENERAL": (
-            "ACCIÓN URGENTE requerida en las próximas 48 horas.\n"
-            "Notificar a las autoridades ambientales competentes.\n"
-            "Realizar inspección en terreno de manera inmediata.\n"
-            "Elaborar informe técnico de la situación detectada."
-        ),
-    },
-}
 # ============================================================================
 # MÓDULO 6: GENERADOR DE PDF
 # ============================================================================
@@ -1602,10 +1480,29 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_text_color(0, 0, 0)
     
     signos = generar_signos_degradacion(reporte_data)
+    colores_signo = {
+        '[CRITICO]': (220, 50, 50),
+        '[ALERTA]':  (200, 100, 0),
+        '[AVISO]':   (100, 100, 0),
+        '[OK]':      (40, 150, 80),
+    }
+    etiquetas_signo = {
+        '[CRITICO]': '>> CRITICO: ',
+        '[ALERTA]':  '>> ALERTA:  ',
+        '[AVISO]':   '>> AVISO:   ',
+        '[OK]':      '>> OK:      ',
+    }
     for signo in signos:
-        pdf.cell(8, 6, clean(signo['icono']))
-        pdf.multi_cell(0, 4, clean(signo['texto']))
-        pdf.ln(2)
+        icono = signo['icono']
+        r, g, b = colores_signo.get(icono, (80, 80, 80))
+        etiqueta = etiquetas_signo.get(icono, '>> ')
+        pdf.set_font("helvetica", "B", 9)
+        pdf.set_text_color(r, g, b)
+        pdf.cell(28, 5, clean(etiqueta))
+        pdf.set_font("helvetica", "", 9)
+        pdf.set_text_color(0, 0, 0)
+        pdf.multi_cell(0, 5, clean(signo['texto']))
+        pdf.ln(1)
     
     pdf.ln(3)
     
@@ -1690,33 +1587,83 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_text_color(0, 0, 0)
     
     indices_hist = reporte_data.get('indices_historicos', {})
+    hay_datos_climaticos = False
     
     if len(indices_hist.get('temperatura_min', [])) > 1:
+        hay_datos_climaticos = True
         temp_min_inicio = indices_hist['temperatura_min'][0]
         temp_min_final = indices_hist['temperatura_min'][-1]
         cambio_temp = temp_min_final - temp_min_inicio
         
         pdf.set_font("helvetica", "B", 10)
-        pdf.cell(0, 6, "Temperatura Mínima:")
-        pdf.ln(6)
+        pdf.set_text_color(20, 50, 80)
+        pdf.cell(0, 7, "Temperatura Minima (TerraCLIM):", ln=1)
         pdf.set_font("helvetica", "", 9)
-        pdf.multi_cell(0, 4, 
-            f"Cambio: {cambio_temp:+.2f}°C en 20 años. "
-            f"{'Calentamiento detectado' if cambio_temp > 0 else 'Enfriamiento detectado'}", ln=1)
+        pdf.set_text_color(0, 0, 0)
+        pdf.multi_cell(0, 5,
+            f"Valor inicial (hace 20 anos): {temp_min_inicio:.2f}°C\n"
+            f"Valor reciente: {temp_min_final:.2f}°C\n"
+            f"Cambio neto: {cambio_temp:+.2f}°C\n"
+            f"Tendencia: {'Calentamiento detectado en el periodo analizado.' if cambio_temp > 0 else 'Enfriamiento detectado en el periodo analizado.'}")
+        pdf.ln(5)
+    
+    if len(indices_hist.get('temperatura_max', [])) > 1:
+        hay_datos_climaticos = True
+        tmax_inicio = indices_hist['temperatura_max'][0]
+        tmax_final = indices_hist['temperatura_max'][-1]
+        cambio_tmax = tmax_final - tmax_inicio
+        
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(20, 50, 80)
+        pdf.cell(0, 7, "Temperatura Maxima (TerraCLIM):", ln=1)
+        pdf.set_font("helvetica", "", 9)
+        pdf.set_text_color(0, 0, 0)
+        pdf.multi_cell(0, 5,
+            f"Valor inicial (hace 20 anos): {tmax_inicio:.2f}°C\n"
+            f"Valor reciente: {tmax_final:.2f}°C\n"
+            f"Cambio neto: {cambio_tmax:+.2f}°C\n"
+            f"Tendencia: {'Incremento de temperaturas maximas.' if cambio_tmax > 0 else 'Reduccion de temperaturas maximas.'}")
+        pdf.ln(5)
     
     if len(indices_hist.get('precipitacion', [])) > 1:
+        hay_datos_climaticos = True
         prec_inicio = indices_hist['precipitacion'][0]
         prec_final = indices_hist['precipitacion'][-1]
         cambio_prec = ((prec_final - prec_inicio) / prec_inicio * 100) if prec_inicio > 0 else 0
         
-        pdf.ln(3)
         pdf.set_font("helvetica", "B", 10)
-        pdf.cell(0, 6, "Precipitación Anual:")
-        pdf.ln(6)
+        pdf.set_text_color(20, 50, 80)
+        pdf.cell(0, 7, "Precipitacion Anual (TerraCLIM):", ln=1)
         pdf.set_font("helvetica", "", 9)
-        pdf.multi_cell(0, 4, 
-            f"Cambio: {cambio_prec:+.1f}% en 20 años. "
-            f"{'Aumento de precipitación' if cambio_prec > 0 else 'Disminución de precipitación'}", ln=1)
+        pdf.set_text_color(0, 0, 0)
+        pdf.multi_cell(0, 5,
+            f"Precipitacion inicial (hace 20 anos): {prec_inicio:.1f} mm/ano\n"
+            f"Precipitacion reciente: {prec_final:.1f} mm/ano\n"
+            f"Cambio relativo: {cambio_prec:+.1f}%\n"
+            f"Tendencia: {'Aumento de precipitaciones en el periodo.' if cambio_prec > 0 else 'Disminucion de precipitaciones en el periodo.'}")
+        pdf.ln(5)
+    
+    if not hay_datos_climaticos:
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(20, 50, 80)
+        pdf.cell(0, 7, "Estado de datos TerraCLIM:", ln=1)
+        pdf.set_font("helvetica", "", 9)
+        pdf.set_text_color(60, 60, 60)
+        pdf.multi_cell(0, 5,
+            "No se pudieron recuperar datos historicos de TerraCLIM para este ciclo de analisis.\n"
+            "Esto puede deberse a:\n"
+            "  - Alta cobertura de nubes en el periodo de consulta\n"
+            "  - Latencia en la disponibilidad de datos de Google Earth Engine\n"
+            "  - Zona fuera del rango de cobertura del producto IDAHO_EPSCOR/TERRACLIM\n\n"
+            "Recomendacion: Ejecutar nuevamente el reporte en los proximos dias para obtener\n"
+            "el analisis climatico completo de 20 anos.")
+        pdf.ln(3)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 4,
+            "Nota tecnica: TerraCLIM es un conjunto de datos climaticos globales de alta resolucion (~4 km)\n"
+            "derivado de WorldClim y CRU. Cubre variables como temperatura minima/maxima, precipitacion,\n"
+            "humedad del suelo y evapotranspiración desde 1958 hasta la actualidad.")
     
     pdf.ln(5)
     

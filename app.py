@@ -2120,6 +2120,181 @@ if not st.session_state.get('authenticated'):
     
     st.stop()
 
+
+def mostrar_guia():
+    """Contenido de la pestaña Guía — accesible para admin y clientes"""
+    st.title("📖 Guía de Uso BioCore Intelligence")
+
+    with st.expander("📚 1. ¿Qué es BioCore Intelligence?", expanded=True):
+        st.markdown("""
+BioCore Intelligence es un sistema de **vigilancia ambiental satelital** que monitorea proyectos en tiempo real usando datos de NASA y ESA.
+
+Utiliza el **Protocolo de Validación de Línea Base Espectral**, que distingue entre:
+- ✅ **Cambios reales** (degradación, contaminación, pérdida forestal, desecación)
+- 🔄 **Ruido de sensor** (variaciones naturales en zonas áridas o minerales)
+
+Esto garantiza que las alertas generadas sean técnicamente sólidas y defendibles ante autoridades regulatorias (SMA, DGA, CONAF).
+        """)
+
+    with st.expander("🛰️ 2. Sensores y Fuentes de Datos"):
+        st.markdown("""
+| Sensor | Uso principal | Resolución |
+|---|---|---|
+| **Sentinel-2** (ESA) | Índices espectrales SAVI, NDWI, NDSI, NDVI | 10–30 m |
+| **Sentinel-1 SAR** (ESA) | Radar de apertura sintética, atraviesa nubes | 10 m |
+| **MODIS** (NASA) | Temperatura de superficie (LST) | 1 km |
+| **NASA FIRMS** | Detección de focos de incendio activos | 375 m |
+| **TerraCLIM** | Precipitación y temperatura histórica (20 años) | ~4 km |
+| **Hansen GFC** | Pérdida forestal acumulada desde el año 2000 | 30 m |
+| **Copernicus LC** | Clasificación de cobertura y uso de suelo | 100 m |
+        """)
+
+    with st.expander("🎯 3. Tipos de Proyectos Monitoreados"):
+        df_tipos = pd.DataFrame({
+            "Tipo": ["⛏️ MINERÍA", "❄️ GLACIAR", "🌲 BOSQUE", "💧 HUMEDAL", "🌾 AGRÍCOLA"],
+            "Índice Principal": ["NDWI", "NDSI", "SAVI", "NDWI", "SAVI + NDWI"],
+            "Normativa Asociada": [
+                "SMA / DGA",
+                "DGA / Min. Medio Ambiente",
+                "Ley 20.283 / CONAF",
+                "Decreto Humedales / Ramsar",
+                "SAG / normativa agrícola"
+            ],
+            "Alerta Crítica si...": [
+                "NDWI < 0.10 o caída > 20%",
+                "NDSI < 0.20 o retracción > 15%",
+                "SAVI < 0.25 o pérdida > 25%",
+                "NDWI < 0.25 o caída > 20%",
+                "SAVI < 0.25 y NDWI < 0.20"
+            ]
+        })
+        st.dataframe(df_tipos, use_container_width=True)
+
+    with st.expander("🔢 4. Índices Espectrales Explicados"):
+        st.markdown("""
+#### SAVI — Índice de Vegetación Ajustado al Suelo
+- **Rango:** -1 a 1 (en la práctica 0 a 0.7 para vegetación)
+- **> 0.40** → Vegetación densa y sana
+- **0.25 – 0.40** → Vegetación moderada o bajo estrés
+- **< 0.25** → Vegetación degradada o suelo expuesto
+- *Más preciso que NDVI en zonas áridas o con suelo desnudo*
+
+#### NDWI — Índice de Agua en Vegetación/Cuerpos de Agua
+- **Rango:** -1 a 1
+- **> 0.40** → Agua libre o vegetación muy húmeda
+- **0.20 – 0.40** → Humedad moderada
+- **< 0.10** → Estrés hídrico severo o ausencia de agua
+
+#### NDSI — Índice de Nieve y Hielo
+- **Rango:** -1 a 1
+- **> 0.50** → Hielo perenne consolidado
+- **0.35 – 0.50** → Cobertura en transición estacional
+- **< 0.20** → Sin firma de hielo, sustrato expuesto
+
+#### NDVI — Índice de Vegetación de Diferencia Normalizada
+- **Rango:** -1 a 1
+- Indicador de verdor general, complementa al SAVI
+- Más sensible al ruido de suelo en zonas áridas
+
+#### Temperatura LST (MODIS)
+- Temperatura de superficie terrestre en °C
+- Umbral de alerta: **> 15°C en zonas glaciares**
+- Indicador de riesgo de incendio en bosques y humedales
+
+#### SAR VV (Sentinel-1)
+- Retrodispersión radar en banda C, polarización VV
+- Valores típicos: **agua libre < -15 dB** | **vegetación densa -10 a -5 dB** | **suelo/estructuras > -8 dB**
+- Único sensor que funciona con cobertura nubosa total
+        """)
+
+    with st.expander("🔍 5. Clasificación Automática del Terreno"):
+        df_terrenos = pd.DataFrame({
+            "Clasificación": ["MINERAL_ARIDO", "VEGETADO", "CRIOSFERA", "HIDRICO"],
+            "Criterio de detección": ["SAVI < 0.10", "SAVI >= 0.30", "NDSI >= 0.35", "NDWI >= 0.20"],
+            "Características": [
+                "Sin vegetación, mayor tolerancia a variaciones",
+                "Bosques, cultivos — alta sensibilidad",
+                "Glaciares y nieve permanente",
+                "Lagos, humedales, ríos"
+            ],
+            "Comportamiento del sistema": [
+                "Permite mayor variación sin alerta",
+                "Alerta ante pérdidas > 10–25%",
+                "Alerta ante retracción > 15%",
+                "Alerta ante desecación > 20%"
+            ]
+        })
+        st.dataframe(df_terrenos, use_container_width=True)
+
+    with st.expander("⚖️ 6. Reglas de Validación y Niveles de Riesgo"):
+        st.markdown("""
+El sistema calcula automáticamente el **nivel de riesgo** en tres categorías:
+
+#### 🟢 NORMAL — Bajo Control
+- Los índices están dentro de los rangos históricos esperados
+- Variación respecto a línea base dentro de umbrales normales
+- No se requiere acción inmediata
+
+#### 🟡 MODERADO — Precaución
+- Se detectan variaciones significativas pero no críticas
+- Se recomienda intensificar el monitoreo
+- Posible ciclo estacional o estrés temporal
+
+#### 🔴 CRÍTICO — Alerta
+- Degradación confirmada o pérdida acelerada
+- Se requiere acción inmediata y notificación a autoridades
+- El reporte PDF documenta el hallazgo para presentación regulatoria
+
+---
+**Reglas de validación por variación:**
+
+| Variación vs. Línea Base | Clasificación |
+|---|---|
+| < 10% | Normal |
+| 10% – 25% | Moderado |
+| > 25% (o índice bajo umbral crítico) | Crítico |
+        """)
+
+    with st.expander("📋 7. Cómo Generar un Reporte"):
+        st.markdown("""
+1. Inicia sesión con tus credenciales de proyecto
+2. Ve a la pestaña **🛰️ Vigilancia**
+3. Selecciona tu proyecto en el menú desplegable
+4. Haz clic en **"🚀 Ejecutar Análisis Satelital"**
+5. Espera el procesamiento (puede tomar 30–90 segundos según el área)
+6. Revisa el diagnóstico, índices y gráficos históricos
+7. Descarga el **PDF** o envía por **Telegram** usando los botones correspondientes
+
+> 💡 El análisis usa siempre la imagen más reciente disponible con menos del 30% de nubosidad.
+        """)
+
+    with st.expander("📊 8. Interpretación del Reporte PDF"):
+        st.markdown("""
+El reporte PDF generado contiene:
+
+- **Sección 1:** Información del proyecto y responsable
+- **Sección 2:** Clasificación CONAF (solo proyectos BOSQUE)
+- **Sección 3:** Estado global y nivel de riesgo con color
+- **Sección 4:** Indicadores de degradación detectados
+- **Sección 5:** Tabla de índices espectrales actuales vs. línea base
+- **Sección 6:** Diagnóstico técnico detallado
+- **Sección 7:** Monitoreo radar Sentinel-1 SAR
+- **Sección 8:** Gráficos históricos de 20 años
+- **Sección 9:** Análisis de cambio climático (TerraCLIM)
+- **Sección 10:** Recomendaciones según nivel de riesgo y tipo de proyecto
+
+> El PDF es un documento técnico válido para presentación ante **SMA, DGA y CONAF**.
+        """)
+
+    with st.expander("📞 9. Contacto y Soporte"):
+        st.markdown("""
+**Responsable Técnica:** Loreto Campos Carrasco
+📧 consultorabiocore@gmail.com
+⏰ Lunes a Viernes, 8:00 – 18:00 hrs
+
+Para ajustes de parámetros, nuevas coordenadas o problemas técnicos, contacta directamente al equipo BioCore Intelligence.
+        """)
+
 # === TABS PRINCIPALES ===
 if st.session_state.get('admin_mode'):
     tab1, tab_informe, tab_excel, tab_clientes, tab_soporte, tab_guia = st.tabs([
@@ -2540,6 +2715,11 @@ with tab_soporte:
         with st.expander("¿Qué es un índice espectral?"):
             st.write("Son medidas de características ambientales desde satélites")
 
+# === PESTAÑA GUIA (ADMIN) ===
+if st.session_state.get('admin_mode'):
+    with tab_guia:
+        mostrar_guia()
+
 # === PESTAÑA HISTORIAL ===
 if not st.session_state.get('admin_mode'):
     with tab_historial:
@@ -2569,177 +2749,8 @@ if not st.session_state.get('admin_mode'):
         st.info("Próximamente...")
     
     with tab_guia:
-        st.title("📖 Guía de Uso BioCore Intelligence")
+        mostrar_guia()
 
-        with st.expander("📚 1. ¿Qué es BioCore Intelligence?", expanded=True):
-            st.markdown("""
-BioCore Intelligence es un sistema de **vigilancia ambiental satelital** que monitorea proyectos en tiempo real usando datos de NASA y ESA.
-
-Utiliza el **Protocolo de Validación de Línea Base Espectral**, que distingue entre:
-- ✅ **Cambios reales** (degradación, contaminación, pérdida forestal, desecación)
-- 🔄 **Ruido de sensor** (variaciones naturales en zonas áridas o minerales)
-
-Esto garantiza que las alertas generadas sean técnicamente sólidas y defendibles ante autoridades regulatorias (SMA, DGA, CONAF).
-            """)
-
-        with st.expander("🛰️ 2. Sensores y Fuentes de Datos"):
-            st.markdown("""
-| Sensor | Uso principal | Resolución |
-|---|---|---|
-| **Sentinel-2** (ESA) | Índices espectrales SAVI, NDWI, NDSI, NDVI | 10–30 m |
-| **Sentinel-1 SAR** (ESA) | Radar de apertura sintética, atraviesa nubes | 10 m |
-| **MODIS** (NASA) | Temperatura de superficie (LST) | 1 km |
-| **NASA FIRMS** | Detección de focos de incendio activos | 375 m |
-| **TerraCLIM** | Precipitación y temperatura histórica (20 años) | ~4 km |
-| **Hansen GFC** | Pérdida forestal acumulada desde el año 2000 | 30 m |
-| **Copernicus LC** | Clasificación de cobertura y uso de suelo | 100 m |
-            """)
-
-        with st.expander("🎯 3. Tipos de Proyectos Monitoreados"):
-            df_tipos = pd.DataFrame({
-                'Tipo': ['⛏️ MINERÍA', '❄️ GLACIAR', '🌲 BOSQUE', '💧 HUMEDAL', '🌾 AGRÍCOLA'],
-                'Índice Principal': ['NDWI', 'NDSI', 'SAVI', 'NDWI', 'SAVI + NDWI'],
-                'Normativa Asociada': [
-                    'SMA / DGA',
-                    'DGA / Min. Medio Ambiente',
-                    'Ley 20.283 / CONAF',
-                    'Decreto Humedales / Ramsar',
-                    'SAG / normativa agrícola'
-                ],
-                'Alerta Crítica si...': [
-                    'NDWI < 0.10 o caída > 20%',
-                    'NDSI < 0.20 o retracción > 15%',
-                    'SAVI < 0.25 o pérdida > 25%',
-                    'NDWI < 0.25 o caída > 20%',
-                    'SAVI < 0.25 y NDWI < 0.20'
-                ]
-            })
-            st.dataframe(df_tipos, use_container_width=True)
-
-        with st.expander("🔢 4. Índices Espectrales Explicados"):
-            st.markdown("""
-#### SAVI — Índice de Vegetación Ajustado al Suelo
-- **Rango:** -1 a 1 (en la práctica 0 a 0.7 para vegetación)
-- **> 0.40** → Vegetación densa y sana
-- **0.25 – 0.40** → Vegetación moderada o bajo estrés
-- **< 0.25** → Vegetación degradada o suelo expuesto
-- *Más preciso que NDVI en zonas áridas o con suelo desnudo*
-
-#### NDWI — Índice de Agua en Vegetación/Cuerpos de Agua
-- **Rango:** -1 a 1
-- **> 0.40** → Agua libre o vegetación muy húmeda
-- **0.20 – 0.40** → Humedad moderada
-- **< 0.10** → Estrés hídrico severo o ausencia de agua
-
-#### NDSI — Índice de Nieve y Hielo
-- **Rango:** -1 a 1
-- **> 0.50** → Hielo perenne consolidado
-- **0.35 – 0.50** → Cobertura en transición estacional
-- **< 0.20** → Sin firma de hielo, sustrato expuesto
-
-#### NDVI — Índice de Vegetación de Diferencia Normalizada
-- **Rango:** -1 a 1
-- Indicador de verdor general, complementa al SAVI
-- Más sensible al ruido de suelo en zonas áridas
-
-#### Temperatura LST (MODIS)
-- Temperatura de superficie terrestre en °C
-- Umbral de alerta: **> 15°C en zonas glaciares**
-- Indicador de riesgo de incendio en bosques y humedales
-
-#### SAR VV (Sentinel-1)
-- Retrodispersión radar en banda C, polarización VV
-- Valores típicos: **agua libre < -15 dB** | **vegetación densa -10 a -5 dB** | **suelo/estructuras > -8 dB**
-- Único sensor que funciona con cobertura nubosa total
-            """)
-
-        with st.expander("🔍 5. Clasificación Automática del Terreno"):
-            df_terrenos = pd.DataFrame({
-                'Clasificación': ['MINERAL_ARIDO', 'VEGETADO', 'CRIOSFERA', 'HIDRICO'],
-                'Criterio de detección': ['SAVI < 0.10', 'SAVI >= 0.30', 'NDSI >= 0.35', 'NDWI >= 0.20'],
-                'Características': [
-                    'Sin vegetación, mayor tolerancia a variaciones',
-                    'Bosques, cultivos — alta sensibilidad',
-                    'Glaciares y nieve permanente',
-                    'Lagos, humedales, ríos'
-                ],
-                'Comportamiento del sistema': [
-                    'Permite mayor variación sin alerta',
-                    'Alerta ante pérdidas > 10–25%',
-                    'Alerta ante retracción > 15%',
-                    'Alerta ante desecación > 20%'
-                ]
-            })
-            st.dataframe(df_terrenos, use_container_width=True)
-
-        with st.expander("⚖️ 6. Reglas de Validación y Niveles de Riesgo"):
-            st.markdown("""
-El sistema calcula automáticamente el **nivel de riesgo** en tres categorías:
-
-#### 🟢 NORMAL — Bajo Control
-- Los índices están dentro de los rangos históricos esperados
-- Variación respecto a línea base dentro de umbrales normales
-- No se requiere acción inmediata
-
-#### 🟡 MODERADO — Precaución
-- Se detectan variaciones significativas pero no críticas
-- Se recomienda intensificar el monitoreo
-- Posible ciclo estacional o estrés temporal
-
-#### 🔴 CRÍTICO — Alerta
-- Degradación confirmada o pérdida acelerada
-- Se requiere acción inmediata y notificación a autoridades
-- El reporte PDF documenta el hallazgo para presentación regulatoria
-
----
-**Reglas de validación por variación:**
-
-| Variación vs. Línea Base | Clasificación |
-|---|---|
-| < 10% | Normal |
-| 10% – 25% | Moderado |
-| > 25% (o índice bajo umbral crítico) | Crítico |
-            """)
-
-        with st.expander("📋 7. Cómo Generar un Reporte"):
-            st.markdown("""
-1. Inicia sesión con tus credenciales de proyecto
-2. Ve a la pestaña **🛰️ Vigilancia**
-3. Selecciona tu proyecto en el menú desplegable
-4. Haz clic en **"🚀 Ejecutar Análisis Satelital"**
-5. Espera el procesamiento (puede tomar 30–90 segundos según el área)
-6. Revisa el diagnóstico, índices y gráficos históricos
-7. Descarga el **PDF** o envía por **Telegram** usando los botones correspondientes
-
-> 💡 El análisis usa siempre la imagen más reciente disponible con menos del 30% de nubosidad.
-            """)
-
-        with st.expander("📊 8. Interpretación del Reporte PDF"):
-            st.markdown("""
-El reporte PDF generado contiene:
-
-- **Sección 1:** Información del proyecto y responsable
-- **Sección 2:** Clasificación CONAF (solo proyectos BOSQUE)
-- **Sección 3:** Estado global y nivel de riesgo con color
-- **Sección 4:** Indicadores de degradación detectados
-- **Sección 5:** Tabla de índices espectrales actuales vs. línea base
-- **Sección 6:** Diagnóstico técnico detallado
-- **Sección 7:** Monitoreo radar Sentinel-1 SAR
-- **Sección 8:** Gráficos históricos de 20 años
-- **Sección 9:** Análisis de cambio climático (TerraCLIM)
-- **Sección 10:** Recomendaciones según nivel de riesgo y tipo de proyecto
-
-> El PDF es un documento técnico válido para presentación ante **SMA, DGA y CONAF**.
-            """)
-
-        with st.expander("📞 9. Contacto y Soporte"):
-            st.markdown("""
-**Responsable Técnica:** Loreto Campos Carrasco
-📧 consultorabiocore@gmail.com
-⏰ Lunes a Viernes, 8:00 – 18:00 hrs
-
-Para ajustes de parámetros, nuevas coordenadas o problemas técnicos, contacta directamente al equipo BioCore Intelligence.
-            """)
 
 st.markdown("---")
 st.markdown("""

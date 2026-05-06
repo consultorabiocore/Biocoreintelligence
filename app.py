@@ -2580,30 +2580,50 @@ with tab_informe:
         
         with col2:
             rango_sel = st.selectbox("📊 Rango de Análisis", 
-                ["Últimos 7 días", "Últimas 2 semanas", "Último mes", "Últimos 3 meses", "Último año"],
+                ["Últimos 7 días", "Últimas 2 semanas", "Último mes", "Últimos 3 meses",
+                 "Último año", "Últimos 5 años", "Últimos 10 años", "Últimos 15 años", "Últimos 20 años"],
                 key="audit_rango")
-        
-        with col3:
-            anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
-
-        with col4:
-            meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-            if rango_sel != "Último año":
-                mes_sel = st.selectbox("📅 Mes", meses, index=datetime.now().month - 1, key="audit_mes")
-            else:
-                mes_sel = "Año completo"
-                st.info("📅 Período: Año completo")
         
         rango_dias_map = {
             "Últimos 7 días": 7,
             "Últimas 2 semanas": 14,
             "Último mes": 30,
             "Últimos 3 meses": 90,
-            "Último año": 365
+            "Último año": 365,
+            "Últimos 5 años": 365 * 5,
+            "Últimos 10 años": 365 * 10,
+            "Últimos 15 años": 365 * 15,
+            "Últimos 20 años": 365 * 20,
         }
         rango_dias = rango_dias_map.get(rango_sel, 30)
-        
+
+        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+        with col3:
+            if rango_sel == "Último mes":
+                anio_sel = st.number_input("📆 Año", value=datetime.now().year, min_value=2010, max_value=datetime.now().year, key="audit_anio")
+            else:
+                anio_sel = datetime.now().year
+                st.empty()
+
+        with col4:
+            rangos_multianio = ["Últimos 5 años", "Últimos 10 años", "Últimos 15 años", "Últimos 20 años"]
+            if rango_sel == "Último mes":
+                mes_sel = st.selectbox("📅 Mes", meses, index=datetime.now().month - 1, key="audit_mes")
+            elif rango_sel == "Último año":
+                mes_sel = "Año completo"
+                st.info("📅 Año completo")
+            elif rango_sel in rangos_multianio:
+                anio_ini = datetime.now().year - rango_dias_map[rango_sel] // 365
+                mes_sel = f"{anio_ini} — {datetime.now().year}"
+                st.info(f"📅 {anio_ini} — {datetime.now().year}")
+            else:
+                fecha_ini = (datetime.now() - timedelta(days=rango_dias)).strftime("%d/%m/%Y")
+                fecha_fin = datetime.now().strftime("%d/%m/%Y")
+                mes_sel = f"{fecha_ini} al {fecha_fin}"
+                st.info(f"📅 {fecha_ini} al {fecha_fin}")
+
         if st.button("🚀 Generar Auditoría Completa", key="btn_gen_audit"):
             with st.spinner("⏳ Procesando auditoría..."):
                 try:

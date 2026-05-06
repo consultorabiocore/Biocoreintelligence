@@ -547,7 +547,7 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
                     indices_historicos['temp'].append(float(temp_stats.get('LST_Day_1km', 0)))
                 
                 # TerraCLIM
-                terraclim = ee.ImageCollection('IDAHO_EPSCOR/TERRACLIM/v8')\
+                terraclim = ee.ImageCollection('IDAHO_EPSCOR/TERRACLIM')\
                     .filterBounds(geom)\
                     .filterDate(f'{anio}-01-01', f'{anio}-12-31')\
                     .select(['pr', 'tmmn', 'tmmx'])\
@@ -584,71 +584,149 @@ def obtener_historico_20_anios(geom, tipo_proyecto):
 # ============================================================================
 
 def obtener_informacion_conaf(geom, tipo_proyecto):
-    """Obtiene información CONAF sobre tipo de bosque"""
-    
+    """Obtiene información de cobertura forestal usando:
+    1. Hansen Global Forest Change (alta resolución, actualizado anualmente)
+    2. COPERNICUS/GLOBAL_LAND_COVER como respaldo para clasificación
+    Relevante para Chile: Hansen detecta pérdida forestal desde 2000 con 30m de resolución,
+    compatible con los estándares de monitoreo CONAF/SNASPE.
+    """
+
     info_conaf = {
         'tipo_bosque': 'No disponible',
         'area_bosque': 0,
         'densidad': 'N/A',
-        'estado': 'No clasificado'
+        'estado': 'No clasificado',
+        'cobertura_dosel': 0.0,
+        'perdida_acumulada_ha': 0.0,
+        'anio_mayor_perdida': 'N/A',
+        'fuente': 'N/A'
     }
-    
+
     if tipo_proyecto.upper() != 'BOSQUE':
         return info_conaf
-    
+
+    # --- FUENTE 1: Hansen Global Forest Change (UMD) ---
+    # Es la fuente más usada por CONAF y organismos internacionales para Chile
     try:
-        bosques = ee.ImageCollection('COPERNICUS/GLOBAL_LAND_COVER/102001_V3')\
-            .filterBounds(geom)\
-            .select('discrete_classification')\
-            .first()
-        
-        if bosques is not None:
-            class_stats = bosques.reduceRegion(
-                ee.Reducer.mode(),
-                geom,
-                30
-            ).getInfo()
-            
-            clasificacion = int(class_stats.get('discrete_classification', 0))
-            
-            clases_bosque = {
-                10: {'tipo': 'Bosque herbáceo', 'densidad': 'Baja'},
-                11: {'tipo': 'Bosque herbáceo natural', 'densidad': 'Moderada'},
-                12: {'tipo': 'Bosque herbáceo cultivado', 'densidad': 'Moderada'},
-                20: {'tipo': 'Arbustos', 'densidad': 'Variable'},
-                30: {'tipo': 'Cobertura herbácea', 'densidad': 'Dispersa'},
-                40: {'tipo': 'Cultivos', 'densidad': 'N/A'},
-                50: {'tipo': 'Área urbana', 'densidad': 'N/A'},
-                60: {'tipo': 'Suelo desnudo', 'densidad': 'Nula'},
-                70: {'tipo': 'Agua', 'densidad': 'N/A'},
-                80: {'tipo': 'Nieve/Hielo', 'densidad': 'Nula'},
-                90: {'tipo': 'Bosque cerrado', 'densidad': 'Alta'},
-                100: {'tipo': 'Bosque abierto', 'densidad': 'Moderada'},
-            }
-            
-            if clasificacion in clases_bosque:
-                info_conaf['tipo_bosque'] = clases_bosque[clasificacion]['tipo']
-                info_conaf['densidad'] = clases_bosque[clasificacion]['densidad']
-            
-            # AQUÍ ESTÁ LA CORRECCIÓN: Usar .Or() en lugar de .or()
-            area_bosque = bosques.eq(90).Or(bosques.eq(100)).reduceRegion(
-                ee.Reducer.sum(),
-                geom,
-                30
-            ).getInfo()
-            
-            info_conaf['area_bosque'] = float(area_bosque.get('discrete_classification', 0)) * 0.0009
-            
-            if info_conaf['densidad'] == 'Alta':
-                info_conaf['estado'] = 'Bosque sano'
-            elif info_conaf['densidad'] == 'Moderada':
-                info_conaf['estado'] = 'Bosque estable'
-            else:
-                info_conaf['estado'] = 'Cobertura baja'
-        
-    except Exception as e:
-        pass
-    
+        hansen = ee.Image('UMD/hansen/global_forest_change_2023_v1_11')
+
+        # Cobertura de dosel año 2000 (base) con umbral >30% (estándar FAO)
+        treecover = hansen.select('treecover2000')
+        bosque_mask = treecover.gte(30)
+
+        cobertura_stats = treecover.updateMask(bosque_mask).reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=geom,
+            scale=30,
+            maxPixels=1e9
+        ).getInfo()
+        cobertura_dosel = float(cobertura_stats.get('treecover2000', 0))
+        info_conaf['cobertura_dosel'] = round(cobertura_dosel, 1)
+
+        # Área total con cobertura boscosa (ha)
+        area_bosque_px = bosque_mask.reduceRegion(
+            reducer=ee.Reducer.sum(),
+            geometry=geom,
+            scale=30,
+            maxPixels=1e9
+        ).getInfo()
+        area_ha = float(area_bosque_px.get('treecover2000', 0)) * 0.09  # px 30m -> ha
+        info_conaf['area_bosque'] = round(area_ha, 2)
+
+        # Pérdida acumulada de bosque (ha) desde 2000
+        loss = hansen.select('loss')
+        loss_stats = loss.reduceRegion(
+            reducer=ee.Reducer.sum(),
+            geometry=geom,
+            scale=30,
+            maxPixels=1e9
+        ).getInfo()
+        perdida_ha = float(loss_stats.get('loss', 0)) * 0.09
+        info_conaf['perdida_acumulada_ha'] = round(perdida_ha, 2)
+
+        # Año de mayor pérdida (lossyear: 1=2001 ... 23=2023)
+        lossyear = hansen.select('lossyear').updateMask(hansen.select('loss'))
+        anio_stats = lossyear.reduceRegion(
+            reducer=ee.Reducer.mode(),
+            geometry=geom,
+            scale=30,
+            maxPixels=1e9
+        ).getInfo()
+        anio_cod = anio_stats.get('lossyear', None)
+        if anio_cod and int(anio_cod) > 0:
+            info_conaf['anio_mayor_perdida'] = str(2000 + int(anio_cod))
+
+        # Clasificación de densidad según cobertura de dosel
+        if cobertura_dosel >= 60:
+            info_conaf['densidad'] = 'Alta'
+            info_conaf['tipo_bosque'] = 'Bosque denso (dosel >60%)'
+            info_conaf['estado'] = 'Bosque sano'
+        elif cobertura_dosel >= 30:
+            info_conaf['densidad'] = 'Moderada'
+            info_conaf['tipo_bosque'] = 'Bosque abierto (dosel 30-60%)'
+            info_conaf['estado'] = 'Bosque estable'
+        elif cobertura_dosel >= 10:
+            info_conaf['densidad'] = 'Baja'
+            info_conaf['tipo_bosque'] = 'Matorral arbolado (dosel 10-30%)'
+            info_conaf['estado'] = 'Cobertura baja'
+        else:
+            info_conaf['densidad'] = 'Nula'
+            info_conaf['tipo_bosque'] = 'Sin cobertura forestal significativa'
+            info_conaf['estado'] = 'Sin bosque detectado'
+
+        info_conaf['fuente'] = 'Hansen GFC 2023 (UMD) - Compatible CONAF/FAO'
+
+    except Exception:
+        # --- FUENTE 2: Copernicus como respaldo ---
+        try:
+            bosques = ee.ImageCollection('COPERNICUS/GLOBAL_LAND_COVER/102001_V3')\
+                .filterBounds(geom)\
+                .select('discrete_classification')\
+                .first()
+
+            if bosques is not None:
+                class_stats = bosques.reduceRegion(
+                    ee.Reducer.mode(), geom, 100
+                ).getInfo()
+                clasificacion = int(class_stats.get('discrete_classification', 0))
+
+                clases_bosque = {
+                    10: {'tipo': 'Bosque herbáceo', 'densidad': 'Baja'},
+                    11: {'tipo': 'Bosque herbáceo natural', 'densidad': 'Moderada'},
+                    12: {'tipo': 'Bosque herbáceo cultivado', 'densidad': 'Moderada'},
+                    20: {'tipo': 'Arbustos', 'densidad': 'Variable'},
+                    30: {'tipo': 'Cobertura herbácea', 'densidad': 'Dispersa'},
+                    40: {'tipo': 'Cultivos', 'densidad': 'N/A'},
+                    50: {'tipo': 'Área urbana', 'densidad': 'N/A'},
+                    60: {'tipo': 'Suelo desnudo', 'densidad': 'Nula'},
+                    70: {'tipo': 'Agua', 'densidad': 'N/A'},
+                    80: {'tipo': 'Nieve/Hielo', 'densidad': 'Nula'},
+                    90: {'tipo': 'Bosque cerrado', 'densidad': 'Alta'},
+                    100: {'tipo': 'Bosque abierto', 'densidad': 'Moderada'},
+                }
+
+                if clasificacion in clases_bosque:
+                    info_conaf['tipo_bosque'] = clases_bosque[clasificacion]['tipo']
+                    info_conaf['densidad'] = clases_bosque[clasificacion]['densidad']
+
+                area_px = bosques.eq(90).Or(bosques.eq(100)).reduceRegion(
+                    ee.Reducer.sum(), geom, 100
+                ).getInfo()
+                info_conaf['area_bosque'] = round(
+                    float(area_px.get('discrete_classification', 0)) * 0.01, 2
+                )
+
+                if info_conaf['densidad'] == 'Alta':
+                    info_conaf['estado'] = 'Bosque sano'
+                elif info_conaf['densidad'] == 'Moderada':
+                    info_conaf['estado'] = 'Bosque estable'
+                else:
+                    info_conaf['estado'] = 'Cobertura baja'
+
+                info_conaf['fuente'] = 'Copernicus Global Land Cover (respaldo)'
+        except Exception:
+            pass
+
     return info_conaf
 
 # ============================================================================
@@ -1538,25 +1616,52 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     if reporte_data.get('tipo') == 'BOSQUE':
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, "2. CLASIFICACIÓN CONAF", ln=1)
-        
+        pdf.cell(0, 10, "2. CLASIFICACIÓN FORESTAL (COMPATIBLE CONAF)", ln=1)
+
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
-        
+
         info_conaf = reporte_data.get('info_conaf', {})
+
         conaf_table = [
-            ["Tipo de Bosque:", info_conaf.get('tipo_bosque', 'N/A')],
-            ["Densidad:", info_conaf.get('densidad', 'N/A')],
-            ["Área (ha):", f"{info_conaf.get('area_bosque', 0):.2f}"],
-            ["Estado:", info_conaf.get('estado', 'No clasificado')],
+            ["Tipo de Bosque:",         info_conaf.get('tipo_bosque', 'N/A')],
+            ["Densidad:",               info_conaf.get('densidad', 'N/A')],
+            ["Estado:",                 info_conaf.get('estado', 'No clasificado')],
+            ["Área con cobertura (ha):", f"{info_conaf.get('area_bosque', 0):.2f}"],
+            ["Cobertura de dosel (%):", f"{info_conaf.get('cobertura_dosel', 0):.1f}%"],
+            ["Pérdida acumulada (ha):", f"{info_conaf.get('perdida_acumulada_ha', 0):.2f}"],
+            ["Año mayor pérdida:",      info_conaf.get('anio_mayor_perdida', 'N/A')],
+            ["Fuente de datos:",        info_conaf.get('fuente', 'N/A')],
         ]
-        
+
         for row in conaf_table:
             pdf.set_font("helvetica", "B", 9)
-            pdf.cell(60, 7, clean(row[0]))
+            pdf.cell(65, 7, clean(row[0]))
             pdf.set_font("helvetica", "", 9)
-            pdf.cell(0, 7, clean(row[1]), ln=1)
-        
+            pdf.cell(0, 7, clean(str(row[1])), ln=1)
+
+        # Alerta si hay pérdida significativa
+        perdida = info_conaf.get('perdida_acumulada_ha', 0)
+        area = info_conaf.get('area_bosque', 1)
+        if area > 0 and perdida > 0:
+            pct_perdida = (perdida / (area + perdida)) * 100
+            pdf.ln(2)
+            if pct_perdida > 20:
+                pdf.set_font("helvetica", "B", 9)
+                pdf.set_text_color(220, 50, 50)
+                pdf.multi_cell(0, 5, clean(
+                    f"ALERTA: Se ha perdido el {pct_perdida:.1f}% de la cobertura original "
+                    f"desde el año 2000. Requiere evaluación conforme a Ley 20.283."
+                ))
+            elif pct_perdida > 5:
+                pdf.set_font("helvetica", "B", 9)
+                pdf.set_text_color(200, 100, 0)
+                pdf.multi_cell(0, 5, clean(
+                    f"PRECAUCION: Pérdida del {pct_perdida:.1f}% de cobertura detectada "
+                    f"desde el año 2000. Monitoreo reforzado recomendado."
+                ))
+            pdf.set_text_color(0, 0, 0)
+
         pdf.ln(5)
     
     # SECCIÓN 3: ESTADO
@@ -1683,13 +1788,90 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     diagnostico = reporte_data.get('diagnostico_completo', 'Sin diagnóstico')
     pdf.multi_cell(0, 6, clean(diagnostico.strip()))
 
-    # SECCIÓN 7: GRÁFICOS
+    # SECCIÓN 7: SENTINEL-1 SAR
+    pdf.ln(5)
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(20, 50, 80)
+    pdf.cell(0, 10, "7. MONITOREO RADAR - SENTINEL-1 SAR", ln=1)
+
+    pdf.set_font("helvetica", "", 9)
+    pdf.set_text_color(0, 0, 0)
+    pdf.multi_cell(0, 5, clean(
+        "Sentinel-1 opera en banda C (5.4 GHz) con polarizacion VV. "
+        "A diferencia de sensores opticos, atraviesa nubes y lluvia, "
+        "siendo el unico dato disponible en dias de alta nubosidad."
+    ))
+    pdf.ln(3)
+
+    sar_vv = float(reporte_data.get('sar_vv', 0))
+
+    # Tabla SAR
+    pdf.set_font("helvetica", "B", 9)
+    pdf.set_fill_color(40, 80, 120)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(60, 8, "Parametro", border=1, align="C", fill=True)
+    pdf.cell(40, 8, "Valor", border=1, align="C", fill=True)
+    pdf.cell(0,  8, "Interpretacion", border=1, align="C", fill=True)
+    pdf.ln()
+
+    pdf.set_font("helvetica", "", 9)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(60, 8, "Retrodispersion VV (dB)", border=1)
+    pdf.cell(40, 8, f"{sar_vv:.2f} dB", border=1, align="C")
+
+    tipo_sar = reporte_data.get('tipo', 'GENERAL').upper()
+    if tipo_sar == 'GLACIAR':
+        if sar_vv < -15:
+            interp_sar = "Hielo/nieve consolidada"
+        elif sar_vv < -8:
+            interp_sar = "Superficie mixta hielo-roca"
+        else:
+            interp_sar = "Roca expuesta o suelo seco"
+    elif tipo_sar == 'HUMEDAL':
+        if sar_vv < -15:
+            interp_sar = "Agua libre presente"
+        elif sar_vv < -8:
+            interp_sar = "Humedad superficial moderada"
+        else:
+            interp_sar = "Superficie seca o sedimentos"
+    elif tipo_sar == 'BOSQUE':
+        if sar_vv > -5:
+            interp_sar = "Dosel denso o biomasa alta"
+        elif sar_vv > -10:
+            interp_sar = "Bosque moderado"
+        else:
+            interp_sar = "Vegetacion escasa o suelo expuesto"
+    elif tipo_sar == 'MINERIA':
+        if sar_vv > -8:
+            interp_sar = "Estructuras o maquinaria activa"
+        else:
+            interp_sar = "Superficie mineral sin actividad aparente"
+    elif tipo_sar == 'AGRICOLA':
+        if sar_vv > -8:
+            interp_sar = "Cultivo desarrollado o suelo humedo"
+        else:
+            interp_sar = "Suelo desnudo o cultivo raso"
+    else:
+        interp_sar = "Sin interpretacion especifica"
+
+    pdf.cell(0, 8, clean(interp_sar), border=1)
+    pdf.ln(10)
+
+    pdf.set_font("helvetica", "I", 8)
+    pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(0, 4, clean(
+        "Nota: Valores tipicos de referencia VV: agua libre < -15 dB | "
+        "vegetacion densa -10 a -5 dB | suelo seco/estructuras > -8 dB. "
+        "Util como dato independiente en condiciones de nubosidad total."
+    ))
+
+    # SECCIÓN 8: GRÁFICOS (antes era 7)
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, "7. ANÁLISIS ESPECTRAL - 20 AÑOS", ln=1)
+        pdf.cell(0, 10, "8. ANÁLISIS ESPECTRAL - 20 AÑOS", ln=1)
         pdf.ln(5)
         
         try:
@@ -1702,7 +1884,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "8. ANÁLISIS DE CAMBIO CLIMÁTICO (TERRACLIM)", ln=1)
+    pdf.cell(0, 10, "9. ANÁLISIS DE CAMBIO CLIMÁTICO (TERRACLIM)", ln=1)
     pdf.ln(3)
     
     pdf.set_font("helvetica", "", 9)
@@ -1795,7 +1977,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "9. RECOMENDACIONES")
+    pdf.cell(0, 10, "10. RECOMENDACIONES")
     pdf.ln(10)
     
     # 1. Obtener datos con valores seguros por defecto

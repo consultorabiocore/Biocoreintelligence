@@ -1276,10 +1276,10 @@ def generar_reporte_total(p, rango_dias=30):
     variacion_ndvi = calcular_variacion(ndvi_now, ndvi_base)
 
     # === OBTENER HISTÓRICO SEGÚN RANGO SELECCIONADO ===
-    # Los gráficos SIEMPRE muestran hasta 20 años para que sean visualmente ricos.
-    # rango_anios solo afecta el título del PDF y la sección climática ERA5.
+    # rango_anios controla cuántos años se grafican Y el título del PDF.
+    # Para rangos < 1 año se usa 1 año mínimo (GEE opera por año completo).
     rango_anios = max(1, min(20, round(rango_dias / 365))) if rango_dias >= 365 else 1
-    indices_historicos = obtener_historico_20_anios(geom, p.get('Tipo', 'GENERAL'), rango_anios=20)
+    indices_historicos = obtener_historico_20_anios(geom, p.get('Tipo', 'GENERAL'), rango_anios=rango_anios)
     
     if not any(indices_historicos.values()):
         indices_historicos = {
@@ -1946,14 +1946,15 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         "Util como dato independiente en condiciones de nubosidad total."
     ))
 
-    # SECCIÓN 8: GRÁFICOS — siempre muestra histórico completo de 20 años
+    # SECCIÓN 8: GRÁFICOS — muestra el rango elegido por el cliente
     rango_anios_pdf = reporte_data.get('rango_anios', 20)
+    label_anios = f"{rango_anios_pdf} AÑO{'S' if rango_anios_pdf != 1 else ''}"
     if img_path and os.path.exists(img_path):
         pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
         pdf.set_text_color(20, 50, 80)
-        pdf.cell(0, 10, "8. ANÁLISIS ESPECTRAL HISTÓRICO - 20 AÑOS", ln=1)
+        pdf.cell(0, 10, f"8. ANÁLISIS ESPECTRAL - {label_anios}", ln=1)
         pdf.ln(5)
         
         try:
@@ -1961,12 +1962,12 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         except:
             pass
     
-    # SECCIÓN 9: CAMBIO CLIMÁTICO (ERA5-Land) — refleja el rango seleccionado
+    # SECCIÓN 9: CAMBIO CLIMÁTICO (ERA5-Land) — mismo rango
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, f"9. ANÁLISIS CLIMÁTICO ERA5-Land ({rango_anios_pdf} AÑOS)", ln=1)
+    pdf.cell(0, 10, f"9. ANÁLISIS CLIMÁTICO ERA5-Land - {label_anios}", ln=1)
     pdf.ln(3)
     
     pdf.set_font("helvetica", "", 9)

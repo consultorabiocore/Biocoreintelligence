@@ -80,14 +80,26 @@ def es_admin(contraseña_admin):
 
 def verificar_credenciales_usuario(email, password):
     try:
-        res = supabase.table("usuarios").select("*").eq("email_cliente", email.strip().lower()).execute()
+        email_normalizado = email.strip().lower()
+        res = supabase.table("usuarios").select("*").eq("email_cliente", email_normalizado).execute()
         if res.data:
             cliente = res.data[0]
             password_guardada = cliente.get('password_cliente', '')
             if password_guardada and hash_password(password) == password_guardada:
                 return True, cliente
+            return False, None
+        # Si no encontró por email, intentar búsqueda insensible a mayúsculas/minúsculas
+        # (por si el email fue guardado con formato diferente)
+        res_all = supabase.table("usuarios").select("email_cliente, password_cliente, Proyecto, Tipo, Coordenadas, ano_linea_base, id_telegram, hora_reporte, frecuencia_reporte").execute()
+        if res_all.data:
+            for cliente in res_all.data:
+                email_guardado = (cliente.get('email_cliente') or '').strip().lower()
+                if email_guardado == email_normalizado:
+                    password_guardada = cliente.get('password_cliente', '')
+                    if password_guardada and hash_password(password) == password_guardada:
+                        return True, cliente
         return False, None
-    except:
+    except Exception as e:
         return False, None
 
 # === FUNCIÓN DE MAPA ===
@@ -1787,15 +1799,14 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         icono = signo['icono']
         r, g, b = colores_signo.get(icono, (80, 80, 80))
         etiqueta = etiquetas_signo.get(icono, '>> ')
-        x_inicio = pdf.get_x()
         pdf.set_font("helvetica", "B", 9)
         pdf.set_text_color(r, g, b)
-        pdf.cell(28, 5, clean(etiqueta), ln=1)
+        # Sin ln=1 para que el cursor quede en la misma línea
+        pdf.cell(32, 5, clean(etiqueta))
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
-        # Retroceder a la misma línea pero indentado para el texto
-        pdf.set_xy(x_inicio + 28, pdf.get_y() - 5)
-        pdf.multi_cell(0, 5, clean(signo['texto']))
+        # Ancho fijo: 210 - margen_izq(10) - margen_der(10) - etiqueta(32) = 158
+        pdf.multi_cell(158, 5, clean(signo['texto']))
         pdf.ln(1)
     
     pdf.ln(3)

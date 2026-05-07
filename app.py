@@ -132,31 +132,68 @@ def dibujar_mapa_biocore(coordenadas):
         return folium.Map(location=[-33.45, -70.66], zoom_start=4)
 
 # === OBTENER COORDENADAS CORRECTAMENTE ===
+def limpiar_coordenadas(coords):
+    """
+    Valida y limpia coordenadas.
+    Asegura que estén en formato [[lon, lat], ...] y en rango válido.
+    """
+    if not isinstance(coords, list):
+        raise ValueError(f"Coordenadas debe ser una lista, no {type(coords)}")
+
+    if len(coords) < 3:
+        raise ValueError("Mínimo 3 puntos requeridos para polígono")
+
+    coords_limpios = []
+    for i, coord in enumerate(coords):
+        if isinstance(coord, (list, tuple)) and len(coord) == 2:
+            try:
+                lon = float(coord[0])
+                lat = float(coord[1])
+                if not (-180 <= lon <= 180):
+                    raise ValueError(f"Longitud fuera de rango: {lon}")
+                if not (-90 <= lat <= 90):
+                    raise ValueError(f"Latitud fuera de rango: {lat}")
+                coords_limpios.append([lon, lat])
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Coordenada {i} inválida: {coord} - {str(e)}")
+        else:
+            raise ValueError(f"Coordenada {i} no es [lon, lat]: {coord}")
+
+    # Asegurar que el polígono cierre
+    if coords_limpios[0] != coords_limpios[-1]:
+        coords_limpios.append(coords_limpios[0])
+
+    return coords_limpios
+
+
 def obtener_coordenadas_correctamente(p):
-    """Obtiene las coordenadas del proyecto desde Supabase"""
+    """
+    Obtiene las coordenadas del proyecto desde Supabase.
+    Versión mejorada con corrección automática de formato y validación de rangos.
+    """
     raw_coords = p.get('Coordenadas')
-    
+
     if raw_coords is None or raw_coords == '' or raw_coords == 'null':
         raise ValueError('Coordenadas vacías')
-    
+
     if isinstance(raw_coords, list):
-        return raw_coords
-    
+        return limpiar_coordenadas(raw_coords)
+
     if isinstance(raw_coords, str):
         try:
             coords = json.loads(raw_coords)
-            return coords
+            return limpiar_coordenadas(coords)
         except json.JSONDecodeError:
             try:
                 coords = eval(raw_coords)
-                return coords
+                return limpiar_coordenadas(coords)
             except:
                 raise ValueError(f'No se pudo parsear: {raw_coords}')
-    
+
     if isinstance(raw_coords, dict):
         if 'coordinates' in raw_coords:
-            return raw_coords['coordinates']
-    
+            return limpiar_coordenadas(raw_coords['coordinates'])
+
     raise ValueError(f'Formato no reconocido: {type(raw_coords)}')
 
 # ============================================================================
@@ -593,17 +630,34 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 
         elif tipo == 'MINERIA':
             regen = 'OK' if savi > 0.25 else 'REVISAR'
-            est_swir = '\U0001f6e1\ufe0f Sin movimientos' if swir < 0.28 else '\u26a0\ufe0f ALERTA: Faena detectada'
-            est_ndwi = '\u2705 Niveles normales' if ndwi > 0.20 else '\u26a0\ufe0f ALERTA: Desecaci\u00f3n/Relaves'
+            est_swir = '🛡️ Sin movimientos' if swir < 0.28 else '⚠️ ALERTA: Faena detectada'
+            est_ndwi = '✅ Niveles normales' if ndwi > 0.20 else '⚠️ ALERTA: Desecación/Relaves'
+
+            # NDSI para criosfera adyacente
+            if ndsi > 0.40:
+                seccion_ndsi = (
+                    f"❄️ CRIOSFERA (NDSI): {ndsi:.3f} ({v_ndsi:+.1f}%)\n"
+                    f"   └ Hielo perenne - Glaciar activo\n"
+                    f"   └ Requerimiento: Monitoreo DGA Art. 6 RSEIA\n"
+                )
+            elif ndsi > 0.20:
+                seccion_ndsi = (
+                    f"❄️ CRIOSFERA (NDSI): {ndsi:.3f}\n"
+                    f"   └ Nieve estacional detectada\n"
+                )
+            else:
+                seccion_ndsi = ""
+
             diagnostico = (
-                "\n\u26cf\ufe0f MONITOREO INTEGRAL DE YACIMIENTO:\n"
-                "\U0001f6e1\ufe0f INTEGRIDAD TERRITORIAL (SU-6): \n"
-                f"\u2514 SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}\n"
-                f"\u2514 Estatus: {est_swir}\n"
-                f"\U0001f4a7 RECURSOS H\u00cdDRICOS (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs Base)\n"
-                f"\u2514 Estatus: {est_ndwi}\n"
-                f"\U0001f331 VEGETACI\u00d3N (VE-5): SAVI: {savi:.3f} | Altura: {altura:.1f}m\n"
-                f"\u2514 An\u00e1lisis: Cumplimiento Ley 20.283 (Regeneraci\u00f3n: {regen})."
+                "\n⛏️ MONITOREO INTEGRAL DE YACIMIENTO:\n"
+                "🛡️ INTEGRIDAD TERRITORIAL (SU-6): \n"
+                f"   └ SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}\n"
+                f"   └ Estatus: {est_swir}\n"
+                f"💧 RECURSOS HÍDRICOS (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs Base)\n"
+                f"   └ Estatus: {est_ndwi}\n"
+                + seccion_ndsi +
+                f"🌱 VEGETACIÓN (VE-5): SAVI: {savi:.3f}\n"
+                f"   └ Análisis: Cumplimiento Ley 20.283 (Regeneración: {regen})."
             )
 
         elif tipo == 'BOSQUE':
@@ -1138,9 +1192,24 @@ def obtener_informacion_conaf(geom, tipo_proyecto):
 # MÓDULO 3: EVALUACIÓN POR TIPO DE PROYECTO
 # ============================================================================
 
-def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
-    """MINERÍA - Basado en NDWI"""
-    
+def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp, ndsi=0.0):
+    """MINERÍA - Basado en NDWI + NDSI (Criosfera adyacente)"""
+
+    # --- EVALUACIÓN DE CRIOSFERA COMO FACTOR CONTEXTUAL ---
+    if ndsi > 0.40:
+        contexto_criosfera = (
+            f"\n❄️ CRIOSFERA ADYACENTE: Se detecta cobertura de nieve/hielo (NDSI: {ndsi:.3f}). "
+            f"Glaciares en zona de influencia. Requiere monitoreo según DGA Art. 6 RSEIA."
+        )
+    elif ndsi > 0.20:
+        contexto_criosfera = (
+            f"\n❄️ CRIOSFERA EN TRANSICIÓN: NDSI de {ndsi:.3f} indica nieve estacional. "
+            f"Verificar balance de masa glacial en eventos de precipitación."
+        )
+    else:
+        contexto_criosfera = ""
+
+    # --- EVALUACIÓN PRINCIPAL DE MINERÍA (NDWI + SAVI) ---
     if savi < 0.01:
         if ndwi_actual < 0.10:
             estado = "🟢 BAJO CONTROL"
@@ -1149,7 +1218,7 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
             diagnostico = (
                 f"Sector de alta montaña con vegetación nula (SAVI: {savi:.4f}). "
                 f"NDWI de {ndwi_actual:.4f} es consistente con litología mineral. "
-                f"Status: BLINDADO ante hallazgos de degradación ambiental."
+                f"Status: BLINDADO ante hallazgos de degradación ambiental.{contexto_criosfera}"
             )
         else:
             estado = "🟡 PRECAUCIÓN"
@@ -1157,7 +1226,7 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
             color = (200, 100, 0)
             diagnostico = (
                 f"Acumulación anómala de agua en zona árida (NDWI: {ndwi_actual:.4f}). "
-                f"Posible acumulación en relaves. Requiere inspección."
+                f"Posible acumulación en relaves. Requiere inspección.{contexto_criosfera}"
             )
     else:
         if ndwi_actual > 0.30:
@@ -1167,7 +1236,7 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
             diagnostico = (
                 f"Recursos hídricos disponibles (NDWI: {ndwi_actual:.4f}). "
                 f"Vegetación perimetral ({savi:.4f}) con buena hidratación. "
-                f"Cumplimiento normativo verificado."
+                f"Cumplimiento normativo verificado.{contexto_criosfera}"
             )
         elif 0.15 <= ndwi_actual <= 0.30:
             if variacion_ndwi < -20:
@@ -1177,7 +1246,7 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
                 diagnostico = (
                     f"Caída severa de NDWI ({variacion_ndwi:.1f}%). "
                     f"De {ndwi_base:.4f} a {ndwi_actual:.4f}. "
-                    f"Requiere medidas urgentes de restitución hídrica."
+                    f"Requiere medidas urgentes de restitución hídrica.{contexto_criosfera}"
                 )
             else:
                 estado = "🟡 PRECAUCIÓN"
@@ -1186,7 +1255,7 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
                 diagnostico = (
                     f"NDWI en rango de alerta ({ndwi_actual:.4f}). "
                     f"Incremento: {variacion_ndwi:+.1f}%. "
-                    f"Se recomienda intensificar monitoreo de drenaje."
+                    f"Se recomienda intensificar monitoreo de drenaje.{contexto_criosfera}"
                 )
         else:
             estado = "🔴 ALERTA CRÍTICA"
@@ -1195,9 +1264,9 @@ def evaluar_mineria(ndwi_actual, ndwi_base, variacion_ndwi, savi, temp):
             diagnostico = (
                 f"Humedad crítica (NDWI: {ndwi_actual:.4f}). "
                 f"Riesgo de inestabilidad de taludes. "
-                f"ACCIÓN INMEDIATA: Implementar sistemas de riego y drenaje."
+                f"ACCIÓN INMEDIATA: Implementar sistemas de riego y drenaje.{contexto_criosfera}"
             )
-    
+
     return estado, nivel, color, diagnostico
 
 
@@ -1646,7 +1715,7 @@ def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
     
     if tipo == 'MINERIA':
         estado, nivel, color_estado, diagnostico_detallado = evaluar_mineria(
-            ndwi_now, ndwi_base, variacion_ndwi, savi_now, temp_val
+            ndwi_now, ndwi_base, variacion_ndwi, savi_now, temp_val, ndsi_now
         )
     elif tipo == 'GLACIAR':
         estado, nivel, color_estado, diagnostico_detallado = evaluar_glaciar(

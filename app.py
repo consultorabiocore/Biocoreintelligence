@@ -2404,9 +2404,9 @@ if not st.session_state.get('authenticated'):
     </div>
 
     <div class="bc-tagline">
-        <span class="bc-sup">Vigilancia ambiental satelital</span>
-        <h1>Vigilancia ambiental para tu proyecto en tiempo real</h1>
-        <p>Evidencia técnica antes de que llegue la fiscalización.</p>
+        <span class="bc-sup">BioCore Intelligence</span>
+        <h1>Auditoría de Vigilancia Ambiental y Resiliencia Climática</h1>
+        <p>Evidencia técnica satelital antes de que llegue la fiscalización.</p>
     </div>
 
     <div class="bc-sensors">
@@ -2432,31 +2432,31 @@ if not st.session_state.get('authenticated'):
     st.markdown("""
     <div class="bc-features">
         <div class="bc-feat-card">
-            <div class="bc-icon">🛰️</div>
-            <div class="bc-ftitle">Índices espectrales</div>
+            <div class="bc-icon">[ S-2 ]</div>
+            <div class="bc-ftitle">Indices espectrales</div>
             <div class="bc-fdesc">SAVI, NDWI, NDSI, NDVI en resolución 10 m con Sentinel-2</div>
         </div>
         <div class="bc-feat-card">
-            <div class="bc-icon">📊</div>
+            <div class="bc-icon">[ PDF ]</div>
             <div class="bc-ftitle">Reportes PDF</div>
             <div class="bc-fdesc">Descargables con firma técnica y análisis histórico de 20 años</div>
         </div>
         <div class="bc-feat-card">
-            <div class="bc-icon">📡</div>
+            <div class="bc-icon">[ TLG ]</div>
             <div class="bc-ftitle">Alertas Telegram</div>
             <div class="bc-fdesc">Notificaciones automáticas según frecuencia diaria o semanal</div>
         </div>
         <div class="bc-feat-card">
-            <div class="bc-icon">🔥</div>
-            <div class="bc-ftitle">Detección de incendios</div>
-            <div class="bc-fdesc">Focos activos en tiempo real vía NASA FIRMS y capa CONAF</div>
+            <div class="bc-icon">[ SAR ]</div>
+            <div class="bc-ftitle">Radar Sentinel-1</div>
+            <div class="bc-fdesc">Detección de focos activos y análisis de superficie vía SAR</div>
         </div>
     </div>
 
     <div class="bc-access-box">
-        <h3>🔐 Acceso restringido</h3>
-        <p>Inicia sesión desde el panel izquierdo 👈</p>
-        <p><a href="mailto:consultorabiocore@gmail.com">📧 consultorabiocore@gmail.com</a></p>
+        <h3>Acceso restringido</h3>
+        <p>Inicia sesión desde el panel izquierdo</p>
+        <p><a href="mailto:consultorabiocore@gmail.com">consultorabiocore@gmail.com</a></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2849,7 +2849,7 @@ with tab_informe:
             anio = st.session_state.get('anio_audit', datetime.now().year)
             proyecto_data = st.session_state.get('proyecto_data', {})
             
-            st.info("📋 **VISTA PREVIA DEL REPORTE**")
+            st.info("VISTA PREVIA DEL REPORTE")
             
             estado_color = '#10b981' if 'CONTROL' in reporte['estado'] else '#f97316' if 'PRECAUCIÓN' in reporte['estado'] else '#ef4444'
             
@@ -2864,28 +2864,38 @@ with tab_informe:
             
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             with col_m1:
-                st.metric("SAVI", f"{reporte['savi_actual']:.4f}", f"{reporte['variacion']:+.1f}%")
+                st.metric("SAVI (VE-5)", f"{reporte['savi_actual']:.4f}", f"{reporte['variacion']:+.1f}%")
             with col_m2:
                 st.metric("NDWI", f"{reporte['ndwi']:.4f}", f"{reporte['variacion_ndwi']:+.1f}%")
             with col_m3:
                 st.metric("NDSI", f"{reporte['ndsi']:.4f}", f"{reporte['variacion_ndsi']:+.1f}%")
             with col_m4:
-                st.metric("Temperatura", f"{reporte['temp']:.1f}°C")
+                st.metric("NDVI (VE-7)", f"{reporte['ndvi']:.4f}", f"{reporte['variacion_ndvi']:+.1f}%")
+
+            col_m5, col_m6, col_m7, col_m8 = st.columns(4)
+            with col_m5:
+                st.metric("SWIR (SU-6)", f"{reporte['swir']:.4f}")
+            with col_m6:
+                st.metric("Clay Index", f"{reporte['clay']:.4f}")
+            with col_m7:
+                st.metric("SAR VV", f"{reporte.get('sar_vv', 0):.2f} dB")
+            with col_m8:
+                st.metric("Temp LST", f"{reporte['temp']:.1f} C")
             
             st.markdown("")
             
-            st.markdown("### 🔍 Diagnóstico Técnico")
+            st.markdown("### Diagnostico Tecnico")
             st.info(f"{reporte['diagnostico_completo']}")
             
-            with st.expander("📨 Ver Mensaje Telegram"):
+            with st.expander("Ver Mensaje Telegram"):
                 mensaje_telegram = generar_mensaje_telegram_dinamico(reporte, proyecto_data)
                 st.code(mensaje_telegram, language="text")
             
-            st.markdown("### ✅ Acciones")
+            st.markdown("### Acciones")
             col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
             
             with col_btn1:
-                if st.button("📥 Descargar PDF", key="btn_download_pdf"):
+                if st.button("Descargar PDF", key="btn_download_pdf"):
                     with st.spinner("Generando PDF..."):
                         try:
                             img_path = generar_graficos_profesionales(
@@ -2903,7 +2913,7 @@ with tab_informe:
                                 raise Exception("Tipo inesperado en la exportación PDF: " + str(type(result)))
 
                             st.download_button(
-                                label="✅ Descargar Auditoría PDF",
+                                label="Descargar Auditoria PDF",
                                 data=pdf_bytes,
                                 file_name=f"Auditoria_{proyecto}_{mes}_{anio}.pdf",
                                 mime="application/pdf",
@@ -2912,18 +2922,18 @@ with tab_informe:
 
                             if img_path and os.path.exists(img_path):
                                 os.remove(img_path)
-                            st.success("✅ PDF listo para descargar")
+                            st.success("PDF listo para descargar")
                         except Exception as e:
-                            st.error(f"❌ Error al generar PDF: {str(e)}")
+                            st.error(f"Error al generar PDF: {str(e)}")
             
             with col_btn2:
-                if st.button("🔄 Regenerar", key="btn_new_audit"):
+                if st.button("Regenerar", key="btn_new_audit"):
                     st.session_state['reporte_actual'] = None
                     st.session_state['mostrar_preview'] = False
                     st.rerun()
             
             with col_btn3:
-                if st.button("📤 Enviar Telegram", key="btn_send_telegram"):
+                if st.button("Enviar Telegram", key="btn_send_telegram"):
                     with st.spinner("Enviando..."):
                         try:
                             if proyecto_data.get('id_telegram'):
@@ -2939,18 +2949,18 @@ with tab_informe:
                                         timeout=10
                                     )
                                     if response.status_code == 200:
-                                        st.success("✅ Reporte enviado por Telegram")
+                                        st.success("Reporte enviado por Telegram")
                                     else:
-                                        st.error(f"❌ Error: {response.status_code}")
+                                        st.error(f"Error Telegram: {response.status_code}")
                                 else:
-                                    st.warning("⚠️ Token de Telegram no configurado")
+                                    st.warning("Token de Telegram no configurado")
                             else:
-                                st.warning("⚠️ No hay ID de Telegram registrado")
+                                st.warning("No hay ID de Telegram registrado")
                         except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
+                            st.error(f"Error: {str(e)}")
             
             with col_btn4:
-                if st.button("❌ Cancelar", key="btn_cancel"):
+                if st.button("Cancelar", key="btn_cancel"):
                     st.session_state['reporte_actual'] = None
                     st.session_state['mostrar_preview'] = False
                     st.rerun()

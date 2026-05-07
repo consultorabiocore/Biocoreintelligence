@@ -202,10 +202,15 @@ def obtener_coordenadas_correctamente(p):
 def crear_portada_biocore():
     """Portada original con mapa satelital"""
 
-    st.markdown("""
-    <h1 style="text-align: center; margin-top: 30px;">🛰️ BioCore Intelligence</h1>
-    <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
-    """, unsafe_allow_html=True)
+    # Header: logo pequeño + título en la misma fila
+    col_logo, col_titulo = st.columns([1, 5])
+    with col_logo:
+        st.image("logo_biocore.png", width=90)
+    with col_titulo:
+        st.markdown("""
+        <h1 style="margin-top: 15px;">BioCore Intelligence</h1>
+        <p style="color: #888; margin-top: -10px;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -216,11 +221,6 @@ def crear_portada_biocore():
         attr='Google Satellite'
     )
     folium_static(demo_map, width=1200, height=400)
-
-    # Logo centrado debajo del mapa
-    col_izq, col_centro, col_der = st.columns([1.5, 1, 1.5])
-    with col_centro:
-        st.image("logo_biocore.png", width=200)
 
     st.markdown("---")
     st.markdown("""

@@ -432,7 +432,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
         header = (
             "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
             "\u2551   \U0001f6f0\ufe0f  AUDITOR\u00cdA DE VIGILANCIA AMBIENTAL   \u2551\n"
-            "\u2551      Y RESILIENCIA CLIM\u00c1TICA (v2026.2)     \u2551\n"
+            "\u2551      Y RESILIENCIA CLIM\u00c1TICA     \u2551\n"
             "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n"
             f"\U0001f4cd PROYECTO: {proyecto}\n"
             f"\U0001f4ca TIPO: {tipo} | \U0001f4c5 AN\u00c1LISIS: {fecha}\n"

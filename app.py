@@ -218,9 +218,9 @@ def crear_portada_biocore():
     folium_static(demo_map, width=1200, height=400)
 
     # Logo centrado debajo del mapa
-    col_izq, col_centro, col_der = st.columns([1, 2, 1])
+    col_izq, col_centro, col_der = st.columns([1.5, 1, 1.5])
     with col_centro:
-        st.image("logo_biocore.png", use_container_width=True)
+        st.image("logo_biocore.png", width=200)
 
     st.markdown("---")
     st.markdown("""

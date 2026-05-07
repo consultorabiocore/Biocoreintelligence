@@ -25,7 +25,7 @@ import numpy as np
 matplotlib.use('Agg')
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="BioCore Intelligence", layout="wide")
+st.set_page_config(page_title="Auditoría de vigilancia ambiental y resiliencia climática", layout="wide")
 
 st.markdown("""
 <style>

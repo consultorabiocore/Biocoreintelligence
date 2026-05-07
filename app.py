@@ -162,7 +162,6 @@ def obtener_coordenadas_correctamente(p):
 # ============================================================================
 # MÓDULO 0: PORTADA MEJORADA
 # ============================================================================
-
 def crear_portada_biocore():
     """Portada profesional con animaciones y diseño premium"""
     
@@ -174,7 +173,6 @@ def crear_portada_biocore():
         font-family: 'Inter', sans-serif;
     }
     
-    /* Animaciones */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -185,15 +183,11 @@ def crear_portada_biocore():
         50% { opacity: 0.7; }
     }
     
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-    }
-    
     .bc-container {
         background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1529 100%);
-        padding: 0;
-        margin: 0 -9999px;
+        padding: 40px 20px;
+        margin: 0;
+        border-radius: 15px;
     }
     
     .bc-header {
@@ -335,7 +329,6 @@ def crear_portada_biocore():
     .bc-feature-icon {
         font-size: 2em;
         margin-bottom: 12px;
-        animation: float 3s ease-in-out infinite;
     }
     
     .bc-feature-title {
@@ -436,13 +429,13 @@ def crear_portada_biocore():
             <div class="bc-logo-section">
                 <span class="bc-logo-text">🧬 BioCore Intelligence</span>
             </div>
-            <span class="bc-live-badge">⬤ Sistema Activo 2026</span>
+            <span class="bc-live-badge">● Sistema Activo 2026</span>
         </div>
         
         <div class="bc-hero">
             <div class="bc-tagline-sup">Environmental Monitoring System</div>
             <h1 class="bc-title-main">Auditoría de Vigilancia Ambiental</h1>
-            <p class="bc-subtitle">Evidencia técnica satelital defensible ante autoridades regulatorias</p>
+            <p class="bc-subtitle">Evidencia técnica satelital defendible ante autoridades regulatorias</p>
             <p class="bc-features-text">Fusión inteligente de 8 satélites | 20+ años históricos | Art. 6 RSEIA | Tiempo Real</p>
         </div>
         
@@ -460,7 +453,7 @@ def crear_portada_biocore():
         <div class="bc-features-grid">
             <div class="bc-feature-card" style="--delay: 0s;">
                 <div class="bc-feature-icon">📊</div>
-                <div class="bc-feature-title">Índices Espectrales</div>
+                <div class="bc-feature-title">Indices Espectrales</div>
                 <div class="bc-feature-desc">SAVI, NDWI, NDSI, NDVI con resolución 10m en Sentinel-2</div>
             </div>
             <div class="bc-feature-card" style="--delay: 0.1s;">
@@ -493,7 +486,7 @@ def crear_portada_biocore():
         <div class="bc-stats">
             <div class="bc-stat-card">
                 <div class="bc-stat-number">20+</div>
-                <div class="bc-stat-label">Años Históricos</div>
+                <div class="bc-stat-label">Anos Históricos</div>
             </div>
             <div class="bc-stat-card">
                 <div class="bc-stat-number">8</div>
@@ -1452,7 +1445,6 @@ def evaluar_agricola(savi_actual, savi_base, variacion_savi, ndwi_actual, variac
 # ============================================================================
 # MÓDULO 4: GENERADOR DE REPORTE COMPLETO
 # ============================================================================
-
 def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
     """Genera reporte completo y guarda en Supabase"""
     try:
@@ -1464,11 +1456,25 @@ def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
                 'tipo': 'error'
             }
 
-        if not isinstance(raw_coords[0], (list, tuple)):
-            return {
-                'error': 'Formato de coordenadas inválido',
-                'tipo': 'error'
-            }
+        # Validar que cada coordenada sea [lon, lat]
+        for coord in raw_coords:
+            if not isinstance(coord, (list, tuple)) or len(coord) != 2:
+                return {
+                    'error': f'Formato de coordenada inválido: {coord}',
+                    'tipo': 'error'
+                }
+            try:
+                lon, lat = float(coord[0]), float(coord[1])
+                if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+                    return {
+                        'error': f'Coordenada fuera de rango: [{lon}, {lat}]',
+                        'tipo': 'error'
+                    }
+            except (ValueError, TypeError):
+                return {
+                    'error': f'Coordenada no es numérica: {coord}',
+                    'tipo': 'error'
+                }
         
         geom = ee.Geometry.Polygon(raw_coords)
 
@@ -1477,6 +1483,7 @@ def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
             'error': f'Error en geometría: {str(e)}',
             'tipo': 'error'
         }
+    
 
     # === SENTINEL 2 - ACTUAL ===
     try:

@@ -200,120 +200,31 @@ def obtener_coordenadas_correctamente(p):
 # MÓDULO 0: PORTADA MEJORADA
 # ============================================================================
 def crear_portada_biocore():
-    """Portada profesional usando componentes nativos de Streamlit"""
+    """Portada original con mapa satelital"""
 
-    # Estilos mínimos necesarios
     st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-    * { font-family: 'Inter', sans-serif; }
-    .bc-live-badge {
-        background: #0f2a1a; border: 1px solid #1a5c35; color: #4ade80;
-        font-size: 0.8em; padding: 6px 16px; border-radius: 20px; font-weight: 500;
-        display: inline-block;
-    }
-    .bc-pill {
-        background: #0f1a2e; border: 1px solid #1e3a5f; color: #7ec8f5;
-        font-size: 0.8em; padding: 5px 12px; border-radius: 20px;
-        display: inline-block; margin: 3px;
-    }
-    .bc-card {
-        background: linear-gradient(135deg, #0d1120, #1a1f3a);
-        border: 1px solid #1e2847; border-radius: 12px; padding: 20px;
-        height: 100%; text-align: center;
-    }
-    .bc-card-icon { font-size: 2em; margin-bottom: 8px; }
-    .bc-card-title { color: #cbd5e1; font-weight: 600; margin-bottom: 6px; }
-    .bc-card-desc { color: #64748b; font-size: 0.85em; line-height: 1.5; }
-    .bc-stat {
-        background: linear-gradient(135deg, #0f1a2e, #1a2f4d);
-        border: 1px solid #1e3a5f; border-radius: 10px; padding: 18px; text-align: center;
-    }
-    .bc-stat-num { font-size: 2em; font-weight: 700; color: #7ec8f5; }
-    .bc-stat-lbl { font-size: 0.75em; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
-    .bc-cta {
-        background: linear-gradient(135deg, #0f2a1a, #1a3f2a);
-        border: 1px solid #1a5c35; border-radius: 12px; padding: 30px; text-align: center;
-    }
-    </style>
+    <h1 style="text-align: center; margin-top: 30px;">🛰️ BioCore Intelligence</h1>
+    <p style="text-align: center; font-size: 1.1em; color: #888;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
     """, unsafe_allow_html=True)
 
-    # Header
-    col_logo, col_badge = st.columns([2, 1])
-    with col_logo:
-        st.markdown("## 🧬 BioCore Intelligence")
-    with col_badge:
-        st.markdown('<div style="padding-top:10px"><span class="bc-live-badge">● Sistema Activo 2026</span></div>', unsafe_allow_html=True)
+    st.markdown("---")
 
-    st.divider()
+    demo_map = folium.Map(
+        location=[-33.45, -70.66],
+        zoom_start=4,
+        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        attr='Google Satellite'
+    )
+    folium_static(demo_map, width=1200, height=400)
 
-    # Hero
-    st.markdown("<div style='text-align:center; padding: 20px 0;'>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#64748b; letter-spacing:2px; font-size:0.8em; text-transform:uppercase;'>Environmental Monitoring System</p>", unsafe_allow_html=True)
-    st.markdown("<h1 style='color:#e2e8f0; font-size:2.2rem; font-weight:700; margin-bottom:12px;'>Auditoría de Vigilancia Ambiental</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#94a3b8; font-size:1em; max-width:600px; margin:0 auto 10px;'>Evidencia técnica satelital defendible ante autoridades regulatorias</p>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#64748b; font-size:0.85em;'>Fusión inteligente de 8 satélites | 20+ años históricos | Art. 6 RSEIA | Tiempo Real</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Sensores
+    st.markdown("---")
     st.markdown("""
-    <div style='text-align:center; margin: 20px 0 30px;'>
-        <span class="bc-pill">🛰️ Sentinel-2 (10m)</span>
-        <span class="bc-pill">📡 Sentinel-1 SAR</span>
-        <span class="bc-pill">🌡️ MODIS NASA</span>
-        <span class="bc-pill">🔥 NASA FIRMS</span>
-        <span class="bc-pill">🌲 Hansen GFC</span>
-        <span class="bc-pill">🌍 ERA5-Land</span>
-        <span class="bc-pill">🏞️ Copernicus LC</span>
-        <span class="bc-pill">📊 CONAF</span>
+    <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px;">
+    <h3>🔐 Acceso Restringido</h3>
+    <p>Inicia sesión desde el panel izquierdo <b>👈</b></p>
+    <p style="font-size: 0.9em; color: #888;">📧 consultorabiocore@gmail.com</p>
     </div>
     """, unsafe_allow_html=True)
-
-    # Feature cards - fila 1
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown('<div class="bc-card"><div class="bc-card-icon">📊</div><div class="bc-card-title">Índices Espectrales</div><div class="bc-card-desc">SAVI, NDWI, NDSI, NDVI con resolución 10m en Sentinel-2</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="bc-card"><div class="bc-card-icon">📋</div><div class="bc-card-title">Reportes PDF</div><div class="bc-card-desc">Descargables con firma técnica y análisis histórico de 20 años</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div class="bc-card"><div class="bc-card-icon">📡</div><div class="bc-card-title">Alertas Telegram</div><div class="bc-card-desc">Notificaciones automáticas según frecuencia configurada</div></div>', unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
-
-    # Feature cards - fila 2
-    c4, c5, c6 = st.columns(3)
-    with c4:
-        st.markdown('<div class="bc-card"><div class="bc-card-icon">🛡️</div><div class="bc-card-title">Blindaje Legal RSEIA</div><div class="bc-card-desc">Art. 6 RSEIA, Ficha SU-6, normativa ambiental chilena</div></div>', unsafe_allow_html=True)
-    with c5:
-        st.markdown('<div class="bc-card"><div class="bc-card-icon">🔍</div><div class="bc-card-title">Monitoreo Radar SAR</div><div class="bc-card-desc">Detección de cambios atravesando nubes y lluvia</div></div>', unsafe_allow_html=True)
-    with c6:
-        st.markdown('<div class="bc-card"><div class="bc-card-icon">🎯</div><div class="bc-card-title">5 Tipos de Proyecto</div><div class="bc-card-desc">Minería, Glaciares, Bosques, Humedales, Agricultura</div></div>', unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
-
-    # Stats
-    s1, s2, s3, s4 = st.columns(4)
-    with s1:
-        st.markdown('<div class="bc-stat"><div class="bc-stat-num">20+</div><div class="bc-stat-lbl">Años Históricos</div></div>', unsafe_allow_html=True)
-    with s2:
-        st.markdown('<div class="bc-stat"><div class="bc-stat-num">8</div><div class="bc-stat-lbl">Satélites Fusionados</div></div>', unsafe_allow_html=True)
-    with s3:
-        st.markdown('<div class="bc-stat"><div class="bc-stat-num">5</div><div class="bc-stat-lbl">Tipos de Proyecto</div></div>', unsafe_allow_html=True)
-    with s4:
-        st.markdown('<div class="bc-stat"><div class="bc-stat-num">24h</div><div class="bc-stat-lbl">Actualización</div></div>', unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
-
-    # CTA
-    st.markdown("""
-    <div class="bc-cta">
-        <p style="color:#4ade80; font-size:1.2em; font-weight:600; margin-bottom:8px;">🔐 Acceso Restringido</p>
-        <p style="color:#86efac; margin-bottom:6px;">Inicia sesión desde el panel izquierdo con tus credenciales BioCore</p>
-        <p style="color:#7ec8f5; font-weight:500;">📧 consultorabiocore@gmail.com</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:30px; text-align:center; color:#475569; font-size:0.85em; border-top:1px solid #1e2847; padding-top:20px;'><b style='color:#cbd5e1'>BioCore Intelligence © 2026</b><br>Todos los derechos reservados | Tecnología de Vigilancia Ambiental Satelital</div>", unsafe_allow_html=True)
 
 # ============================================================================
 # MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO (CORREGIDO)

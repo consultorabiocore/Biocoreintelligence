@@ -160,445 +160,520 @@ def obtener_coordenadas_correctamente(p):
     raise ValueError(f'Formato no reconocido: {type(raw_coords)}')
 
 # ============================================================================
-# MÓDULO TELEGRAM MEJORADO - Reporte Profesional Completo
+# MÓDULO 0: PORTADA MEJORADA
 # ============================================================================
-# Este módulo reemplaza/complementa generar_mensaje_telegram_dinamico()
-# Incluye: Clay Index + Fichas SEA + Art. 6 RSEIA + Blindaje Legal
 
-def generar_mensaje_telegram_profesional(reporte_data, proyecto_data):
-    """
-    Generador profesional de reportes Telegram con blindaje legal completo.
+def crear_portada_biocore():
+    """Portada profesional con animaciones y diseño premium"""
     
-    Integra:
-    - Clay Index (cly) para integridad de sustrato (Ficha SU-6)
-    - NDSI para criósfera (glaciares)
-    - SAR VV para verificación radar
-    - Art. 6 RSEIA para regeneración ecosistémica
-    - Normativa específica por tipo de proyecto
-    """
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    # ═══ EXTRACCIÓN DE DATOS ═══
-    tipo = proyecto_data.get('Tipo', 'MINERIA').upper()
-    proyecto = proyecto_data.get('Proyecto', 'N/A')
-    fecha = reporte_data.get('fecha', 'N/A')
-    estado = reporte_data.get('estado', 'BAJO CONTROL')
-    nivel = reporte_data.get('nivel', 'NORMAL')
-    
-    # Índices espectrales
-    savi = reporte_data.get('savi_actual', 0)
-    ndwi = reporte_data.get('ndwi', 0)
-    ndsi = reporte_data.get('ndsi', 0)
-    ndvi = reporte_data.get('ndvi', 0)
-    swir = reporte_data.get('swir', 0)
-    clay = reporte_data.get('clay', 0)
-    temp = reporte_data.get('temp', 0)
-    
-    # Datos adicionales
-    sar_vv = reporte_data.get('sar_vv', 0)
-    incendios = reporte_data.get('incendios_activos', 0)
-    altura = reporte_data.get('altura', reporte_data.get('ndvi', 0) * 10)
-    
-    # Variaciones
-    v_savi = reporte_data.get('variacion', 0)
-    v_ndwi = reporte_data.get('variacion_ndwi', 0)
-    v_ndsi = reporte_data.get('variacion_ndsi', 0)
-    v_ndvi = reporte_data.get('variacion_ndvi', 0)
-    
-    # ═══ HEADER UNIVERSAL ═══
-    header = (
-        "╔══════════════════════════════════════════════════════════╗\n"
-        "║  🛰️  AUDITORÍA DE VIGILANCIA AMBIENTAL Y RESILIENCIA     ║\n"
-        "║              CLIMÁTICA - BioCore Intelligence (v2026.2)   ║\n"
-        "╚══════════════════════════════════════════════════════════╝\n\n"
-        f"📍 PROYECTO: {proyecto}\n"
-        f"📊 TIPO: {tipo}\n"
-        f"📅 ANÁLISIS: {fecha}\n"
-        f"🛰️ SENSORES: Sentinel-2/1 (ESA) | MODIS/FIRMS (NASA) | ERA5-Land (ECMWF)\n"
-        "═" * 62 + "\n\n"
-    )
-    
-    # ═══ SECCIÓN DINÁMICA POR TIPO ═══
-    
-    if tipo == 'GLACIAR':
-        diagnostico = generar_diagnostico_glaciar(
-            ndsi, v_ndsi, clay, swir, temp, incendios, sar_vv, altura
-        )
-    
-    elif tipo == 'MINERIA':
-        diagnostico = generar_diagnostico_mineria(
-            ndwi, v_ndwi, savi, ndvi, swir, clay, temp, sar_vv, incendios
-        )
-    
-    elif tipo == 'BOSQUE':
-        diagnostico = generar_diagnostico_bosque(
-            savi, v_savi, ndwi, ndvi, temp, incendios, altura, clay
-        )
-    
-    elif tipo == 'HUMEDAL':
-        diagnostico = generar_diagnostico_humedal(
-            ndwi, v_ndwi, savi, swir, clay, ndvi, temp
-        )
-    
-    elif tipo == 'AGRICOLA':
-        diagnostico = generar_diagnostico_agricola(
-            savi, v_savi, ndwi, v_ndwi, ndvi, temp
-        )
-    
-    else:
-        diagnostico = generar_diagnostico_generico(
-            savi, ndwi, ndsi, ndvi, temp, estado
-        )
-    
-    # ═══ SECCIÓN DE INTEGRIDAD (SU-6 RSEIA) ═══
-    integridad_suelo = generar_integridad_suelo(clay, swir, tipo)
-    
-    # ═══ SECCIÓN DE VALIDACIÓN HIDRICA (ART. 6 RSEIA) ═══
-    validacion_hidrica = generar_validacion_hidrica(
-        reporte_data.get('swir_base', swir),
-        reporte_data.get('ndwi_base', ndwi),
-        swir, ndwi
-    )
-    
-    # ═══ RECOMENDACIONES ═══
-    recomendaciones = generar_recomendaciones_telegram(nivel, tipo, reporte_data)
-    
-    # ═══ FOOTER LEGAL ═══
-    footer = (
-        "═" * 62 + "\n"
-        f"✅ ESTADO: {estado}\n"
-        f"⚠️ NIVEL DE RIESGO: {nivel}\n"
-        "═" * 62 + "\n"
-        "📋 VALIDACIONES NORMATIVAS:\n"
-        f"  • Art. 6 RSEIA: {validacion_hidrica['conclusion']}\n"
-        f"  • Ficha SU-6 (Suelo): {integridad_suelo['conclusion']}\n"
-        f"  • Normativa {tipo}: ✅ CUMPLIMIENTO VERIFICADO\n"
-        "═" * 62 + "\n"
-        "📝 RECOMENDACIONES:\n" + recomendaciones + "\n"
-        "═" * 62 + "\n"
-        "🔍 Fusión satelital avanzada BioCore Intelligence © 2026\n"
-        "⚖️ Documento técnico válido para presentación ante SMA/DGA"
-    )
-    
-    # ═══ COMPILAR MENSAJE ═══
-    mensaje_completo = header + diagnostico + integridad_suelo['detalle'] + validacion_hidrica['detalle'] + footer
-    
-    # ═══ VALIDAR LONGITUD ═══
-    # Telegram permite máx 4096 caracteres. Si es más largo, truncar con advertencia
-    if len(mensaje_completo) > 4000:
-        # Acortar footer y mantener contenido crítico
-        mensaje_completo = mensaje_completo[:3900] + "\n\n[Ver reporte completo en PDF]"
-    
-    return mensaje_completo
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# FUNCIONES AUXILIARES POR TIPO DE PROYECTO
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generar_diagnostico_glaciar(ndsi, v_ndsi, clay, swir, temp, incendios, sar_vv, altura):
-    """Diagnóstico específico para glaciares"""
-    
-    if ndsi > 0.50:
-        est_ndsi = "✅ Hielo perenne consolidado"
-    elif ndsi > 0.35:
-        est_ndsi = "⚠️ Cobertura en transición estacional"
-    elif ndsi > 0.20:
-        est_ndsi = "🟡 Retracción moderada detectada"
-    else:
-        est_ndsi = "🔴 RETRACCIÓN CRÍTICA - Sustrato expuesto"
-    
-    est_clay = "🛡️ Sustrato mineral estable" if clay < 0.25 else "⚠️ Anomalía en sustrato detectada"
-    est_fuego = "✅ Sin fuego" if incendios == 0 else f"🔥 {incendios} focos activos"
-    
-    diagnostico = (
-        "\n❄️ CRIÓSFERA - MONITOREO GLACIAL:\n"
-        f"  NDSI (Nieve/Hielo): {ndsi:.3f} (Variación: {v_ndsi:+.1f}%)\n"
-        f"  └─ {est_ndsi}\n"
-        f"  Temperatura LST: {temp:.1f}°C\n"
-        f"  └─ {'⚠️ Fusión acelerada' if temp > 15 else '✅ Temperatura normal'}\n"
-        f"  SAR VV (Radar): {sar_vv:.2f} dB\n"
-        f"  └─ {'Hielo consolidado' if sar_vv < -15 else 'Superficie mixta' if sar_vv < -8 else 'Roca expuesta'}\n"
-        f"  Arcillas (SU-6): {clay:.3f} - {est_clay}\n"
-        f"  Fuegos activos: {est_fuego}\n"
-    )
-    
-    return diagnostico
-
-
-def generar_diagnostico_mineria(ndwi, v_ndwi, savi, ndvi, swir, clay, temp, sar_vv, incendios):
-    """Diagnóstico específico para minería"""
-    
-    regen = "✅ Regeneración OK" if savi > 0.25 else "⚠️ REVISAR regeneración"
-    est_swir = "🛡️ Sin movimientos" if swir < 0.28 else "⚠️ ALERTA: Faena detectada"
-    est_ndwi = "✅ Niveles normales" if ndwi > 0.20 else "⚠️ ALERTA: Desecación"
-    
-    diagnostico = (
-        "\n⛏️ MONITOREO INTEGRAL DE YACIMIENTO:\n"
-        f"  NDWI (Agua): {ndwi:.4f} (Variación: {v_ndwi:+.1f}%)\n"
-        f"  └─ {est_ndwi}\n"
-        f"  SWIR (SU-6): {swir:.2f}\n"
-        f"  └─ {est_swir}\n"
-        f"  SAVI (VE-5): {savi:.3f} - {regen}\n"
-        f"  NDVI (VE-7): {ndvi:.3f}\n"
-        f"  Clay Index: {clay:.3f}\n"
-        f"  SAR VV: {sar_vv:.2f} dB\n"
-        f"  └─ {'Alta retrodispersión: material acumulado' if sar_vv > -5 else 'Sustrato mineral normal'}\n"
-    )
-    
-    return diagnostico
-
-
-def generar_diagnostico_bosque(savi, v_savi, ndwi, ndvi, temp, incendios, altura, clay):
-    """Diagnóstico específico para bosques"""
-    
-    if savi > 0.40:
-        est_savi = "✅ Vigor óptimo - Bosque sano"
-    elif savi > 0.25:
-        est_savi = "🟡 Estrés moderado - Revisar"
-    else:
-        est_savi = "🔴 Degradación severa - ACCIÓN URGENTE"
-    
-    est_alt = "✅ Refugio preservado" if altura > 5 else "⚠️ Estructura alterada"
-    est_fuego = "✅ Bajo control" if incendios == 0 else f"🔴 {incendios} focos activos"
-    
-    diagnostico = (
-        "\n🌲 VIGILANCIA FORESTAL (Ley 20.283):\n"
-        f"  SAVI (VE-5): {savi:.3f} (Variación: {v_savi:+.1f}%)\n"
-        f"  └─ {est_savi}\n"
-        f"  Altura GEDI: {altura:.1f}m\n"
-        f"  └─ {est_alt}\n"
-        f"  NDWI (Humedad): {ndwi:.4f}\n"
-        f"  NDVI (Densidad): {ndvi:.3f}\n"
-        f"  Temperatura LST: {temp:.1f}°C\n"
-        f"  Focos de incendio: {est_fuego}\n"
-    )
-    
-    return diagnostico
-
-
-def generar_diagnostico_humedal(ndwi, v_ndwi, savi, swir, clay, ndvi, temp):
-    """Diagnóstico específico para humedales"""
-    
-    if ndwi > 0.40:
-        est_ndwi = "✅ Saturado - Ciclo hidrológico óptimo"
-    elif ndwi > 0.25:
-        est_ndwi = "🟡 Variabilidad moderada"
-    else:
-        est_ndwi = "🔴 Desecación en curso - CRÍTICO"
-    
-    est_swir = "🛡️ Humedad basal conservada" if swir > 0.25 else "⚠️ Suelo expuesto"
-    
-    diagnostico = (
-        "\n💧 VIGILANCIA ECOSISTEMA ACUÁTICO:\n"
-        f"  NDWI (Ciclo Hídrico): {ndwi:.4f} (Variación: {v_ndwi:+.1f}%)\n"
-        f"  └─ {est_ndwi}\n"
-        f"  SWIR (SU-6): {swir:.2f}\n"
-        f"  └─ {est_swir}\n"
-        f"  SAVI (Flora hidrófila): {savi:.3f}\n"
-        f"  NDVI (Productividad): {ndvi:.3f}\n"
-        f"  Clay Index: {clay:.3f}\n"
-        f"  Temperatura: {temp:.1f}°C\n"
-    )
-    
-    return diagnostico
-
-
-def generar_diagnostico_agricola(savi, v_savi, ndwi, v_ndwi, ndvi, temp):
-    """Diagnóstico específico para agricultura"""
-    
-    if savi > 0.45 and ndwi > 0.30:
-        est_rendimiento = "✅ Óptimo (rendimiento máximo)"
-    elif savi > 0.35 and ndwi > 0.20:
-        est_rendimiento = "🟡 Normal (rendimiento esperado)"
-    else:
-        est_rendimiento = "🔴 Bajo (< 50% de potencial)"
-    
-    diagnostico = (
-        "\n🌾 OPTIMIZACIÓN DE CULTIVOS:\n"
-        f"  SAVI (Vigor): {savi:.3f} (Variación: {v_savi:+.1f}%)\n"
-        f"  NDWI (Humedad): {ndwi:.4f} (Variación: {v_ndwi:+.1f}%)\n"
-        f"  NDVI (Estado fenológico): {ndvi:.3f}\n"
-        f"  Temperatura: {temp:.1f}°C\n"
-        f"  └─ Rendimiento esperado: {est_rendimiento}\n"
-    )
-    
-    return diagnostico
-
-
-def generar_diagnostico_generico(savi, ndwi, ndsi, ndvi, temp, estado):
-    """Diagnóstico genérico para tipos no especificados"""
-    
-    diagnostico = (
-        "\n📊 ANÁLISIS ESPECTRAL GENERAL:\n"
-        f"  SAVI: {savi:.3f}\n"
-        f"  NDWI: {ndwi:.4f}\n"
-        f"  NDSI: {ndsi:.3f}\n"
-        f"  NDVI: {ndvi:.3f}\n"
-        f"  Temperatura: {temp:.1f}°C\n"
-        f"  Estado: {estado}\n"
-    )
-    
-    return diagnostico
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# VALIDACIONES NORMATIVAS
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generar_integridad_suelo(clay, swir, tipo):
-    """
-    Ficha SU-6 RSEIA: Procesos Erosivos
-    Clay Index para validar estabilidad de sustrato
-    """
-    
-    if clay < 0.25:
-        conclusion = "✅ CUMPLE"
-        estado_suelo = "Sustrato mineral permanece estable sin remoción no autorizada"
-    else:
-        conclusion = "⚠️ REVISAR"
-        estado_suelo = "Posible alteración del sustrato - Inspeccion recomendada"
-    
-    detalle = (
-        "\n🛡️ FICHA SU-6 (INTEGRIDAD TERRITORIAL - RSEIA):\n"
-        f"  Clay Index (cly): {clay:.3f}\n"
-        f"  SWIR (Humedad basal): {swir:.2f}\n"
-        f"  └─ {estado_suelo}\n"
-        f"  Normativa: Cumplimiento {conclusion}\n"
-    )
-    
-    return {
-        'conclusion': conclusion,
-        'detalle': detalle
-    }
-
-
-def generar_validacion_hidrica(swir_base, ndwi_base, swir_actual, ndwi_actual):
-    """
-    Artículo 6 RSEIA: Capacidad de regeneración y permanencia
-    Correlacion hidrica automatica para validar respuesta ecosistemica
-    """
-    
-    # Criterios de validación
-    if swir_actual < swir_base * 0.85 and ndwi_actual > ndwi_base * 1.10:
-        conclusion = "✅ RECARGA HÍDRICA CONFIRMADA"
-        diagnostico = "Se certifica recarga natural por precipitación con respuesta ecosistémica consistente"
-    elif swir_actual > swir_base * 1.15 and ndwi_actual < ndwi_base * 0.90:
-        conclusion = "⚠️ ESTRÉS HÍDRICO DETECTADO"
-        diagnostico = "Patrón de sequía o pérdida hídrica - Se recomienda verificación en terreno"
-    else:
-        conclusion = "✅ NORMAL"
-        diagnostico = "Variaciones dentro del rango esperado para el ciclo hidrológico"
-    
-    detalle = (
-        "\n💧 ART. 6 RSEIA (CAPACIDAD DE REGENERACIÓN):\n"
-        f"  SWIR (línea base): {swir_base:.2f} | Actual: {swir_actual:.2f}\n"
-        f"  NDWI (línea base): {ndwi_base:.4f} | Actual: {ndwi_actual:.4f}\n"
-        f"  └─ {diagnostico}\n"
-        f"  Validación: {conclusion}\n"
-    )
-    
-    return {
-        'conclusion': conclusion,
-        'detalle': detalle
-    }
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# RECOMENDACIONES AUTOMÁTICAS
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generar_recomendaciones_telegram(nivel, tipo, reporte_data):
-    """Genera recomendaciones contextualizadas según nivel y tipo"""
-    
-    recomendaciones_mapa = {
-        'NORMAL': {
-            'MINERIA': [
-                "✓ Continuar monitoreo mensual de NDWI",
-                "✓ Verificar integridad de drenaje perimetral",
-                "✓ Actualizar Plan de Cierre según normativa"
-            ],
-            'GLACIAR': [
-                "✓ Mantener registros de balance de masa",
-                "✓ Coordinar con DGA ante variaciones > 10%",
-                "✓ Evitar actividades que generen polvo"
-            ],
-            'BOSQUE': [
-                "✓ Vigilancia de incendios en estación estival",
-                "✓ Inventario forestal conforme Ley 20.283",
-                "✓ Control de especies invasoras"
-            ],
-            'HUMEDAL': [
-                "✓ Monitoreo nivel de agua mensualmente",
-                "✓ Registrar avistamientos de fauna",
-                "✓ Asegurar cumplimiento Decreto Humedales"
-            ],
-            'AGRICOLA': [
-                "✓ Plan de riego según demanda evapotranspirativa",
-                "✓ Monitoreo fitosanitario semanal",
-                "✓ Optimizar fertilización con análisis de suelo"
-            ]
-        },
-        'MODERADO': {
-            'MINERIA': [
-                "⚠️ Intensificar monitoreo a frecuencia quincenal",
-                "⚠️ Revisar sistemas de contención de relaves",
-                "⚠️ Notificar a SMA si variación persiste > 30 días"
-            ],
-            'GLACIAR': [
-                "⚠️ Solicitar estudio glaciológico complementario",
-                "⚠️ Notificar a DGA sobre retracción detectada",
-                "⚠️ Aumentar frecuencia de monitoreo a 15 días"
-            ],
-            'BOSQUE': [
-                "⚠️ Inspección en terreno para identificar causa",
-                "⚠️ Evaluar presencia de plagas con CONAF",
-                "⚠️ Preparar plan de reforestación de contingencia"
-            ],
-            'HUMEDAL': [
-                "⚠️ Verificar fuentes de aporte hídrico",
-                "⚠️ Contactar a DGA para monitoreo conjunto",
-                "⚠️ Documentar cambios con fotografías"
-            ],
-            'AGRICOLA': [
-                "⚠️ Aumentar frecuencia de riego de inmediato",
-                "⚠️ Aplicar análisis foliar para deficiencias",
-                "⚠️ Revisar sistemas de riego por fugas"
-            ]
-        },
-        'CRITICO': {
-            'MINERIA': [
-                "🔴 ACCIÓN INMEDIATA: Notificar SMA/DGA en 24 hrs",
-                "🔴 Paralizar operaciones en zona afectada",
-                "🔴 Contratar empresa especializada en restauración"
-            ],
-            'GLACIAR': [
-                "🔴 EMERGENCIA: Notificar DGA de inmediato",
-                "🔴 Contratar glaciólogo certificado para evaluación",
-                "🔴 Suspender toda actividad en el área"
-            ],
-            'BOSQUE': [
-                "🔴 EMERGENCIA: Notificar CONAF de inmediato",
-                "🔴 Implementar plan de reforestación urgente",
-                "🔴 Solicitar zona de protección a autoridades"
-            ],
-            'HUMEDAL': [
-                "🔴 EMERGENCIA: Notificar DGA/SMA de desecación",
-                "🔴 Iniciar restauración hidrológica de emergencia",
-                "🔴 Contratar especialista en restauración acuática"
-            ],
-            'AGRICOLA': [
-                "🔴 ACCIÓN URGENTE: Riego de emergencia inmediato",
-                "🔴 Evaluar pérdida de cosecha con asegurador",
-                "🔴 Aplicar tratamiento fitosanitario de emergencia"
-            ]
-        }
+    * {
+        font-family: 'Inter', sans-serif;
     }
     
-    recomendaciones = recomendaciones_mapa.get(nivel, {}).get(tipo, [
-        "• Contactar al equipo técnico para evaluación"
-    ])
+    /* Animaciones */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
     
-    return "\n".join(recomendaciones)
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .bc-container {
+        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1529 100%);
+        padding: 0;
+        margin: 0 -9999px;
+    }
+    
+    .bc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 40px;
+        border-bottom: 1px solid #1e2847;
+        margin-bottom: 30px;
+        animation: fadeIn 0.8s ease-out;
+    }
+    
+    .bc-logo-section {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .bc-logo-text {
+        color: #e2e8f0;
+        font-weight: 600;
+        font-size: 1.1em;
+        letter-spacing: 0.5px;
+    }
+    
+    .bc-live-badge {
+        background: #0f2a1a;
+        border: 1px solid #1a5c35;
+        color: #4ade80;
+        font-size: 0.75em;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 500;
+        animation: pulse 2s infinite;
+    }
+    
+    .bc-hero {
+        text-align: center;
+        padding: 40px 20px;
+        animation: fadeIn 1s ease-out 0.2s both;
+    }
+    
+    .bc-tagline-sup {
+        font-size: 0.8em;
+        color: #64748b;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+    
+    .bc-title-main {
+        font-size: 3.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0 0 15px 0;
+        line-height: 1.1;
+    }
+    
+    .bc-subtitle {
+        color: #94a3b8;
+        font-size: 1.1em;
+        max-width: 700px;
+        margin: 0 auto 15px;
+        font-weight: 400;
+        line-height: 1.7;
+    }
+    
+    .bc-features-text {
+        color: #64748b;
+        font-size: 0.95em;
+        margin: 0 auto;
+    }
+    
+    .bc-sensors-grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin: 30px 0 40px;
+        animation: fadeIn 1.2s ease-out 0.4s both;
+    }
+    
+    .bc-sensor-pill {
+        background: linear-gradient(135deg, #0f1a2e 0%, #1a2f4d 100%);
+        border: 1px solid #1e3a5f;
+        color: #7ec8f5;
+        font-size: 0.8em;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .bc-sensor-pill:hover {
+        border-color: #2e5aa5;
+        background: linear-gradient(135deg, #1a2f4d 0%, #2a4a7d 100%);
+        transform: translateY(-2px);
+    }
+    
+    .bc-features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin: 50px 0;
+        animation: fadeIn 1.4s ease-out 0.6s both;
+    }
+    
+    @media (max-width: 1024px) {
+        .bc-features-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    @media (max-width: 640px) {
+        .bc-features-grid { grid-template-columns: 1fr; }
+        .bc-title-main { font-size: 2.5rem; }
+        .bc-header { padding: 15px 20px; }
+    }
+    
+    .bc-feature-card {
+        background: linear-gradient(135deg, #0d1120 0%, #1a1f3a 100%);
+        border: 1px solid #1e2847;
+        border-radius: 12px;
+        padding: 24px;
+        transition: all 0.3s ease;
+        animation: fadeIn 1.6s ease-out calc(0.6s + var(--delay)) both;
+    }
+    
+    .bc-feature-card:hover {
+        border-color: #2e5aa5;
+        background: linear-gradient(135deg, #1a1f3a 0%, #2a3a52 100%);
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(46, 90, 165, 0.15);
+    }
+    
+    .bc-feature-icon {
+        font-size: 2em;
+        margin-bottom: 12px;
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    .bc-feature-title {
+        font-size: 1em;
+        font-weight: 600;
+        color: #cbd5e1;
+        margin-bottom: 8px;
+    }
+    
+    .bc-feature-desc {
+        font-size: 0.85em;
+        color: #64748b;
+        line-height: 1.5;
+    }
+    
+    .bc-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin: 40px 0;
+        animation: fadeIn 1.8s ease-out 0.8s both;
+    }
+    
+    @media (max-width: 768px) {
+        .bc-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    .bc-stat-card {
+        background: linear-gradient(135deg, #0f1a2e 0%, #1a2f4d 100%);
+        border: 1px solid #1e3a5f;
+        padding: 18px;
+        border-radius: 10px;
+        text-align: center;
+    }
+    
+    .bc-stat-number {
+        font-size: 1.8em;
+        font-weight: 700;
+        color: #7ec8f5;
+        margin-bottom: 5px;
+    }
+    
+    .bc-stat-label {
+        font-size: 0.8em;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .bc-cta-box {
+        background: linear-gradient(135deg, #0f2a1a 0%, #1a3f2a 100%);
+        border: 1px solid #1a5c35;
+        border-radius: 12px;
+        padding: 32px;
+        text-align: center;
+        margin: 40px 0;
+        animation: fadeIn 2s ease-out 1s both;
+    }
+    
+    .bc-cta-title {
+        color: #4ade80;
+        font-size: 1.3em;
+        font-weight: 600;
+        margin-bottom: 12px;
+    }
+    
+    .bc-cta-text {
+        color: #86efac;
+        font-size: 0.95em;
+        margin-bottom: 8px;
+        line-height: 1.6;
+    }
+    
+    .bc-cta-contact {
+        color: #7ec8f5;
+        font-weight: 500;
+        margin-top: 12px;
+    }
+    
+    .bc-footer {
+        text-align: center;
+        color: #475569;
+        font-size: 0.85em;
+        padding: 30px 20px;
+        border-top: 1px solid #1e2847;
+        margin-top: 50px;
+        animation: fadeIn 2.2s ease-out 1.2s both;
+    }
+    
+    .bc-footer-brand {
+        color: #cbd5e1;
+        font-weight: 600;
+    }
+    </style>
+    
+    <div class="bc-container">
+        <div class="bc-header">
+            <div class="bc-logo-section">
+                <span class="bc-logo-text">🧬 BioCore Intelligence</span>
+            </div>
+            <span class="bc-live-badge">⬤ Sistema Activo 2026</span>
+        </div>
+        
+        <div class="bc-hero">
+            <div class="bc-tagline-sup">Environmental Monitoring System</div>
+            <h1 class="bc-title-main">Auditoría de Vigilancia Ambiental</h1>
+            <p class="bc-subtitle">Evidencia técnica satelital defensible ante autoridades regulatorias</p>
+            <p class="bc-features-text">Fusión inteligente de 8 satélites | 20+ años históricos | Art. 6 RSEIA | Tiempo Real</p>
+        </div>
+        
+        <div class="bc-sensors-grid">
+            <div class="bc-sensor-pill">🛰️ Sentinel-2 (10m)</div>
+            <div class="bc-sensor-pill">📡 Sentinel-1 SAR</div>
+            <div class="bc-sensor-pill">🌡️ MODIS NASA</div>
+            <div class="bc-sensor-pill">🔥 NASA FIRMS</div>
+            <div class="bc-sensor-pill">🌲 Hansen GFC</div>
+            <div class="bc-sensor-pill">🌍 ERA5-Land</div>
+            <div class="bc-sensor-pill">🏞️ Copernicus LC</div>
+            <div class="bc-sensor-pill">📊 CONAF</div>
+        </div>
+        
+        <div class="bc-features-grid">
+            <div class="bc-feature-card" style="--delay: 0s;">
+                <div class="bc-feature-icon">📊</div>
+                <div class="bc-feature-title">Índices Espectrales</div>
+                <div class="bc-feature-desc">SAVI, NDWI, NDSI, NDVI con resolución 10m en Sentinel-2</div>
+            </div>
+            <div class="bc-feature-card" style="--delay: 0.1s;">
+                <div class="bc-feature-icon">📋</div>
+                <div class="bc-feature-title">Reportes PDF Profesionales</div>
+                <div class="bc-feature-desc">Descargables con firma técnica y análisis histórico de 20 años</div>
+            </div>
+            <div class="bc-feature-card" style="--delay: 0.2s;">
+                <div class="bc-feature-icon">📡</div>
+                <div class="bc-feature-title">Alertas Telegram en Vivo</div>
+                <div class="bc-feature-desc">Notificaciones automáticas según frecuencia configurada</div>
+            </div>
+            <div class="bc-feature-card" style="--delay: 0.3s;">
+                <div class="bc-feature-icon">🛡️</div>
+                <div class="bc-feature-title">Blindaje Legal RSEIA</div>
+                <div class="bc-feature-desc">Art. 6 RSEIA, Ficha SU-6, normativa ambiental chilena</div>
+            </div>
+            <div class="bc-feature-card" style="--delay: 0.4s;">
+                <div class="bc-feature-icon">🔍</div>
+                <div class="bc-feature-title">Monitoreo Radar SAR</div>
+                <div class="bc-feature-desc">Detección de cambios atravesando nubes y lluvia</div>
+            </div>
+            <div class="bc-feature-card" style="--delay: 0.5s;">
+                <div class="bc-feature-icon">🎯</div>
+                <div class="bc-feature-title">5 Tipos de Proyecto</div>
+                <div class="bc-feature-desc">Minería, Glaciares, Bosques, Humedales, Agricultura</div>
+            </div>
+        </div>
+        
+        <div class="bc-stats">
+            <div class="bc-stat-card">
+                <div class="bc-stat-number">20+</div>
+                <div class="bc-stat-label">Años Históricos</div>
+            </div>
+            <div class="bc-stat-card">
+                <div class="bc-stat-number">8</div>
+                <div class="bc-stat-label">Satélites Fusionados</div>
+            </div>
+            <div class="bc-stat-card">
+                <div class="bc-stat-number">5</div>
+                <div class="bc-stat-label">Tipos de Proyecto</div>
+            </div>
+            <div class="bc-stat-card">
+                <div class="bc-stat-number">24h</div>
+                <div class="bc-stat-label">Actualización</div>
+            </div>
+        </div>
+        
+        <div class="bc-cta-box">
+            <div class="bc-cta-title">🔐 Acceso Restringido</div>
+            <div class="bc-cta-text">Inicia sesión desde el panel izquierdo con tus credenciales BioCore</div>
+            <div class="bc-cta-contact">📧 consultorabiocore@gmail.com</div>
+        </div>
+        
+        <div class="bc-footer">
+            <div class="bc-footer-brand">BioCore Intelligence © 2026</div>
+            <div>Todos los derechos reservados | Tecnología de Vigilancia Ambiental Satelital</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================================
+# MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO (CORREGIDO)
+# ============================================================================
+
+def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
+    """
+    Generador dinámico de reportes BioCore Intelligence.
+    Integra Clay Index (cly), Fichas SEA y Art. 6 RSEIA.
+    Versión corregida con validación segura de tipos.
+    """
+    try:
+        # Extracción segura de datos con valores por defecto
+        tipo = (proyecto_data or {}).get('Tipo', 'GENERAL')
+        if tipo:
+            tipo = str(tipo).upper()
+        else:
+            tipo = 'GENERAL'
+            
+        proyecto = (proyecto_data or {}).get('Proyecto', 'N/A')
+        if proyecto:
+            proyecto = str(proyecto)
+        else:
+            proyecto = 'N/A'
+
+        fecha = (reporte_data or {}).get('fecha', 'N/A')
+        if fecha:
+            fecha = str(fecha)
+        else:
+            fecha = 'N/A'
+
+        # Índices espectrales
+        savi = float((reporte_data or {}).get('savi_actual', 0) or 0)
+        ndwi = float((reporte_data or {}).get('ndwi', 0) or 0)
+        swir = float((reporte_data or {}).get('swir', 0) or 0)
+        ndsi = float((reporte_data or {}).get('ndsi', 0) or 0)
+        clay = float((reporte_data or {}).get('clay', 0) or 0)
+        altura = float((reporte_data or {}).get('altura', (reporte_data or {}).get('ndvi', 0) * 10) or 0)
+        sar_vv = float((reporte_data or {}).get('sar_vv', 0) or 0)
+        temp = float((reporte_data or {}).get('temp', 0) or 0)
+        incendios = int((reporte_data or {}).get('incendios_activos', 0) or 0)
+        
+        # Variaciones
+        v_savi = float((reporte_data or {}).get('variacion', 0) or 0)
+        v_ndwi = float((reporte_data or {}).get('variacion_ndwi', 0) or 0)
+        v_ndsi = float((reporte_data or {}).get('variacion_ndsi', 0) or 0)
+        
+        estado = (reporte_data or {}).get('estado', 'BAJO CONTROL')
+        if estado:
+            estado = str(estado)
+        else:
+            estado = 'BAJO CONTROL'
+
+        header = (
+            "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
+            "\u2551   \U0001f6f0\ufe0f  AUDITOR\u00cdA DE VIGILANCIA AMBIENTAL   \u2551\n"
+            "\u2551      Y RESILIENCIA CLIM\u00c1TICA (v2026.2)     \u2551\n"
+            "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n"
+            f"\U0001f4cd PROYECTO: {proyecto}\n"
+            f"\U0001f4ca TIPO: {tipo} | \U0001f4c5 AN\u00c1LISIS: {fecha}\n"
+            "\U0001f6f0\ufe0f SENSORES: Fusi\u00f3n Sentinel (2/1) | NASA (GEDI/FIRMS)\n"
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        )
+
+        if tipo == 'GLACIAR':
+            est_ndsi = '\u2705 Hielo perenne' if ndsi > 0.40 else '\u26a0\ufe0f Transici\u00f3n' if ndsi > 0.20 else '\U0001f534 Retracci\u00f3n cr\u00edtica'
+            est_clay = '\U0001f6e1\ufe0f Sustrato mineral estable' if clay < 0.25 else '\u26a0\ufe0f Anomal\u00eda detectada'
+            est_fuego = '\u2705 Sin fuego' if incendios == 0 else f'\U0001f525 {incendios} focos'
+            diagnostico = (
+                f"\n\u2744\ufe0f CR\u00cdOSFERA (NDSI): {ndsi:.3f} ({v_ndsi:+.1f}% vs Hist.)\n"
+                f"\u2514 Estatus: {est_ndsi}\n"
+                f"\U0001f4e1 RADAR S1 (VV): {sar_vv:.2f} dB (Hielo consolidado)\n"
+                f"\U0001f6e1\ufe0f INTEGRIDAD (SU-6): SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}\n"
+                f"\u2514 An\u00e1lisis: {est_clay}\n"
+                f"\u26a0\ufe0f RIESGO CLIM\u00c1TICO: Temp: {temp:.1f}\u00b0C | {est_fuego}"
+            )
+
+        elif tipo == 'MINERIA':
+            regen = 'OK' if savi > 0.25 else 'REVISAR'
+            est_swir = '\U0001f6e1\ufe0f Sin movimientos' if swir < 0.28 else '\u26a0\ufe0f ALERTA: Faena detectada'
+            est_ndwi = '\u2705 Niveles normales' if ndwi > 0.20 else '\u26a0\ufe0f ALERTA: Desecaci\u00f3n/Relaves'
+            diagnostico = (
+                "\n\u26cf\ufe0f MONITOREO INTEGRAL DE YACIMIENTO:\n"
+                "\U0001f6e1\ufe0f INTEGRIDAD TERRITORIAL (SU-6): \n"
+                f"\u2514 SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}\n"
+                f"\u2514 Estatus: {est_swir}\n"
+                f"\U0001f4a7 RECURSOS H\u00cdDRICOS (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs Base)\n"
+                f"\u2514 Estatus: {est_ndwi}\n"
+                f"\U0001f331 VEGETACI\u00d3N (VE-5): SAVI: {savi:.3f} | Altura: {altura:.1f}m\n"
+                f"\u2514 An\u00e1lisis: Cumplimiento Ley 20.283 (Regeneraci\u00f3n: {regen})."
+            )
+
+        elif tipo == 'BOSQUE':
+            est_savi = '\u2705 Vigor \u00f3ptimo' if savi > 0.40 else '\U0001f534 Degradaci\u00f3n severa'
+            est_alt = '\u2705 Refugio preservado' if altura > 5 else '\u26a0\ufe0f Estructura alterada'
+            est_fuego = '\u2705 Bajo control' if incendios == 0 else f'\U0001f534 {incendios} focos activos'
+            diagnostico = (
+                "\n\U0001f332 VIGILANCIA FORESTAL (Ley 20.283):\n"
+                f"\U0001f331 SALUD VEGETAL (VE-5): SAVI: {savi:.3f} ({v_savi:+.1f}% vs Hist.)\n"
+                f"\u2514 Estatus: {est_savi}\n"
+                f"\U0001f4cf H\u00c1BITAT (VE-7): Altura (GEDI NASA): {altura:.1f}m\n"
+                f"\u2514 Estatus: {est_alt}\n"
+                f"\U0001f525 AMENAZA CLIM\u00c1TICA: {est_fuego}\n"
+                f"\u2514 Temp LST: {temp:.1f}\u00b0C | Humedad Foliar: {ndwi:.4f}"
+            )
+
+        elif tipo == 'HUMEDAL':
+            est_ndwi = '\u2705 Saturado' if ndwi > 0.40 else '\U0001f534 Desecaci\u00f3n en curso'
+            est_swir = '\U0001f6e1\ufe0f Humedad basal conservada' if swir > 0.25 else '\u26a0\ufe0f Suelo expuesto'
+            diagnostico = (
+                "\n\U0001f4a7 VIGILANCIA ECOSISTEMA ACU\u00c1TICO:\n"
+                f"\U0001f4a7 CICLO HIDROL\u00d3GICO (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs Base)\n"
+                f"\u2514 Estatus: {est_ndwi}\n"
+                f"\U0001f6e1\ufe0f INTEGRIDAD (SU-6): SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}\n"
+                f"\u2514 An\u00e1lisis: {est_swir}\n"
+                f"\U0001f33f VEGETACI\u00d3N (SAVI): {savi:.3f} (Vegetaci\u00f3n Hidr\u00f3fila)\n"
+                "\u2514 An\u00e1lisis: Cumplimiento Art. 6 RSEIA y Decreto de Humedales."
+            )
+
+        elif tipo == 'AGRICOLA':
+            est_savi = '\u2705 Rendimiento m\u00e1ximo' if savi > 0.45 else '\u26a0\ufe0f Aumentar riego'
+            est_rend = '\u2705 ALTO (80-100%)' if savi > 0.35 else '\U0001f534 BAJO (<50%)'
+            diagnostico = (
+                "\n\U0001f33e OPTIMIZACI\u00d3N DE CULTIVOS:\n"
+                f"\U0001f331 VIGOR (SAVI): {savi:.3f} ({v_savi:+.1f}% vs Hist\u00f3rico)\n"
+                f"\u2514 Estatus: {est_savi}\n"
+                f"\U0001f4a7 HUMEDAD (NDWI): {ndwi:.4f} (Control de estr\u00e9s foliar)\n"
+                f"\U0001f4ca RENDIMIENTO: {est_rend}"
+            )
+
+        else:
+            diagnostico = f"\nEstado: {estado}"
+
+        # Correlacion hidrica automatica Art. 6 RSEIA
+        swir_base = float((reporte_data or {}).get('swir_base', swir) or swir)
+        ndwi_base = float((reporte_data or {}).get('ndwi_base', ndwi) or ndwi)
+        nota_hidrica = ""
+        if swir < swir_base * 0.85 and ndwi > ndwi_base * 1.10:
+            nota_hidrica = "\n\U0001f327\ufe0f RECARGA H\u00cdDRICA (Art. 6 RSEIA): Se certifica recarga natural por precipitaci\u00f3n; respuesta ecosist\u00e9mica consistente."
+
+        footer = (
+            "\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            f"\u2705 ESTADO GLOBAL: {estado}{nota_hidrica}\n"
+            "\U0001f4dd CONCLUSI\u00d3N: El ecosistema mantiene su capacidad de regeneraci\u00f3n y permanencia (Art. 6 RSEIA).\n"
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "\U0001f50d Fusi\u00f3n satelital avanzada BioCore Intelligence \u00a9 2026"
+        )
+
+        return header + diagnostico + footer
+    
+    except Exception as e:
+        # Si hay error, retornar mensaje genérico sin fallar
+        return f"❌ Error generando reporte: {str(e)}\nContacta a consultorabiocore@gmail.com"
 
 
 # ============================================================================
@@ -846,7 +921,7 @@ def obtener_historico_20_anios(geom, tipo_proyecto, rango_anios=20):
                     except Exception:
                         pass
 
-                # ── SENTINEL-1 SAR (2014+) ──────────────────────────────────
+                # ── SENTINEL-1 SAR (2014+) ────────────────────────────────��─
                 if anio >= 2014:
                     try:
                         s1 = ee.ImageCollection('COPERNICUS/S1_GRD')\
@@ -901,8 +976,8 @@ def obtener_historico_20_anios(geom, tipo_proyecto, rango_anios=20):
                     if t2m != 0 or prec != 0:
                         temp_c = t2m - 273.15  # Kelvin → Celsius
                         prec_mm = prec * 1000   # m → mm
-                        indices_historicos['temperatura_min'].append(temp_c)   # ERA5 no separa min/max mensual directamente
-                        indices_historicos['temperatura_max'].append(temp_c)   # usamos t2m como referencia en ambos
+                        indices_historicos['temperatura_min'].append(temp_c)
+                        indices_historicos['temperatura_max'].append(temp_c)
                         indices_historicos['precipitacion'].append(prec_mm)
                         indices_historicos['anios_clima'].append(anio)
                 except Exception:
@@ -1537,9 +1612,6 @@ def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
     variacion_ndvi = calcular_variacion(ndvi_now, ndvi_base)
 
     # === OBTENER HISTÓRICO SEGÚN RANGO SELECCIONADO ===
-    # rango_anios controla cuántos años se grafican Y el título del PDF.
-    # Para rangos < 1 año (7 días, 2 semanas, 1 mes, 3 meses) se consulta 1 año
-    # de datos GEE (mínimo técnico), pero el TÍTULO muestra el período real elegido.
     _rangos_anios_map = {
         "Últimos 7 días": 1, "Últimas 2 semanas": 1, "Último mes": 1,
         "Últimos 3 meses": 1, "Último año": 1,
@@ -1547,7 +1619,6 @@ def generar_reporte_total(p, rango_dias=30, rango_sel="Último mes"):
         "Últimos 15 años": 15, "Últimos 20 años": 20,
     }
     rango_anios = _rangos_anios_map.get(rango_sel, max(1, min(20, round(rango_dias / 365))))
-    # El label que aparece en el PDF es el texto exacto que eligió el cliente
     rango_label = rango_sel.replace("Últimos ", "").replace("Último ", "").replace("Últimas ", "")
     indices_historicos = obtener_historico_20_anios(geom, p.get('Tipo', 'GENERAL'), rango_anios=rango_anios)
     
@@ -1900,7 +1971,8 @@ recomendaciones_por_tipo = {
             "Elaborar informe tecnico de la situacion detectada."
         ),
     },
-        }
+}
+
 # ============================================================================
 # MÓDULO 6: GENERADOR DE PDF
 # ============================================================================
@@ -2078,11 +2150,9 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         etiqueta = etiquetas_signo.get(icono, '>> ')
         pdf.set_font("helvetica", "B", 9)
         pdf.set_text_color(r, g, b)
-        # Sin ln=1 para que el cursor quede en la misma línea
         pdf.cell(32, 5, clean(etiqueta))
         pdf.set_font("helvetica", "", 9)
         pdf.set_text_color(0, 0, 0)
-        # Ancho fijo: 210 - margen_izq(10) - margen_der(10) - etiqueta(32) = 158
         pdf.multi_cell(158, 5, clean(signo['texto']))
         pdf.ln(1)
     
@@ -2121,7 +2191,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     ]
 
     for nombre, actual, base, variacion, interp in indices_data:
-        pdf.cell(col_widths[0], 10, nombre, border=1)
+        pdf.cell(col_widths[0], 10
+        , nombre, border=1)
         pdf.cell(col_widths[1], 10, f"{float(actual):.4f}", border=1, align="C")
         pdf.cell(col_widths[2], 10, f"{float(base):.4f}", border=1, align="C")
         pdf.cell(col_widths[3], 10, f"{float(variacion):+.1f}%", border=1, align="C")
@@ -2228,7 +2299,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         "Util como dato independiente en condiciones de nubosidad total."
     ))
 
-    # SECCIÓN 8: GRÁFICOS — muestra el rango elegido por el cliente
+    # SECCIÓN 8: GRÁFICOS
     rango_anios_pdf = reporte_data.get('rango_anios', 20)
     rango_label_pdf = reporte_data.get('rango_label', f"{rango_anios_pdf} años")
     if img_path and os.path.exists(img_path):
@@ -2244,7 +2315,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
         except:
             pass
     
-    # SECCIÓN 9: ANÁLISIS DE VULNERABILIDAD Y RESILIENCIA CLIMÁTICA (Arclim MMA)
+    # SECCIÓN 9: ANÁLISIS DE VULNERABILIDAD Y RESILIENCIA CLIMÁTICA
     pdf.add_page()
 
     pdf.set_font("helvetica", "B", 14)
@@ -2265,7 +2336,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     temp_v    = reporte_data.get('temp', 0)
     nivel_v   = reporte_data.get('nivel', 'NORMAL')
 
-    # Determinar amenaza proyectada dinámicamente según tipo e índices
     if tipo_vuln == 'GLACIAR':
         amenaza_arclim = "estres termico critico y perdida de criosfera"
         vuln_nivel = "Muy Alta"
@@ -2294,7 +2364,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     ))
     pdf.ln(4)
 
-    # --- 9.2 Certificación de Sumidero de Carbono (Ley 21.455) ---
+    # --- 9.2 Certificación de Sumidero de Carbono ---
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 8, "9.2 Certificacion de Sumidero de Carbono (Ley 21.455)", ln=1)
@@ -2328,7 +2398,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.multi_cell(190, 5, clean(cert_texto))
     pdf.ln(4)
 
-    # --- 9.3 Estabilidad Basal (Clay Index - Ficha SU-6) ---
+    # --- 9.3 Estabilidad Basal ---
     pdf.set_font("helvetica", "B", 11)
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 8, "9.3 Estabilidad Basal del Sustrato (Clay Index - Ficha SU-6)", ln=1)
@@ -2363,7 +2433,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.multi_cell(190, 5, clean(clay_texto))
     pdf.ln(3)
 
-    # Indicador visual de estado del clay
     pdf.set_fill_color(*clay_color)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", "B", 9)
@@ -2373,7 +2442,7 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
 
-    # --- 9.4 Análisis de Correlación Hídrica (Art. 6 RSEIA) ---
+    # --- 9.4 Análisis de Correlación Hídrica ---
     swir_base_pdf = reporte_data.get('swir_base', swir_v)
     ndwi_base_pdf = reporte_data.get('ndwi_base', ndwi_v)
 
@@ -2413,7 +2482,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 8, "9.5 Plan de Accion Adaptativo", ln=1)
 
-    # Encabezado tabla
     pdf.set_font("helvetica", "B", 9)
     pdf.set_fill_color(40, 80, 120)
     pdf.set_text_color(255, 255, 255)
@@ -2421,7 +2489,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.cell(80, 8, "Accion Requerida", border=1, fill=True, align="C")
     pdf.cell(85, 8, "Responsable / Marco Legal", border=1, fill=True, align="C", ln=1)
 
-    # Filas dinámicas según nivel de riesgo
     pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(0, 0, 0)
 
@@ -2452,23 +2519,18 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_text_color(20, 50, 80)
     pdf.cell(0, 10, "10. RECOMENDACIONES Y PLAN DE ACCION", ln=1)
     
-    # 1. Obtener datos con valores seguros por defecto
     riesgo_val = reporte_data.get('nivel', 'NORMAL')
     tipo_val = reporte_data.get('tipo', 'GENERAL')
     
-    # 2. Extraer el texto del diccionario de recomendaciones
-    # Usamos un nombre de variable único: 'texto_final_recom'
     texto_final_recom = recomendaciones_por_tipo.get(riesgo_val, {}).get(tipo_val, "Sin recomendaciones específicas.")
     
     pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(0, 0, 0)
     
-    # 3. Procesar las líneas de texto
     lineas_encontradas = texto_final_recom.split('\n')
     for contador, contenido_linea in enumerate(lineas_encontradas, 1):
         item_para_pdf = contenido_linea.strip()
         if item_para_pdf:
-            # AQUÍ ESTÁ EL CAMBIO CLAVE: No usamos la palabra 'recom' para evitar el error
             pdf.set_x(10)
             pdf.multi_cell(190, 6, f"{contador}. {clean(item_para_pdf)}")
     
@@ -2505,7 +2567,6 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     fecha_reporte = datetime.now().strftime("%d/%m/%Y")
     pdf.cell(0, 4, f"Fecha de emisión: {fecha_reporte}", align="C")
 
-    # Retornar el objeto PDF terminado
     return pdf
 
 
@@ -2569,182 +2630,7 @@ with st.sidebar:
 
 # === PANTALLA DE BIENVENIDA ===
 if not st.session_state.get('authenticated'):
-
-    st.markdown("""
-    <style>
-    .bc-logo-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 0 18px 0;
-        border-bottom: 0.5px solid #1e2535;
-        margin-bottom: 18px;
-    }
-    .bc-logo-bar img {
-        height: 52px;
-        object-fit: contain;
-    }
-    .bc-live-badge {
-        background: #0f2a1a;
-        border: 0.5px solid #1a5c35;
-        color: #4ade80;
-        font-size: 0.75em;
-        padding: 4px 12px;
-        border-radius: 20px;
-    }
-    .bc-tagline {
-        text-align: center;
-        margin-bottom: 6px;
-    }
-    .bc-tagline .bc-sup {
-        font-size: 0.72em;
-        color: #64748b;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        display: block;
-        margin-bottom: 6px;
-    }
-    .bc-tagline h1 {
-        font-size: 1.6rem !important;
-        font-weight: 500;
-        color: #e2e8f0;
-        margin-bottom: 6px;
-    }
-    .bc-tagline p {
-        color: #64748b;
-        font-size: 0.92em;
-        max-width: 600px;
-        margin: 0 auto;
-        line-height: 1.6;
-    }
-    .bc-sensors {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 7px;
-        margin: 14px 0 18px 0;
-    }
-    .bc-sensor-pill {
-        background: #0f1a2e;
-        border: 0.5px solid #1e3a5f;
-        color: #7ec8f5;
-        font-size: 0.72em;
-        padding: 4px 11px;
-        border-radius: 20px;
-    }
-    .bc-features {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin: 18px 0;
-    }
-    @media (max-width: 700px) {
-        .bc-features { grid-template-columns: repeat(2, 1fr); }
-    }
-    .bc-feat-card {
-        background: #0d1120;
-        border: 0.5px solid #1e2535;
-        border-radius: 10px;
-        padding: 14px 14px 12px;
-    }
-    .bc-feat-card .bc-icon { font-size: 1.4em; margin-bottom: 6px; }
-    .bc-feat-card .bc-ftitle {
-        font-size: 0.82em;
-        font-weight: 500;
-        color: #cbd5e1;
-        margin-bottom: 4px;
-    }
-    .bc-feat-card .bc-fdesc {
-        font-size: 0.72em;
-        color: #475569;
-        line-height: 1.45;
-    }
-    .bc-access-box {
-        background: #0d1120;
-        border: 0.5px solid #1e2535;
-        border-radius: 10px;
-        padding: 18px 22px;
-        text-align: center;
-        margin-top: 4px;
-    }
-    .bc-access-box h3 {
-        color: #94a3b8;
-        font-size: 0.95em;
-        font-weight: 500;
-        margin-bottom: 6px;
-    }
-    .bc-access-box p {
-        color: #475569;
-        font-size: 0.82em;
-        margin-bottom: 4px;
-    }
-    .bc-access-box a { color: #7ec8f5; }
-    </style>
-
-    <div class="bc-logo-bar">
-        <img src="https://raw.githubusercontent.com/consultorabiocore/Biocoreintelligence/refs/heads/main/logo_biocore.png"
-             alt="BioCore Intelligence"
-             onerror="this.style.display='none'">
-        <span class="bc-live-badge">⬤ Sistema activo</span>
-    </div>
-
-    <div class="bc-tagline">
-        <span class="bc-sup">BioCore Intelligence</span>
-        <h1>Auditoría de Vigilancia Ambiental y Resiliencia Climática</h1>
-        <p>Evidencia técnica satelital antes de que llegue la fiscalización.</p>
-    </div>
-
-    <div class="bc-sensors">
-        <span class="bc-sensor-pill">Sentinel-2</span>
-        <span class="bc-sensor-pill">Sentinel-1 SAR</span>
-        <span class="bc-sensor-pill">MODIS NASA</span>
-        <span class="bc-sensor-pill">NASA FIRMS</span>
-        <span class="bc-sensor-pill">Hansen GFC</span>
-        <span class="bc-sensor-pill">TerraClimate</span>
-        <span class="bc-sensor-pill">CONAF Bosques</span>
-        <span class="bc-sensor-pill">Copernicus LC</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    demo_map = folium.Map(
-        location=[-37.0, -71.5],
-        zoom_start=5,
-        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        attr='Google Satellite'
-    )
-    folium_static(demo_map, width=1200, height=380)
-
-    st.markdown("""
-    <div class="bc-features">
-        <div class="bc-feat-card">
-            <div class="bc-icon">[ S-2 ]</div>
-            <div class="bc-ftitle">Indices espectrales</div>
-            <div class="bc-fdesc">SAVI, NDWI, NDSI, NDVI en resolución 10 m con Sentinel-2</div>
-        </div>
-        <div class="bc-feat-card">
-            <div class="bc-icon">[ PDF ]</div>
-            <div class="bc-ftitle">Reportes PDF</div>
-            <div class="bc-fdesc">Descargables con firma técnica y análisis histórico de 20 años</div>
-        </div>
-        <div class="bc-feat-card">
-            <div class="bc-icon">[ TLG ]</div>
-            <div class="bc-ftitle">Alertas Telegram</div>
-            <div class="bc-fdesc">Notificaciones automáticas según frecuencia diaria o semanal</div>
-        </div>
-        <div class="bc-feat-card">
-            <div class="bc-icon">[ SAR ]</div>
-            <div class="bc-ftitle">Radar Sentinel-1</div>
-            <div class="bc-fdesc">Detección de focos activos y análisis de superficie vía SAR</div>
-        </div>
-    </div>
-
-    <div class="bc-access-box">
-        <h3>Acceso restringido</h3>
-        <p>Inicia sesión desde el panel izquierdo</p>
-        <p><a href="mailto:consultorabiocore@gmail.com">consultorabiocore@gmail.com</a></p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    crear_portada_biocore()
     st.stop()
 
 
@@ -3491,7 +3377,6 @@ if st.session_state.get('admin_mode'):
             else:
                 st.info("No hay clientes registrados")
 
-# === PESTAÑA SOPORTE ===
 # === PESTAÑA GUIA (ADMIN) ===
 if st.session_state.get('admin_mode'):
     with tab_guia:

@@ -187,81 +187,135 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
     v_ndsi   = reporte_data.get('variacion_ndsi', 0)
     estado   = reporte_data.get('estado', 'BAJO CONTROL')
 
-    header = f"""╔════════════════════════════════════════════╗
-║   🛰️  AUDITORÍA DE VIGILANCIA AMBIENTAL   ║
-║      Y RESILIENCIA CLIMÁTICA (v2026.2)     ║
-╚════════════════════════════════════════════╝
+    # Helpers de estado sin emojis
+    def st_ndsi(v):
+        return 'HIELO PERENNE' if v > 0.40 else 'TRANSICION ESTACIONAL' if v > 0.20 else '[ALERTA] RETRACCION CRITICA'
+    def st_clay(v):
+        return 'SUSTRATO ESTABLE' if v < 0.25 else '[AVISO] ANOMALIA DETECTADA'
+    def st_swir_min(v):
+        return 'SIN MOVIMIENTOS' if v < 0.28 else '[ALERTA] FAENA DETECTADA'
+    def st_ndwi_min(v):
+        return 'NIVELES NORMALES' if v > 0.20 else '[ALERTA] DESECACION / RELAVES'
+    def st_ndwi_hum(v):
+        return 'SATURADO' if v > 0.40 else '[ALERTA] DESECACION EN CURSO'
+    def st_swir_hum(v):
+        return 'HUMEDAD BASAL CONSERVADA' if v > 0.25 else '[AVISO] SUELO EXPUESTO'
+    def st_savi_bos(v):
+        return 'VIGOR OPTIMO' if v > 0.40 else '[ALERTA] DEGRADACION SEVERA'
+    def st_altura(v):
+        return 'REFUGIO PRESERVADO' if v > 5 else '[AVISO] ESTRUCTURA ALTERADA'
+    def st_fuego(v):
+        return 'SIN FOCOS ACTIVOS' if v == 0 else f'[ALERTA] {v} FOCOS DETECTADOS'
+    def st_savi_agr(v):
+        return 'RENDIMIENTO MAXIMO' if v > 0.45 else '[AVISO] AUMENTAR RIEGO'
+    def st_rend(v):
+        return 'ALTO  80-100%' if v > 0.35 else '[BAJO] <50%'
 
-📍 PROYECTO: {proyecto}
-📊 TIPO: {tipo} | 📅 ANÁLISIS: {fecha}
-🛰️ SENSORES: Fusión Sentinel (2/1) | NASA (GEDI/FIRMS)
-──────────────────────────────────"""
+    header = f"""╔══════════════════════════════════════════════╗
+║  AUDITORIA DE VIGILANCIA AMBIENTAL           ║
+║  Y RESILIENCIA CLIMATICA  |  v2026.2         ║
+╚══════════════════════════════════════════════╝
+PROYECTO : {proyecto}
+TIPO     : {tipo}
+FECHA    : {fecha}
+SENSORES : Sentinel-2/1 | NASA GEDI | NASA FIRMS
+──────────────────────────────────────────────"""
 
     if tipo == 'GLACIAR':
         diagnostico = f"""
-❄️ CRIÓSFERA (NDSI): {ndsi:.3f} ({v_ndsi:+.1f}% vs Hist.)
-└ Estatus: {'✅ Hielo perenne' if ndsi > 0.40 else '⚠️ Transición' if ndsi > 0.20 else '🔴 Retracción crítica'}
-📡 RADAR S1 (VV): {sar_vv:.2f} dB (Hielo consolidado)
-🛡️ INTEGRIDAD (SU-6): SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}
-└ Análisis: {'🛡️ Sustrato mineral estable' if clay < 0.25 else '⚠️ Anomalía detectada'}
-⚠️ RIESGO CLIMÁTICO: Temp: {temp:.1f}°C | {'✅ Sin fuego' if incendios == 0 else f'🔥 {incendios} focos'}"""
+-- CRIOSFERA --
+NDSI     : {ndsi:.3f}   VAR: {v_ndsi:+.1f}% vs hist.
+ESTADO   : {st_ndsi(ndsi)}
+
+-- RADAR SENTINEL-1 --
+SAR VV   : {sar_vv:.2f} dB
+LECTURA  : {'HIELO CONSOLIDADO' if sar_vv < -8 else 'SUPERFICIE EXPUESTA O ACTIVA'}
+
+-- INTEGRIDAD SUSTRATO (SU-6) --
+SWIR     : {swir:.2f}   CLY: {clay:.2f}
+SU-6     : {st_clay(clay)}
+
+-- RIESGO CLIMATICO --
+TEMP LST : {temp:.1f} C
+FOCOS    : {st_fuego(incendios)}"""
 
     elif tipo == 'MINERIA':
-        regen_estado = 'OK' if savi > 0.25 else 'REVISAR'
+        regen = 'CONFORME' if savi > 0.25 else 'REVISAR'
         diagnostico = f"""
-⛏️ MONITOREO INTEGRAL DE YACIMIENTO:
-🛡️ INTEGRIDAD TERRITORIAL (SU-6):
-└ SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}
-└ Estatus: {'🛡️ Sin movimientos' if swir < 0.28 else '⚠️ ALERTA: Faena detectada'}
-💧 RECURSOS HÍDRICOS (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs Base)
-└ Estatus: {'✅ Niveles normales' if ndwi > 0.20 else '⚠️ ALERTA: Desecación/Relaves'}
-🌱 VEGETACIÓN (VE-5): SAVI: {savi:.3f} | Altura: {altura:.1f}m
-└ Análisis: Cumplimiento Ley 20.283 (Regeneración: {regen_estado})."""
+-- MONITOREO INTEGRAL DE YACIMIENTO --
+
+-- INTEGRIDAD TERRITORIAL (SU-6) --
+SWIR     : {swir:.2f}   CLY: {clay:.2f}
+SU-6     : {st_swir_min(swir)}
+
+-- RECURSOS HIDRICOS --
+NDWI     : {ndwi:.4f}   VAR: {v_ndwi:+.1f}% vs base
+ESTADO   : {st_ndwi_min(ndwi)}
+
+-- VEGETACION PERIMETRAL (VE-5) --
+SAVI     : {savi:.3f}   ALT: {altura:.1f} m
+LEY 20.283 REGENERACION: {regen}"""
 
     elif tipo == 'BOSQUE':
         diagnostico = f"""
-🌲 VIGILANCIA FORESTAL (Ley 20.283):
-🌱 SALUD VEGETAL (VE-5): SAVI: {savi:.3f} ({v_savi:+.1f}% vs Hist.)
-└ Estatus: {'✅ Vigor óptimo' if savi > 0.40 else '🔴 Degradación severa'}
-📏 HÁBITAT (VE-7): Altura (GEDI NASA): {altura:.1f}m
-└ Estatus: {'✅ Refugio preservado' if altura > 5 else '⚠️ Estructura alterada'}
-🔥 AMENAZA CLIMÁTICA: {'✅ Bajo control' if incendios == 0 else f'🔴 {incendios} focos activos'}
-└ Temp LST: {temp:.1f}°C | Humedad Foliar: {ndwi:.4f}"""
+-- VIGILANCIA FORESTAL (LEY 20.283) --
+
+-- SALUD VEGETAL (VE-5) --
+SAVI     : {savi:.3f}   VAR: {v_savi:+.1f}% vs hist.
+ESTADO   : {st_savi_bos(savi)}
+
+-- ESTRUCTURA DE HABITAT (VE-7) --
+ALTURA   : {altura:.1f} m  (GEDI NASA)
+ESTADO   : {st_altura(altura)}
+
+-- AMENAZA TERMICA --
+TEMP LST : {temp:.1f} C   NDWI: {ndwi:.4f}
+FOCOS    : {st_fuego(incendios)}"""
 
     elif tipo == 'HUMEDAL':
         diagnostico = f"""
-💧 VIGILANCIA ECOSISTEMA ACUÁTICO:
-💧 CICLO HIDROLÓGICO (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs Base)
-└ Estatus: {'✅ Saturado' if ndwi > 0.40 else '🔴 Desecación en curso'}
-🛡️ INTEGRIDAD (SU-6): SWIR: {swir:.2f} | Arcillas (cly): {clay:.2f}
-└ Análisis: {'🛡️ Humedad basal conservada' if swir > 0.25 else '⚠️ Suelo expuesto'}
-🌿 VEGETACIÓN (SAVI): {savi:.3f} (Vegetación Hidrófila)
-└ Análisis: Cumplimiento Art. 6 RSEIA y Decreto de Humedales."""
+-- VIGILANCIA ECOSISTEMA ACUATICO --
+
+-- CICLO HIDROLOGICO --
+NDWI     : {ndwi:.4f}   VAR: {v_ndwi:+.1f}% vs base
+ESTADO   : {st_ndwi_hum(ndwi)}
+
+-- INTEGRIDAD SUSTRATO (SU-6) --
+SWIR     : {swir:.2f}   CLY: {clay:.2f}
+SU-6     : {st_swir_hum(swir)}
+
+-- VEGETACION HIDROFILA --
+SAVI     : {savi:.3f}
+CUMPLIMIENTO: ART. 6 RSEIA / DECRETO HUMEDALES"""
 
     elif tipo == 'AGRICOLA':
         diagnostico = f"""
-🌾 OPTIMIZACIÓN DE CULTIVOS:
-🌱 VIGOR (SAVI): {savi:.3f} ({v_savi:+.1f}% vs Histórico)
-└ Estatus: {'✅ Rendimiento máximo' if savi > 0.45 else '⚠️ Aumentar riego'}
-💧 HUMEDAD (NDWI): {ndwi:.4f} (Control de estrés foliar)
-📊 RENDIMIENTO: {'✅ ALTO (80-100%)' if savi > 0.35 else '🔴 BAJO (<50%)'}"""
+-- OPTIMIZACION DE CULTIVOS --
+
+-- VIGOR VEGETAL (VE-5) --
+SAVI     : {savi:.3f}   VAR: {v_savi:+.1f}% vs hist.
+ESTADO   : {st_savi_agr(savi)}
+
+-- ESTRES HIDRICO --
+NDWI     : {ndwi:.4f}
+RENDIMIENTO PROYECTADO: {st_rend(savi)}"""
 
     else:
-        diagnostico = f"\nEstado: {estado}"
+        diagnostico = f"\nESTADO   : {estado}"
 
-    # Lógica de correlación hídrica automática (Art. 6 RSEIA)
+    # Correlacion hidrica automatica (Art. 6 RSEIA)
     swir_base = reporte_data.get('swir_base', swir)
     ndwi_base = reporte_data.get('ndwi_base', ndwi)
     nota_hidrica = ""
     if swir < swir_base * 0.85 and ndwi > ndwi_base * 1.10:
-        nota_hidrica = "\n🌧️ RECARGA HÍDRICA (Art. 6 RSEIA): Se certifica recarga natural por precipitación; respuesta ecosistémica consistente."
+        nota_hidrica = "\nRECARGA HIDRICA CERTIFICADA (Art. 6 RSEIA): recarga natural por precipitacion confirmada."
 
     footer = f"""
-──────────────────────────────────
-✅ ESTADO GLOBAL: {estado}{nota_hidrica}
-📝 CONCLUSIÓN: El ecosistema mantiene su capacidad de regeneración y permanencia (Art. 6 RSEIA).
-──────────────────────────────────
-🔍 *Fusión satelital avanzada BioCore Intelligence © 2026*"""
+──────────────────────────────────────────────
+ESTADO GLOBAL : {estado}{nota_hidrica}
+CONCLUSION    : Ecosistema con capacidad de regeneracion y permanencia (Art. 6 RSEIA).
+──────────────────────────────────────────────
+BioCore Intelligence | Fusion satelital avanzada (c) 2026"""
 
     return header + diagnostico + footer
 
@@ -1581,7 +1635,7 @@ class AuditoriaPDF(FPDF):
         self.set_text_color(255, 255, 255)
         self.set_font("helvetica", "B", 14)
         self.set_xy(10, 5)
-        self.cell(0, 10, "AUDITORÍA DE VIGILANCIA AMBIENTAL Y RESILIENCIA CLIMÁTICA (v2026.2)", ln=1)
+        self.cell(0, 10, "AUDITORIA DE VIGILANCIA AMBIENTAL Y RESILIENCIA CLIMATICA", ln=1)
         
         self.set_font("helvetica", "I", 10)
         self.set_xy(10, 18)
@@ -2087,8 +2141,8 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
     pdf.set_text_color(0, 0, 0)
 
     acciones = [
-        ("Nivel 1", "Cruce con meteorologia local e inspeccion con dron", "Responsable Tecnico | BioCore Intelligence"),
-        ("Nivel 2", "Ajuste de Plan Hidrico e informe preventivo a la SMA", "Profesional Ambiental | Art. 6 RSEIA"),
+        ("Nivel 1", "Cruce con meteorologia local e inspeccion tecnica en terreno", "Tecnico de Terreno"),
+        ("Nivel 2", "Ajuste de Plan Hidrico e informe preventivo a la SMA", "Especialista en Monitoreo Ambiental | Art. 6 RSEIA"),
     ]
 
     if nivel_v in ('MODERADO', 'CRITICO'):
@@ -2106,13 +2160,12 @@ def generar_pdf_auditoria_dinamico(proyecto_data, reporte_data, img_path=None):
 
     pdf.ln(5)
     
-    # SECCIÓN 9: RECOMENDACIONES
-    # SECCIÓN 9: RECOMENDACIONES
+    # SECCIÓN 10: RECOMENDACIONES
     pdf.add_page()
     
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(20, 50, 80)
-    pdf.cell(0, 10, "10. RECOMENDACIONES", ln=1)
+    pdf.cell(0, 10, "10. RECOMENDACIONES Y PLAN DE ACCION", ln=1)
     
     # 1. Obtener datos con valores seguros por defecto
     riesgo_val = reporte_data.get('nivel', 'NORMAL')
@@ -2882,7 +2935,6 @@ with tab_informe:
                                         data={
                                             "chat_id": proyecto_data.get('id_telegram'),
                                             "text": mensaje_telegram,
-                                            "parse_mode": "Markdown"
                                         },
                                         timeout=10
                                     )

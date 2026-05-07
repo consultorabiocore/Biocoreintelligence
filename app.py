@@ -200,34 +200,180 @@ def obtener_coordenadas_correctamente(p):
 # MÓDULO 0: PORTADA MEJORADA
 # ============================================================================
 def crear_portada_biocore():
-    """Portada original con mapa satelital"""
+    """Portada mejorada con diseño profesional BioCore Intelligence"""
 
-    # Header: logo pequeño + título en la misma fila
-    col_logo, col_titulo = st.columns([1, 5])
-    with col_logo:
-        st.image("logo_biocore.png", width=90)
-    with col_titulo:
-        st.markdown("""
-        <h1 style="margin-top: 15px;">Auditoría de Vigilancia Ambiental y Resiliencia Climática</h1>
-        <p style="color: #888; margin-top: -10px;">Evidencia técnica antes de que llegue la fiscalización</p>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    .bc-logo-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0 18px 0;
+        border-bottom: 0.5px solid #1e2535;
+        margin-bottom: 18px;
+    }
+    .bc-logo-bar img {
+        height: 52px;
+        object-fit: contain;
+    }
+    .bc-live-badge {
+        background: #0f2a1a;
+        border: 0.5px solid #1a5c35;
+        color: #4ade80;
+        font-size: 0.75em;
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    .bc-tagline {
+        text-align: center;
+        margin-bottom: 6px;
+    }
+    .bc-tagline .bc-sup {
+        font-size: 0.72em;
+        color: #64748b;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .bc-tagline h1 {
+        font-size: 1.6rem !important;
+        font-weight: 500;
+        color: #e2e8f0;
+        margin-bottom: 6px;
+    }
+    .bc-tagline p {
+        color: #64748b;
+        font-size: 0.92em;
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+    .bc-sensors {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 7px;
+        margin: 14px 0 18px 0;
+    }
+    .bc-sensor-pill {
+        background: #0f1a2e;
+        border: 0.5px solid #1e3a5f;
+        color: #7ec8f5;
+        font-size: 0.72em;
+        padding: 4px 11px;
+        border-radius: 20px;
+    }
+    .bc-features {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin: 18px 0;
+    }
+    @media (max-width: 700px) {
+        .bc-features { grid-template-columns: repeat(2, 1fr); }
+    }
+    .bc-feat-card {
+        background: #0d1120;
+        border: 0.5px solid #1e2535;
+        border-radius: 10px;
+        padding: 14px 14px 12px;
+    }
+    .bc-feat-card .bc-icon { font-size: 1.4em; margin-bottom: 6px; }
+    .bc-feat-card .bc-ftitle {
+        font-size: 0.82em;
+        font-weight: 500;
+        color: #cbd5e1;
+        margin-bottom: 4px;
+    }
+    .bc-feat-card .bc-fdesc {
+        font-size: 0.72em;
+        color: #475569;
+        line-height: 1.45;
+    }
+    .bc-access-box {
+        background: #0d1120;
+        border: 0.5px solid #1e2535;
+        border-radius: 10px;
+        padding: 18px 22px;
+        text-align: center;
+        margin-top: 4px;
+    }
+    .bc-access-box h3 {
+        color: #94a3b8;
+        font-size: 0.95em;
+        font-weight: 500;
+        margin-bottom: 6px;
+    }
+    .bc-access-box p {
+        color: #475569;
+        font-size: 0.82em;
+        margin-bottom: 4px;
+    }
+    .bc-access-box a { color: #7ec8f5; }
+    </style>
 
-    st.markdown("---")
+    <div class="bc-logo-bar">
+        <img src="https://raw.githubusercontent.com/consultorabiocore/Biocoreintelligence/refs/heads/main/logo_biocore.png"
+             alt="BioCore Intelligence"
+             onerror="this.style.display='none'">
+        <span class="bc-live-badge">⬤ Sistema activo</span>
+    </div>
+
+    <div class="bc-tagline">
+        <span class="bc-sup">BioCore Intelligence</span>
+        <h1>Auditoría de Vigilancia Ambiental y Resiliencia Climática</h1>
+        <p>Evidencia técnica satelital antes de que llegue la fiscalización.</p>
+    </div>
+
+    <div class="bc-sensors">
+        <span class="bc-sensor-pill">Sentinel-2</span>
+        <span class="bc-sensor-pill">Sentinel-1 SAR</span>
+        <span class="bc-sensor-pill">MODIS NASA</span>
+        <span class="bc-sensor-pill">NASA FIRMS</span>
+        <span class="bc-sensor-pill">Hansen GFC</span>
+        <span class="bc-sensor-pill">TerraClimate</span>
+        <span class="bc-sensor-pill">CONAF Bosques</span>
+        <span class="bc-sensor-pill">Copernicus LC</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     demo_map = folium.Map(
-        location=[-33.45, -70.66],
-        zoom_start=4,
+        location=[-37.0, -71.5],
+        zoom_start=5,
         tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
         attr='Google Satellite'
     )
-    folium_static(demo_map, width=1200, height=400)
+    folium_static(demo_map, width=1200, height=380)
 
-    st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; background-color: #0e1117; padding: 20px; border-radius: 10px;">
-    <h3>🔐 Acceso Restringido</h3>
-    <p>Inicia sesión desde el panel izquierdo <b>👈</b></p>
-    <p style="font-size: 0.9em; color: #888;">📧 consultorabiocore@gmail.com</p>
+    <div class="bc-features">
+        <div class="bc-feat-card">
+            <div class="bc-icon">[ S-2 ]</div>
+            <div class="bc-ftitle">Indices espectrales</div>
+            <div class="bc-fdesc">SAVI, NDWI, NDSI, NDVI en resolución 10 m con Sentinel-2</div>
+        </div>
+        <div class="bc-feat-card">
+            <div class="bc-icon">[ PDF ]</div>
+            <div class="bc-ftitle">Reportes PDF</div>
+            <div class="bc-fdesc">Descargables con firma técnica y análisis histórico de 20 años</div>
+        </div>
+        <div class="bc-feat-card">
+            <div class="bc-icon">[ TLG ]</div>
+            <div class="bc-ftitle">Alertas Telegram</div>
+            <div class="bc-fdesc">Notificaciones automáticas según frecuencia diaria o semanal</div>
+        </div>
+        <div class="bc-feat-card">
+            <div class="bc-icon">[ SAR ]</div>
+            <div class="bc-ftitle">Radar Sentinel-1</div>
+            <div class="bc-fdesc">Detección de focos activos y análisis de superficie vía SAR</div>
+        </div>
+    </div>
+
+    <div class="bc-access-box">
+        <h3>Acceso restringido</h3>
+        <p>Inicia sesión desde el panel izquierdo</p>
+        <p><a href="mailto:consultorabiocore@gmail.com">consultorabiocore@gmail.com</a></p>
     </div>
     """, unsafe_allow_html=True)
 

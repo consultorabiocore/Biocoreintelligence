@@ -1,24 +1,20 @@
-name: BioCore - Reportes Automáticos Telegram
+name: BioCore Daily Report
 
 on:
   schedule:
-    # Corre todos los días a las 09:00 hora Chile (UTC-3 = 12:00 UTC)
-    - cron: '0 12 * * *'
-  
-  # También permite ejecutarlo manualmente desde GitHub con un botón
+    - cron: '0 12 * * *' # 09:00 AM hora Chile
   workflow_dispatch:
     inputs:
       forzar_todos:
-        description: '¿Enviar a TODOS los clientes sin importar frecuencia?'
+        description: '¿Enviar a todos los clientes sin importar la hora?'
         required: false
         default: 'false'
 
 jobs:
   enviar_reportes:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: 📥 Descargar repositorio
+      - name: 📂 Descargar repositorio
         uses: actions/checkout@v4
 
       - name: 🐍 Configurar Python 3.11
@@ -26,11 +22,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 🛰️ Ejecutar script de reportes
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install supabase requests python-dotenv
+
+      - name: 🛰️ Ejecutar Script de BioCore
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          GEE_JSON: ${{ secrets.GEE_JSON }}
-          FORZAR_TODOS: ${{ github.event.inputs.forzar_todos }}
+          SUPABASE_URL: ${{secrets.SUPABASE_URL}}
+          SUPABASE_KEY: ${{secrets.SUPABASE_KEY}}
+          TELEGRAM_TOKEN: ${{secrets.TELEGRAM_TOKEN}}
+          GEE_JSON: ${{secrets.GEE_JSON}}
+          FORZAR_TODOS: ${{github.event.inputs.forzar_todos}}
         run: python scheduler/enviar_reportes.py

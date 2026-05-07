@@ -32,9 +32,9 @@ jobs:
 
       - name: 🛰️ Ejecutar script de reportes
         env:
-          SUPABASE_URL:    ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY:    ${{ secrets.SUPABASE_KEY }}
-          TELEGRAM_TOKEN:  ${{ secrets.TELEGRAM_TOKEN }}
-          GEE_JSON:        ${{ secrets.GEE_JSON }}
-          FORZAR_TODOS:    ${{ github.event.inputs.forzar_todos || 'false' }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        GEE_JSON: ${{ secrets.GEE_JSON }}
+        FORZAR_TODOS:    ${{ github.event.inputs.forzar_todos || 'false' }}
         run: python scheduler/enviar_reportes.py

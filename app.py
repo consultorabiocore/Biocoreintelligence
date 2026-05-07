@@ -25,7 +25,7 @@ import numpy as np
 matplotlib.use('Agg')
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Auditoría de vigilancia ambiental y resiliencia climática", layout="wide")
+st.set_page_config(page_title="Biocore Intelligence", layout="wide")
 
 st.markdown("""
 <style>
@@ -208,7 +208,7 @@ def crear_portada_biocore():
         st.image("logo_biocore.png", width=90)
     with col_titulo:
         st.markdown("""
-        <h1 style="margin-top: 15px;">BioCore Intelligence</h1>
+        <h1 style="margin-top: 15px;">Auditoría de vigilancia ambiental y resiliencia climática</h1>
         <p style="color: #888; margin-top: -10px;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
         """, unsafe_allow_html=True)
 

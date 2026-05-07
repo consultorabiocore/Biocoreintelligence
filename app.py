@@ -220,7 +220,7 @@ def crear_portada_biocore():
     # Logo centrado debajo del mapa
     col_izq, col_centro, col_der = st.columns([1, 2, 1])
     with col_centro:
-        st.image("logo_biocore.jpg", use_container_width=True)
+        st.image("logo_biocore.png", use_container_width=True)
 
     st.markdown("---")
     st.markdown("""

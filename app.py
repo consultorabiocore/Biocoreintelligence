@@ -209,7 +209,7 @@ def crear_portada_biocore():
     with col_titulo:
         st.markdown("""
         <h1 style="margin-top: 15px;">Auditoría de vigilancia ambiental y resiliencia climática</h1>
-        <p style="color: #888; margin-top: -10px;">Sistema de Vigilancia Ambiental Satelital Avanzada</p>
+        <p style="color: #888; margin-top: -10px;">Evidencia técnica antes de que llegue la fiscalización</p>
         """, unsafe_allow_html=True)
 
     st.markdown("---")

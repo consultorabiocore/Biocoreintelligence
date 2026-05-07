@@ -349,22 +349,22 @@ def crear_portada_biocore():
     st.markdown("""
     <div class="bc-features">
         <div class="bc-feat-card">
-            <div class="bc-icon">[ S-2 ]</div>
-            <div class="bc-ftitle">Indices espectrales</div>
+            <div class="bc-icon">🛰️</div>
+            <div class="bc-ftitle">Índices espectrales</div>
             <div class="bc-fdesc">SAVI, NDWI, NDSI, NDVI en resolución 10 m con Sentinel-2</div>
         </div>
         <div class="bc-feat-card">
-            <div class="bc-icon">[ PDF ]</div>
+            <div class="bc-icon">📄</div>
             <div class="bc-ftitle">Reportes PDF</div>
             <div class="bc-fdesc">Descargables con firma técnica y análisis histórico de 20 años</div>
         </div>
         <div class="bc-feat-card">
-            <div class="bc-icon">[ TLG ]</div>
+            <div class="bc-icon">📡</div>
             <div class="bc-ftitle">Alertas Telegram</div>
             <div class="bc-fdesc">Notificaciones automáticas según frecuencia diaria o semanal</div>
         </div>
         <div class="bc-feat-card">
-            <div class="bc-icon">[ SAR ]</div>
+            <div class="bc-icon">🔭</div>
             <div class="bc-ftitle">Radar Sentinel-1</div>
             <div class="bc-fdesc">Detección de focos activos y análisis de superficie vía SAR</div>
         </div>

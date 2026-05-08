@@ -329,12 +329,12 @@ def crear_portada_biocore():
     <div class="bc-sensors">
         <span class="bc-sensor-pill">Sentinel-2</span>
         <span class="bc-sensor-pill">Sentinel-1 SAR</span>
+        <span class="bc-sensor-pill">Landsat 8/9</span>
         <span class="bc-sensor-pill">MODIS NASA</span>
         <span class="bc-sensor-pill">NASA FIRMS</span>
         <span class="bc-sensor-pill">Hansen GFC</span>
         <span class="bc-sensor-pill">ERA5-Land ECMWF</span>
         <span class="bc-sensor-pill">CONAF Bosques</span>
-        <span class="bc-sensor-pill">Copernicus LC</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -351,7 +351,7 @@ def crear_portada_biocore():
         <div class="bc-feat-card">
             <div class="bc-icon">🛰️</div>
             <div class="bc-ftitle">Índices espectrales</div>
-            <div class="bc-fdesc">SAVI, NDWI, NDSI, NDVI en resolución 10 m con Sentinel-2</div>
+            <div class="bc-fdesc">SAVI, NDWI, NDSI, NDVI en resolución 10-30m con Sentinel-2 y Landsat</div>
         </div>
         <div class="bc-feat-card">
             <div class="bc-icon">📄</div>
@@ -468,13 +468,25 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
             )
 
         elif tipo == 'MINERIA':
-            # Interpretaciones específicas para minería
+            # Interpretaciones específicas para minería CON CRIÓSFERA ADYACENTE
+            
+            # Sección de criósfera (para glaciares adyacentes como Pascua Lama)
+            if ndsi > 0.40:
+                est_ndsi = "✅ Hielo perenne consolidado"
+                contexto_ndsi = "Glaciar activo en zona de influencia. DGA Art. 6 RSEIA aplicable."
+            elif ndsi > 0.20:
+                est_ndsi = "⚠️  Nieve estacional detectada"
+                contexto_ndsi = "Criósfera en transición. Monitoreo DGA recomendado."
+            else:
+                est_ndsi = "Nula presencia de nieve"
+                contexto_ndsi = "Sustrato rocoso predominante."
+
             if ndwi < 0.10:
                 est_ndwi = "✅ Litología mineral estable"
-                contexto_ndwi = "NDWI bajo consistente con sector árido."
+                contexto_ndwi = "NDWI bajo consistente con sector árido de alta montaña."
             elif 0.10 <= ndwi <= 0.30:
                 est_ndwi = "⚠️  Humedad moderada"
-                contexto_ndwi = "Posible acumulación. Requiere verificación."
+                contexto_ndwi = "Posible acumulación. Requiere verificación en terreno."
             else:
                 est_ndwi = "🔴 Acumulación anómala"
                 contexto_ndwi = "NDWI elevado en zona árida. Inspección inmediata requerida."
@@ -492,6 +504,9 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
                 est_clay = "⚠️  Procesos erosivos potenciales"
 
             diagnostico = (
+                f"❄️  CRIÓSFERA ADYACENTE (NDSI): {ndsi:.4f} ({v_ndsi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_ndsi}\n"
+                f"└─ Contexto: {contexto_ndsi}\n\n"
                 f"⛏️  MONITOREO INTEGRAL DE YACIMIENTO:\n"
                 f"🛡️  INTEGRIDAD TERRITORIAL (Ficha SU-6):\n"
                 f"└─ SWIR: {swir:.4f} | Arcillas (cly): {clay:.4f}\n"

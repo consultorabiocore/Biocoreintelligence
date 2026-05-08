@@ -468,7 +468,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
                 f"└─ Protocolo: {'DGA Art. 6 RSEIA | Ley de Glaciares' if ndsi < 0.35 else 'Monitoreo estacional DGA'}"
             )
 
-                elif tipo == 'MINERIA':
+        elif tipo == 'MINERIA':
             # Interpretaciones específicas para minería CON CRIÓSFERA ADYACENTE
             
             # Sección de criósfera (para glaciares adyacentes como Pascua Lama)

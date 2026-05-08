@@ -326,7 +326,7 @@ def crear_portada_biocore():
         <p>Evidencia técnica satelital antes de que llegue la fiscalización.</p>
     </div>
 
-    <div class="bc-sensors">
+        <div class="bc-sensors">
         <span class="bc-sensor-pill">Sentinel-2</span>
         <span class="bc-sensor-pill">Sentinel-1 SAR</span>
         <span class="bc-sensor-pill">Landsat 8/9</span>
@@ -335,6 +335,7 @@ def crear_portada_biocore():
         <span class="bc-sensor-pill">Hansen GFC</span>
         <span class="bc-sensor-pill">ERA5-Land ECMWF</span>
         <span class="bc-sensor-pill">CONAF Bosques</span>
+        <span class="bc-sensor-pill">Copernicus LC</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -467,7 +468,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
                 f"└─ Protocolo: {'DGA Art. 6 RSEIA | Ley de Glaciares' if ndsi < 0.35 else 'Monitoreo estacional DGA'}"
             )
 
-        elif tipo == 'MINERIA':
+                elif tipo == 'MINERIA':
             # Interpretaciones específicas para minería CON CRIÓSFERA ADYACENTE
             
             # Sección de criósfera (para glaciares adyacentes como Pascua Lama)
@@ -491,6 +492,16 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
                 est_ndwi = "🔴 Acumulación anómala"
                 contexto_ndwi = "NDWI elevado en zona árida. Inspección inmediata requerida."
 
+            if swir > 0.35:
+                est_swir = "✅ Humedad basal óptima"
+                contexto_swir = "Sustrato con contenido de agua normal. Estabilidad garantizada."
+            elif swir > 0.25:
+                est_swir = "🟡 Humedad moderada"
+                contexto_swir = "Condiciones normales de drenaje."
+            else:
+                est_swir = "⚠️  Sequedad detectada"
+                contexto_swir = "Posible compactación o exposición mineral."
+
             if savi < 0.05:
                 est_savi = "Suelo mineral sin vegetación"
             elif 0.05 <= savi < 0.15:
@@ -500,8 +511,13 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
 
             if clay < 0.25:
                 est_clay = "✅ Sustrato estable, sin remoción detectada"
+                contexto_clay = "Arcillas dentro de rango normal. No se detectan procesos erosivos."
+            elif clay < 0.35:
+                est_clay = "🟡 Arcillas moderadas"
+                contexto_clay = "Revisar procesos erosivos potenciales."
             else:
-                est_clay = "⚠️  Procesos erosivos potenciales"
+                est_clay = "⚠️  Arcillas elevadas"
+                contexto_clay = "Posible alteración del sustrato detectada."
 
             diagnostico = (
                 f"❄️  CRIÓSFERA ADYACENTE (NDSI): {ndsi:.4f} ({v_ndsi:+.1f}% vs {anio_base})\n"
@@ -509,8 +525,11 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
                 f"└─ Contexto: {contexto_ndsi}\n\n"
                 f"⛏️  MONITOREO INTEGRAL DE YACIMIENTO:\n"
                 f"🛡️  INTEGRIDAD TERRITORIAL (Ficha SU-6):\n"
-                f"└─ SWIR: {swir:.4f} | Arcillas (cly): {clay:.4f}\n"
-                f"└─ Análisis: {est_clay}\n\n"
+                f"└─ SWIR (Humedad): {swir:.4f} | Arcillas (cly): {clay:.4f}\n"
+                f"└─ Estatus SWIR: {est_swir}\n"
+                f"   {contexto_swir}\n"
+                f"└─ Estatus Clay: {est_clay}\n"
+                f"   {contexto_clay}\n\n"
                 f"💧 RECURSOS HÍDRICOS (Ficha VE-5 - NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs {anio_base})\n"
                 f"└─ Estatus: {est_ndwi}\n"
                 f"└─ Contexto: {contexto_ndwi}\n\n"

@@ -383,16 +383,17 @@ def crear_portada_biocore():
 def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
     """
     Generador dinámico de reportes BioCore Intelligence.
-    Integra Clay Index (cly), Fichas SEA y Art. 6 RSEIA.
-    Versión corregida con extracción segura de datos y formateo dinámico.
+    Integra análisis específico por tipo de proyecto con año de línea base.
+    Versión mejorada con secciones contextualizadas.
     """
     try:
-        # Extracción segura de datos con valores por defecto
+        # Extracción segura de datos
         tipo = str((proyecto_data or {}).get('Tipo', 'GENERAL')).upper()
         proyecto = str((proyecto_data or {}).get('Proyecto', 'N/A'))
         fecha = str((reporte_data or {}).get('fecha', 'N/A'))
+        anio_base = int((proyecto_data or {}).get('ano_linea_base', 2017))
 
-        # Índices espectrales - Extracción CORRECTA
+        # Índices espectrales
         savi = float((reporte_data or {}).get('savi_actual', 0) or 0)
         ndwi = float((reporte_data or {}).get('ndwi', 0) or 0)
         swir = float((reporte_data or {}).get('swir', 0) or 0)
@@ -416,7 +417,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
         
         estado = str((reporte_data or {}).get('estado', 'BAJO CONTROL'))
 
-        # HEADER
+        # HEADER UNIVERSAL
         header = (
             "╔════════════════════════════════════════════════════════════╗\n"
             "║   🛰️  AUDITORÍA DE VIGILANCIA AMBIENTAL Y RESILIENCIA     ║\n"
@@ -424,165 +425,243 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
             "╚════════════════════════════════════════════════════════════╝\n\n"
             f"📋 PROYECTO: {proyecto}\n"
             f"🎯 TIPO: {tipo}\n"
-            f"📅 ANÁLISIS: {fecha}\n"
-            f"🛰️  SENSORES: Sentinel-2/1 + MODIS + NASA FIRMS\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📅 ANÁLISIS: {fecha} | 📊 Línea Base: {anio_base}\n"
+            f"🛰️  SENSORES: Fusión Sentinel (2/1) | NASA (GEDI/FIRMS)\n"
+            "───────────────────────────────────────��──────────────────────\n\n"
         )
 
-        # SECCIÓN 1: ESTADO DE CRIÓSFERA (NDSI)
-        if ndsi > 0.40:
-            est_ndsi = "✅ Hielo perenne consolidado — balance de masa positivo"
-            contexto_ndsi = "Esencial para el balance hídrico. Firma de glaciar activo."
-        elif ndsi > 0.20:
-            est_ndsi = "⚠️  Nieve dispersa o en fusión — transición estacional"
-            contexto_ndsi = "Se observa transición en la criósfera. Monitorear evolución."
+        # CUERPO DINÁMICO POR TIPO
+        if tipo == 'GLACIAR':
+            # Interpretaciones específicas para glaciares
+            if ndsi > 0.40:
+                est_ndsi = "✅ Hielo perenne consolidado"
+                contexto_ndsi = "Balance de masa positivo. Firma de glaciar activo."
+            elif ndsi > 0.20:
+                est_ndsi = "⚠️  Transición estacional"
+                contexto_ndsi = "Se observa dinámica en la criósfera. Posible fusión estacional."
+            else:
+                est_ndsi = "🔴 Retracción crítica"
+                contexto_ndsi = "Exposición de roca desnuda. Retracción glacial documentada."
+
+            if clay < 0.25:
+                est_clay = "🛡️  Sustrato mineral estable"
+            else:
+                est_clay = "⚠️  Anomalía detectada"
+
+            if swir > 0.3:
+                est_swir = "Humedad basal preservada"
+            else:
+                est_swir = "Sequedad relativa, posible ablación"
+
+            diagnostico = (
+                f"❄️  CRIÓSFERA (NDSI): {ndsi:.4f} ({v_ndsi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_ndsi}\n"
+                f"└─ Análisis: {contexto_ndsi}\n\n"
+                f"📡 RADAR S1 (VV): {sar_vv:.2f} dB\n"
+                f"└─ Análisis: {'Hielo/nieve consolidada' if sar_vv < -12 else 'Mezcla hielo-roca' if sar_vv < -8 else 'Roca expuesta o suelo seco'}\n\n"
+                f"🛡️  INTEGRIDAD DEL TERRENO (SU-6):\n"
+                f"└─ SWIR: {swir:.4f} | Arcillas (cly): {clay:.4f}\n"
+                f"└─ Análisis: {est_clay} | {est_swir}\n\n"
+                f"⚠️  RIESGO CLIMÁTICO:\n"
+                f"└─ Temperatura LST: {temp:.1f}°C\n"
+                f"└─ Incendios: {'✅ Sin focos activos' if incendios == 0 else f'🔥 {incendios} focos detectados'}\n"
+                f"└─ Protocolo: {'DGA Art. 6 RSEIA | Ley de Glaciares' if ndsi < 0.35 else 'Monitoreo estacional DGA'}"
+            )
+
+        elif tipo == 'MINERIA':
+            # Interpretaciones específicas para minería
+            if ndwi < 0.10:
+                est_ndwi = "✅ Litología mineral estable"
+                contexto_ndwi = "NDWI bajo consistente con sector árido."
+            elif 0.10 <= ndwi <= 0.30:
+                est_ndwi = "⚠️  Humedad moderada"
+                contexto_ndwi = "Posible acumulación. Requiere verificación."
+            else:
+                est_ndwi = "🔴 Acumulación anómala"
+                contexto_ndwi = "NDWI elevado en zona árida. Inspección inmediata requerida."
+
+            if savi < 0.05:
+                est_savi = "Suelo mineral sin vegetación"
+            elif 0.05 <= savi < 0.15:
+                est_savi = "Vegetación perimetral escasa"
+            else:
+                est_savi = "Cobertura vegetal activa"
+
+            if clay < 0.25:
+                est_clay = "✅ Sustrato estable, sin remoción detectada"
+            else:
+                est_clay = "⚠️  Procesos erosivos potenciales"
+
+            diagnostico = (
+                f"⛏️  MONITOREO INTEGRAL DE YACIMIENTO:\n"
+                f"🛡️  INTEGRIDAD TERRITORIAL (Ficha SU-6):\n"
+                f"└─ SWIR: {swir:.4f} | Arcillas (cly): {clay:.4f}\n"
+                f"└─ Análisis: {est_clay}\n\n"
+                f"💧 RECURSOS HÍDRICOS (Ficha VE-5 - NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_ndwi}\n"
+                f"└─ Contexto: {contexto_ndwi}\n\n"
+                f"🌱 VEGETACIÓN PERIMETRAL (VE-5 - SAVI): {savi:.4f}\n"
+                f"└─ Estatus: {est_savi}\n"
+                f"└─ Cumplimiento: Ley 20.283 - {'✅ Verificado' if savi > 0.10 or savi < 0.05 else '⚠️  Revisar'}\n\n"
+                f"📡 RADAR S1 (VV): {sar_vv:.2f} dB\n"
+                f"└─ Análisis: {'Alta rugosidad: operación detectada' if sar_vv > -8 else 'Superficie mineral estable'}\n\n"
+                f"⚠️  RIESGO CLIMÁTICO:\n"
+                f"└─ Temperatura: {temp:.1f}°C\n"
+                f"└─ Focos de incendio: {'✅ Sin actividad' if incendios == 0 else f'🔥 {incendios} focos'}"
+            )
+
+        elif tipo == 'BOSQUE':
+            # Interpretaciones específicas para bosques
+            if savi > 0.40:
+                est_savi = "✅ Cobertura densa y saludable"
+                contexto_savi = "Densidad de dosel > 70%. Bosque sano."
+            elif 0.25 <= savi <= 0.40:
+                est_savi = "🟡 Bosque con posible estrés"
+                contexto_savi = "Densidad 40-70%. Monitoreo reforzado recomendado."
+            else:
+                est_savi = "🔴 Degradación severa"
+                contexto_savi = "Posible tala, incendio o plagas. Acción inmediata."
+
+            if ndvi > 0.35:
+                est_ndvi = "Estructura de hábitat robusta"
+            elif 0.15 <= ndvi <= 0.35:
+                est_ndvi = "Estructura moderada"
+            else:
+                est_ndvi = "Estructura degradada"
+
+            if ndwi > 0.30:
+                est_ndwi = "Hidratación óptima, bajo riesgo de incendio"
+            elif 0.15 <= ndwi <= 0.30:
+                est_ndwi = "Humedad moderada, vigilancia recomendada"
+            else:
+                est_ndwi = "🔥 Estrés hídrico crítico, riesgo extremo de incendio"
+
+            diagnostico = (
+                f"🌲 VIGILANCIA FORESTAL (Ley 20.283):\n"
+                f"🌱 SALUD VEGETAL (Ficha VE-5 - SAVI): {savi:.4f} ({v_savi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_savi}\n"
+                f"└─ Análisis: {contexto_savi}\n\n"
+                f"📏 HÁBITAT (Ficha VE-7 - NDVI): {ndvi:.4f} ({v_ndvi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_ndvi}\n\n"
+                f"💧 ESTRÉS HÍDRICO (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs {anio_base})\n"
+                f"└─ Análisis: {est_ndwi}\n\n"
+                f"🔥 AMENAZA CLIMÁTICA:\n"
+                f"└─ Temperatura LST: {temp:.1f}°C\n"
+                f"└─ Focos de incendio: {'✅ Bajo control' if incendios == 0 else f'🔥 ALERTA: {incendios} focos activos'}\n"
+                f"└─ Protocolo: {'Vigilancia CONAF activada' if temp > 20 or incendios > 0 else 'Monitoreo rutinario'}"
+            )
+
+        elif tipo == 'HUMEDAL':
+            # Interpretaciones específicas para humedales
+            if ndwi > 0.40:
+                est_ndwi = "✅ Saturado con agua libre"
+                contexto_ndwi = "Ciclo hidrológico óptimo. Biodiversidad confirmada."
+            elif 0.25 <= ndwi <= 0.40:
+                est_ndwi = "🟡 Variabilidad moderada"
+                contexto_ndwi = "Cambio estacional posible. Monitoreo continuo."
+            elif 0.10 <= ndwi < 0.25:
+                est_ndwi = "🔴 Estrés hídrico severo"
+                contexto_ndwi = "Pérdida del 30-50% de agua. Riesgo de colapso."
+            else:
+                est_ndwi = "🔴 Desecación extrema"
+                contexto_ndwi = "Pérdida > 50%. Riesgo legal Ramsar."
+
+            if savi > 0.30:
+                est_savi = "Vegetación hidrófila presente y activa"
+            else:
+                est_savi = "Vegetación hidrófila ausente o degradada"
+
+            if swir > 0.25:
+                est_swir = "🛡️  Humedad basal conservada"
+            else:
+                est_swir = "⚠️  Suelo expuesto detectado"
+
+            diagnostico = (
+                f"💧 VIGILANCIA ECOSISTEMA ACUÁTICO:\n"
+                f"💧 CICLO HIDROLÓGICO (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_ndwi}\n"
+                f"└─ Contexto: {contexto_ndwi}\n\n"
+                f"🛡️  INTEGRIDAD DEL TERRENO (Ficha SU-6):\n"
+                f"└─ SWIR: {swir:.4f} | Arcillas (cly): {clay:.4f}\n"
+                f"└─ Análisis: {est_swir}\n\n"
+                f"🌿 VEGETACIÓN HIDRÓFILA (SAVI): {savi:.4f}\n"
+                f"└─ Análisis: {est_savi}\n\n"
+                f"📋 NORMATIVA APLICABLE:\n"
+                f"└─ Decreto de Humedales Urbanos\n"
+                f"└─ Convención Ramsar (si aplica)\n"
+                f"└─ Art. 6 RSEIA - Permanencia del Ecosistema"
+            )
+
+        elif tipo == 'AGRICOLA':
+            # Interpretaciones específicas para agricultura
+            if savi > 0.45 and ndwi > 0.30:
+                est_savi = "✅ Cultivo óptimo"
+                contexto_savi = "Rendimiento esperado: máximo. Continuar riego estándar."
+            elif savi > 0.35 and ndwi > 0.20:
+                est_savi = "🟡 Cultivo normal con vigilancia"
+                contexto_savi = "Rendimiento moderado. Plan de riego: mantener."
+            elif savi > 0.25:
+                est_savi = "⚠️  Estrés moderado"
+                contexto_savi = "Aumentar riego y revisar nutrición. Plagas posibles."
+            else:
+                est_savi = "🔴 Degradación severa"
+                contexto_savi = "Riesgo de pérdida total. Acción inmediata requerida."
+
+            if ndwi > 0.30:
+                est_ndwi = "✅ Disponibilidad hídrica óptima"
+            elif 0.20 <= ndwi <= 0.30:
+                est_ndwi = "🟡 Humedad moderada"
+            else:
+                est_ndwi = "🔴 Estrés hídrico crítico"
+
+            rendimiento = "ALTO (80-100%)" if savi > 0.45 else "MODERADO (50-80%)" if savi > 0.35 else "BAJO (<50%)"
+
+            diagnostico = (
+                f"🌾 OPTIMIZACIÓN DE CULTIVOS:\n"
+                f"🌱 VIGOR (Ficha VE-5 - SAVI): {savi:.4f} ({v_savi:+.1f}% vs {anio_base})\n"
+                f"└─ Estatus: {est_savi}\n"
+                f"└─ Contexto: {contexto_savi}\n\n"
+                f"💧 HUMEDAD DEL SUELO (NDWI): {ndwi:.4f} ({v_ndwi:+.1f}% vs {anio_base})\n"
+                f"└─ Análisis: {est_ndwi}\n"
+                f"└─ Control de estrés foliar: {'✅ Óptimo' if ndwi > 0.25 else '⚠️  Revisar'}\n\n"
+                f"📊 RENDIMIENTO ESTIMADO: {rendimiento}\n\n"
+                f"🌡️  VARIABLES CLIMÁTICAS:\n"
+                f"└─ Temperatura LST: {temp:.1f}°C\n"
+                f"└─ Recomendación: {'Riego de emergencia' if savi < 0.25 and ndwi < 0.20 else 'Riego programado'}"
+            )
+
         else:
-            est_ndsi = "❌ Nula presencia de nieve — predomina suelo expuesto"
-            contexto_ndsi = "Sustrato rocoso o mineral. Exposición total detectada."
+            # Caso genérico
+            diagnostico = (
+                f"🛰️  ANÁLISIS GENERAL:\n"
+                f"🌱 SAVI: {savi:.4f} ({v_savi:+.1f}% vs {anio_base})\n"
+                f"💧 NDWI: {ndwi:.4f} ({v_ndwi:+.1f}%)\n"
+                f"❄️  NDSI: {ndsi:.4f} ({v_ndsi:+.1f}%)\n"
+                f"📏 NDVI: {ndvi:.4f} ({v_ndvi:+.1f}%)\n"
+                f"🛡️  SWIR: {swir:.4f} | Clay: {clay:.4f}\n"
+                f"📡 SAR VV: {sar_vv:.2f} dB\n"
+                f"🌡️  Temperatura: {temp:.1f}°C"
+            )
 
-        crirosfera = (
-            f"❄️  ESTADO DE CRIÓSFERA (NDSI):\n"
-            f"└─ Cobertura Actual: {ndsi:.4f}\n"
-            f"└─ Línea Base ({reporte_data.get('anio_base', 2017)}): {ndsi_base:.4f}\n"
-            f"└─ Variación: {v_ndsi:+.1f}%\n"
-            f"└─ Estatus: {est_ndsi}\n"
-            f"└─ Análisis: {contexto_ndsi}\n\n"
-        )
-
-        # SECCIÓN 2: RADAR SENTINEL-1
-        if sar_vv < -15:
-            est_sar = "Hielo/nieve consolidada o agua libre"
-        elif sar_vv < -10:
-            est_sar = "Superficie heterogénea — mezcla de hielo y roca"
-        elif sar_vv < -5:
-            est_sar = "Dosel denso o biomasa significativa"
-        else:
-            est_sar = "Roca desnuda, mineral o superficie rugosa"
-
-        radar = (
-            f"📡 MONITOREO RADAR (Sentinel-1 SAR):\n"
-            f"└─ Retrodispersión VV: {sar_vv:.2f} dB\n"
-            f"└─ Análisis: {est_sar}\n"
-            f"└─ Dato independiente en cobertura nubosa total (único sensor funcional)\n\n"
-        )
-
-        # SECCIÓN 3: INTEGRIDAD DEL TERRENO (SU-6)
-        if clay < 0.25:
-            est_clay = "✅ Sustrato mineral estable sin remoción no autorizada"
-        elif clay < 0.35:
-            est_clay = "⚠️  Arcillas moderadas — revisar procesos erosivos"
-        else:
-            est_clay = "❌ Arcillas elevadas — posible alteración del sustrato"
-
-        if swir > 0.3:
-            est_swir = "Humedad óptima detectada, estabilidad garantizada"
-        elif swir > 0.2:
-            est_swir = "Humedad moderada, sustrato funcional"
-        else:
-            est_swir = "Sequedad detectada, vigilancia recomendada"
-
-        integridad = (
-            f"🛡️  INTEGRIDAD DEL TERRENO (Ficha SU-6):\n"
-            f"└─ SWIR (Humedad): {swir:.4f}\n"
-            f"└─ Clay Index (Arcillas): {clay:.4f}\n"
-            f"└─ Estatus SWIR: {est_swir}\n"
-            f"└─ Estatus Clay: {est_clay}\n\n"
-        )
-
-        # SECCIÓN 4: SALUD VEGETAL (SAVI)
-        if savi > 0.40:
-            est_savi = "✅ Cobertura vegetal densa y saludable"
-            diagnostico_savi = "Densidad de dosel > 70%. Cumplimiento normativo verificado."
-        elif savi > 0.25:
-            est_savi = "🟡 Vegetación moderada con posible estrés"
-            diagnostico_savi = "Densidad de dosel 40-70%. Se recomienda monitoreo reforzado."
-        elif savi > 0.10:
-            est_savi = "⚠️  Vegetación dispersa o en regeneración"
-            diagnostico_savi = "Baja densidad de dosel. Plan de restauración podría ser necesario."
-        else:
-            est_savi = "❌ Suelo expuesto o litología mineral"
-            diagnostico_savi = f"Valores bajos consistentes con sustrato de alta montaña (altitud: litología mineral de sector)"
-
-        vegetacion = (
-            f"🌱 SALUD VEGETAL (Ficha VE-5 - SAVI):\n"
-            f"└─ Vigor Actual: {savi:.4f}\n"
-            f"└─ Vigor Base ({reporte_data.get('anio_base', 2017)}): {savi_base:.4f}\n"
-            f"└─ Variación: {v_savi:+.1f}%\n"
-            f"└─ Estatus: {est_savi}\n"
-            f"└─ Análisis: {diagnostico_savi}\n\n"
-        )
-
-        # SECCIÓN 5: RECURSOS HÍDRICOS (NDWI)
-        if ndwi > 0.40:
-            est_ndwi = "✅ Recursos hídricos abundantes — saturación detectada"
-            diagnostico_ndwi = "Agua libre o muy alta humedad foliar. Óptimo para ecosistemas acuáticos."
-        elif ndwi > 0.20:
-            est_ndwi = "🟡 Humedad moderada — rango normal"
-            diagnostico_ndwi = "Disponibilidad de agua adecuada para sostenimiento de vegetación."
-        else:
-            est_ndwi = "❌ Estrés hídrico detectado"
-            diagnostico_ndwi = f"NDWI: {ndwi:.4f}. Riesgo de desecación o erosión."
-
-        hidrica = (
-            f"💧 RECURSOS HÍDRICOS (Ficha VE-5 - NDWI):\n"
-            f"└─ Disponibilidad Actual: {ndwi:.4f}\n"
-            f"└─ Línea Base: {ndwi_base:.4f}\n"
-            f"└─ Variación: {v_ndwi:+.1f}%\n"
-            f"└─ Estatus: {est_ndwi}\n"
-            f"└─ Análisis: {diagnostico_ndwi}\n\n"
-        )
-
-        # SECCIÓN 6: ESTRUCTURA HABITAT (NDVI)
-        if ndvi > 0.35:
-            est_ndvi = "✅ Estructura de hábitat robusta"
-        elif ndvi > 0.15:
-            est_ndvi = "🟡 Estructura moderada"
-        else:
-            est_ndvi = "❌ Estructura degradada"
-
-        habitat = (
-            f"🏞️  ESTRUCTURA DE HÁBITAT (Ficha VE-7 - NDVI):\n"
-            f"└─ NDVI Actual: {ndvi:.4f}\n"
-            f"└─ Variación: {v_ndvi:+.1f}%\n"
-            f"└─ Estatus: {est_ndvi}\n\n"
-        )
-
-        # SECCIÓN 7: RIESGO CLIMÁTICO
-        if temp > 25:
-            est_temp = "🔥 TEMPERATURA ELEVADA — estrés térmico"
-        elif temp > 15:
-            est_temp = "🌡️  Temperatura moderada"
-        else:
-            est_temp = "❄️  Temperatura baja — criósfera activa"
-
-        alerta_fuego = "✅ Sin focos activos" if incendios == 0 else f"🔥 {incendios} FOCOS DETECTADOS"
-
-        clima = (
-            f"⚠️  RIESGO CLIMÁTICO:\n"
-            f"└─ Temperatura LST: {temp:.1f}°C\n"
-            f"└─ Estatus: {est_temp}\n"
-            f"└─ Incendios: {alerta_fuego}\n\n"
-        )
-
-        # FOOTER
+        # FOOTER UNIVERSAL
         footer = (
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "\n──────────────────────────────────────────────────────────────\n"
             f"✅ ESTADO GLOBAL: {estado}\n"
-            "📝 CONCLUSIÓN: El ecosistema mantiene su capacidad de regeneración y permanencia (Art. 6 RSEIA).\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📝 CONCLUSIÓN: El ecosistema mantiene su capacidad de regeneración\n"
+            "             y permanencia conforme a Art. 6 RSEIA.\n"
+            "──────────────────────────────────────────────────────────────\n\n"
             "🔍 Fusión satelital avanzada BioCore Intelligence © 2026\n"
             "📧 consultorabiocore@gmail.com"
         )
 
         # ENSAMBLAR MENSAJE COMPLETO
-        mensaje_completo = header + crirosfera + radar + integridad + vegetacion + hidrica + habitat + clima + footer
+        mensaje_completo = header + diagnostico + footer
 
         return mensaje_completo
 
     except Exception as e:
         # Si hay error, retornar mensaje genérico sin fallar
         return f"❌ Error generando reporte: {str(e)}\n📧 Contacta a consultorabiocore@gmail.com"
-
 # ============================================================================
 # MÓDULO 1B: AGREGAR DATOS SAR Y FUEGOS
 # ============================================================================

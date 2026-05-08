@@ -317,7 +317,7 @@ def crear_portada_biocore():
         <img src="https://raw.githubusercontent.com/consultorabiocore/Biocoreintelligence/refs/heads/main/logo_biocore.png"
              alt="BioCore Intelligence"
              onerror="this.style.display='none'">
-        <span class="bc-live-badge">⬤ Sistema activo</span>
+        <span class="bc-live-badge">⬀ Sistema activo</span>
     </div>
 
     <div class="bc-tagline">
@@ -332,7 +332,7 @@ def crear_portada_biocore():
         <span class="bc-sensor-pill">MODIS NASA</span>
         <span class="bc-sensor-pill">NASA FIRMS</span>
         <span class="bc-sensor-pill">Hansen GFC</span>
-        <span class="bc-sensor-pill">TerraClimate</span>
+        <span class="bc-sensor-pill">ERA5-Land ECMWF</span>
         <span class="bc-sensor-pill">CONAF Bosques</span>
         <span class="bc-sensor-pill">Copernicus LC</span>
     </div>
@@ -376,7 +376,6 @@ def crear_portada_biocore():
         <p><a href="mailto:consultorabiocore@gmail.com">consultorabiocore@gmail.com</a></p>
     </div>
     """, unsafe_allow_html=True)
-
 # ============================================================================
 # MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO (CORREGIDO)
 # ============================================================================
@@ -427,7 +426,7 @@ def generar_mensaje_telegram_dinamico(reporte_data, proyecto_data):
             f"🎯 TIPO: {tipo}\n"
             f"📅 ANÁLISIS: {fecha} | 📊 Línea Base: {anio_base}\n"
             f"🛰️  SENSORES: Fusión Sentinel (2/1) | NASA (GEDI/FIRMS)\n"
-            "───────────────────────────────────────��──────────────────────\n\n"
+            "──────────────────────────────────────────────────────────────\n\n"
         )
 
         # CUERPO DINÁMICO POR TIPO

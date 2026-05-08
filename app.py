@@ -326,7 +326,7 @@ def crear_portada_biocore():
         <p>Evidencia técnica satelital antes de que llegue la fiscalización.</p>
     </div>
 
-        <div class="bc-sensors">
+    <div class="bc-sensors">
         <span class="bc-sensor-pill">Sentinel-2</span>
         <span class="bc-sensor-pill">Sentinel-1 SAR</span>
         <span class="bc-sensor-pill">Landsat 8/9</span>

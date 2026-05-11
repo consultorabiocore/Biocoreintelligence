@@ -27,7 +27,6 @@ interface TerrainMeshProps {
   showShadowOverlay: boolean;
   onTerrainClick?: (point: { x: number; y: number; z: number }) => void;
 }
-
 function TerrainMesh({
   grid,
   resolution,
@@ -43,29 +42,35 @@ function TerrainMesh({
     const vertexCount = rows * cols;
 
     const pos = new Float32Array(vertexCount * 3);
+    const colors = new Float32Array(vertexCount * 3); // Matriz para los colores biológicos
+    
     let pIdx = 0;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const val = grid[r]![c]!;
-        pos[pIdx++] = c * resolution;
-        pos[pIdx++] = (isNaN(val) ? 0 : val) - minElev;
-        pos[pIdx++] = -(r * resolution);
+        
+        // 1. Posición del vértice
+        pos[pIdx] = c * resolution;
+        pos[pIdx + 1] = (isNaN(val) ? 0 : val) - minElev;
+        pos[pIdx + 2] = -(r * resolution);
+
+        // 2. Lógica de Color (Sustituye al gris sólido)
+        // Simulamos el índice SAVI: verde para vigor, rojo para estrés
+        const simulatedSavi = val > (minElev + 10) ? 0.6 : 0.1; 
+        const color = new THREE.Color(simulatedSavi > 0.5 ? "#2d6a4f" : "#bc4749");
+
+        colors[pIdx] = color.r;
+        colors[pIdx + 1] = color.g;
+        colors[pIdx + 2] = color.b;
+
+        pIdx += 3;
       }
     }
 
+    // Definición de índices para las caras del terreno
     const ind: number[] = [];
     for (let r = 0; r < rows - 1; r++) {
       for (let c = 0; c < cols - 1; c++) {
-        const valTL = grid[r]![c]!;
-        const valTR = grid[r]![c + 1]!;
-        const valBL = grid[r + 1]![c]!;
-        const valBR = grid[r + 1]![c + 1]!;
-
-        // Skip triangles if any vertex is NaN (empty data)
-        if (isNaN(valTL) || isNaN(valTR) || isNaN(valBL) || isNaN(valBR)) {
-          continue;
-        }
-
         const tl = r * cols + c;
         const tr = tl + 1;
         const bl = tl + cols;
@@ -76,6 +81,7 @@ function TerrainMesh({
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3)); // Añadimos el atributo de color
     geo.setIndex(new THREE.BufferAttribute(new Uint32Array(ind), 1));
     geo.computeVertexNormals();
     return geo;
@@ -91,12 +97,14 @@ function TerrainMesh({
           if (onTerrainClick) onTerrainClick(e.point);
         }}
       >
-        <meshStandardMaterial color="#cccccc" side={THREE.DoubleSide} />
+        {/* El material ahora usa vertexColors en lugar de un color fijo gris */}
+        <meshStandardMaterial vertexColors={true} side={THREE.DoubleSide} />
       </mesh>
       {showShadowOverlay && <ShadowOverlay grid={grid} resolution={resolution} />}
     </group>
   );
 }
+
 const geometry = useMemo(() => {
   const rows = grid.length;
   const cols = grid[0]?.length ?? 0;

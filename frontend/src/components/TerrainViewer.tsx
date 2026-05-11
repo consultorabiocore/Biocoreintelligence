@@ -5,7 +5,6 @@
  * Supports click-to-place radar via raycasting.
  * Uses OrbitControls for camera manipulation.
  */
-
 import { useRef, useMemo, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, GizmoHelper, GizmoViewport } from "@react-three/drei";
@@ -15,10 +14,11 @@ import { useTerrainStore } from "../store/terrainStore";
 import { useAnalysisStore } from "../store/analysisStore";
 import { ShadowOverlay } from "./ShadowOverlay";
 
+/** Lógica de color biológico para BioCore */
 const getBioColor = (saviValue: number) => {
-  if (saviValue > 0.5) return new THREE.Color("#2d6a4f"); // Verde oscuro (Vigoroso)
-  if (saviValue > 0.2) return new THREE.Color("#95d5b2"); // Verde claro (Normal)
-  return new THREE.Color("#bc4749");                     // Rojo (Estrés hídrico/Alerta)
+  if (saviValue > 0.5) return new THREE.Color("#2d6a4f"); // Verde vigoroso
+  if (saviValue > 0.2) return new THREE.Color("#95d5b2"); // Verde normal
+  return new THREE.Color("#bc4749");                     // Alerta roja
 };
 
 interface TerrainMeshProps {
@@ -27,6 +27,7 @@ interface TerrainMeshProps {
   showShadowOverlay: boolean;
   onTerrainClick?: (point: { x: number; y: number; z: number }) => void;
 }
+
 function TerrainMesh({
   grid,
   resolution,
@@ -42,22 +43,23 @@ function TerrainMesh({
     const vertexCount = rows * cols;
 
     const pos = new Float32Array(vertexCount * 3);
-    const colors = new Float32Array(vertexCount * 3); // Matriz para los colores biológicos
+    const colors = new Float32Array(vertexCount * 3);
     
     let pIdx = 0;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const val = grid[r]![c]!;
         
-        // 1. Posición del vértice
+        // Posición XYZ
         pos[pIdx] = c * resolution;
         pos[pIdx + 1] = (isNaN(val) ? 0 : val) - minElev;
         pos[pIdx + 2] = -(r * resolution);
 
-        // 2. Lógica de Color (Sustituye al gris sólido)
-        // Simulamos el índice SAVI: verde para vigor, rojo para estrés
-        const simulatedSavi = val > (minElev + 10) ? 0.6 : 0.1; 
-        const color = new THREE.Color(simulatedSavi > 0.5 ? "#2d6a4f" : "#bc4749");
+        // Mapeo de Color BioCore
+        // Simulamos una zona de estrés en el centro para el prototipo
+        const isStressZone = r > rows/3 && r < rows/2 && c > cols/3 && c < cols/2;
+        const simulatedSavi = isStressZone ? 0.1 : 0.6; 
+        const color = getBioColor(simulatedSavi);
 
         colors[pIdx] = color.r;
         colors[pIdx + 1] = color.g;
@@ -67,7 +69,7 @@ function TerrainMesh({
       }
     }
 
-    // Definición de índices para las caras del terreno
+    // Generación de caras (triángulos)
     const ind: number[] = [];
     for (let r = 0; r < rows - 1; r++) {
       for (let c = 0; c < cols - 1; c++) {
@@ -81,7 +83,7 @@ function TerrainMesh({
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3)); // Añadimos el atributo de color
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geo.setIndex(new THREE.BufferAttribute(new Uint32Array(ind), 1));
     geo.computeVertexNormals();
     return geo;
@@ -97,7 +99,7 @@ function TerrainMesh({
           if (onTerrainClick) onTerrainClick(e.point);
         }}
       >
-        {/* El material ahora usa vertexColors en lugar de un color fijo gris */}
+        {/* IMPORTANTE: Activamos vertexColors para ver el mapa biológico */}
         <meshStandardMaterial vertexColors={true} side={THREE.DoubleSide} />
       </mesh>
       {showShadowOverlay && <ShadowOverlay grid={grid} resolution={resolution} />}

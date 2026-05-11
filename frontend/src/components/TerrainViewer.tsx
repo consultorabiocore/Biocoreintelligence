@@ -15,6 +15,12 @@ import { useTerrainStore } from "../store/terrainStore";
 import { useAnalysisStore } from "../store/analysisStore";
 import { ShadowOverlay } from "./ShadowOverlay";
 
+const getBioColor = (saviValue: number) => {
+  if (saviValue > 0.5) return new THREE.Color("#2d6a4f"); // Verde oscuro (Vigoroso)
+  if (saviValue > 0.2) return new THREE.Color("#95d5b2"); // Verde claro (Normal)
+  return new THREE.Color("#bc4749");                     // Rojo (Estrés hídrico/Alerta)
+};
+
 interface TerrainMeshProps {
   grid: number[][];
   resolution: number;
@@ -91,6 +97,44 @@ function TerrainMesh({
     </group>
   );
 }
+const geometry = useMemo(() => {
+  const rows = grid.length;
+  const cols = grid[0]?.length ?? 0;
+  const vertexCount = rows * cols;
+
+  const pos = new Float32Array(vertexCount * 3);
+  const colors = new Float32Array(vertexCount * 3); // Nueva matriz de colores
+  
+  let pIdx = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const val = grid[r]![c]!;
+      
+      // Posición
+      pos[pIdx] = c * resolution;
+      pos[pIdx + 1] = (isNaN(val) ? 0 : val) - minElev;
+      pos[pIdx + 2] = -(r * resolution);
+
+      // Color: Simulamos un área de estrés en el centro del mapa
+      const isStressZone = r > rows/3 && r < rows/2 && c > cols/3 && c < cols/2;
+      const simulatedSavi = isStressZone ? 0.1 : 0.6; 
+      const color = getBioColor(simulatedSavi);
+
+      colors[pIdx] = color.r;
+      colors[pIdx + 1] = color.g;
+      colors[pIdx + 2] = color.b;
+
+      pIdx += 3;
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3)); // Inyectamos los colores
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(ind), 1));
+  geo.computeVertexNormals();
+  return geo;
+}, [grid, resolution, minElev]);
 
 /** All radar markers: current single + all deployed radars */
 function RadarMarkers() {

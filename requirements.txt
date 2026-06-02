@@ -1,37 +1,29 @@
-python-docx
-st-gsheets-connection
-pandas
-earthengine-api
-fpdf2
+# --- Framework y UI ---
 streamlit
-matplotlib
-fpdf
+streamlit-folium
+plotly
+
+# --- Conexiones y Bases de Datos ---
 gspread
 google-auth
+st-gsheets-connection
 st-supabase-connection
-folium
-streamlit-folium
-requests
-supabase
-plotly
-fpdf2==2.7.0
-
-# Dependencias para BioCore Intelligence - Reportes Automáticos
-
-# Client Supabase
 supabase==2.4.0
 postgrest-py==0.13.0
 python-gotrue==1.4.5
 
-# HTTP
-requests==2.31.0
-
-# Manipulación de datos
+# --- Datos y Procesamiento ---
 pandas==2.1.3
 numpy==1.26.2
-
-# Variables de entorno
+requests==2.31.0
 python-dotenv==1.0.0
-
-# Logging y utilidades
 python-dateutil==2.8.2
+
+# --- Mapas e Imágenes Satelitales ---
+earthengine-api
+folium
+matplotlib
+
+# --- Generación de Reportes y Documentos ---
+python-docx
+fpdf2==2.7.0

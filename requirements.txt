@@ -1,23 +1,18 @@
-# --- Dependencias Base (Funcionaban Bien) ---
-python-docx
-st-gsheets-connection
-pandas
-earthengine-api
 streamlit
-matplotlib
-gspread
-google-auth
-st-supabase-connection
-folium
 streamlit-folium
+folium
+plotly
+matplotlib
+pandas
+numpy
 requests
 supabase
-plotly
+st-supabase-connection
+st-gsheets-connection
+gspread
+google-auth
+earthengine-api
+python-docx
 fpdf2==2.7.0
-
-# --- Nuevas Dependencias para Reportes (Compatibles) ---
-postgrest-py
-python-gotrue
-numpy
 python-dotenv
 python-dateutil

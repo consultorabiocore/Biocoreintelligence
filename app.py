@@ -3246,7 +3246,7 @@ if st.session_state.get('admin_mode'):
                 telegram = st.text_input("ID Telegram (opcional)")
                 
                 st.markdown("---")
-                st.markdown("**⏰ Configuración de Reportes Automáticos por Telegram**")
+                
                 col_h, col_f = st.columns(2)
                 with col_h:
                     hora_reporte = st.time_input("Hora de envío", value=time(8, 0))
@@ -3473,12 +3473,6 @@ if not st.session_state.get('admin_mode'):
         except:
             nombre_empresa = proyecto_cliente
         
-        # ===== FORMULARIO PRINCIPAL =====
-        st.markdown("""
-        ---
-        ⏱️ **Nota de Zona Horaria:** Todos los horarios se guardan en **Hora de Chile (UTC-3)**.
-        El backend de GitHub Actions consultará esta tabla cada hora para enviar reportes automáticos.
-        """)
         
         # Mapeo de días
         DIAS_SEMANA = {

@@ -22,6 +22,13 @@ import hashlib
 from io import BytesIO
 import numpy as np
 
+from telegram_reporter import (
+    mostrar_formulario_reportes,
+    mostrar_resumen_reportes,
+    guardar_reporte,
+    obtener_reporte_existente
+)
+
 matplotlib.use('Agg')
 
 # --- CONFIGURACIÓN ---
@@ -3454,54 +3461,172 @@ if not st.session_state.get('admin_mode'):
         except Exception as e:
             st.error(f"Error al cargar historial: {e}")
     
+    
     with tab_config:
-        st.title("⚙️ Mi Configuración de Reportes")
+        st.title("⚙️ Configurar Reportes Automáticos por Telegram")
         proyecto_cliente = st.session_state.get('proyecto_cliente')
         
+        # Obtener nombre de empresa (es el nombre del proyecto)
         try:
-            res = supabase.table("usuarios").select("hora_reporte, frecuencia_reporte").eq("Proyecto", proyecto_cliente).execute()
-            if res.data:
-                datos = res.data[0]
-                hora_actual = datos.get('hora_reporte', '08:00') or '08:00'
-                freq_actual = datos.get('frecuencia_reporte', 'Diario') or 'Diario'
+            res = supabase.table("usuarios").select("Proyecto").eq("Proyecto", proyecto_cliente).execute()
+            nombre_empresa = res.data[0]['Proyecto'] if res.data else proyecto_cliente
+        except:
+            nombre_empresa = proyecto_cliente
+        
+        # ===== FORMULARIO PRINCIPAL =====
+        st.markdown("""
+        ---
+        ⏱️ **Nota de Zona Horaria:** Todos los horarios se guardan en **Hora de Chile (UTC-3)**.
+        El backend de GitHub Actions consultará esta tabla cada hora para enviar reportes automáticos.
+        """)
+        
+        # Mapeo de días
+        DIAS_SEMANA = {
+            "Lunes": 0,
+            "Martes": 1,
+            "Miércoles": 2,
+            "Jueves": 3,
+            "Viernes": 4,
+            "Sábado": 5,
+            "Domingo": 6,
+        }
+        DIAS_SEMANA_REVERSE = {v: k for k, v in DIAS_SEMANA.items()}
+        
+        # Crear formulario con st.form
+        with st.form("form_reportes_telegram", clear_on_submit=True):
+            
+            # ===== Campo: Chat ID de Telegram =====
+            st.markdown("### 💬 Tu Chat ID de Telegram")
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                chat_id = st.text_input(
+                    "Chat ID",
+                    placeholder="Ej: 123456789",
+                    help="ID numérico de tu conversación privada con el bot"
+                )
+            
+            with col2:
+                with st.expander("❓ ¿Cómo obtenerlo?"):
+                    st.markdown("""
+                    **Opción 1: @userinfobot**
+                    1. Abre Telegram
+                    2. Busca: `@userinfobot`
+                    3. Envía cualquier mensaje
+                    4. El bot te responderá tu User ID
+                    
+                    **Opción 2: @GetIdsBot**
+                    1. Busca: `@GetIdsBot`
+                    2. Inicia el bot
+                    3. Tu ID aparecerá automáticamente
+                    """)
+            
+            # ===== Campo: Frecuencia =====
+            st.markdown("### 📅 Frecuencia de Reportes")
+            frecuencia = st.radio(
+                "¿Con qué frecuencia recibirás los reportes?",
+                options=["Diario", "Semanal"],
+                horizontal=True,
+            )
+            
+            # ===== Campo: Hora del Reporte =====
+            st.markdown("### 🕐 Hora del Reporte (Zona Horaria Chile)")
+            hora_reporte = st.slider(
+                "Selecciona la hora (formato 24h)",
+                min_value=0,
+                max_value=23,
+                value=9,
+                step=1,
+                format="%d:00",
+            )
+            st.caption(f"📍 Horario seleccionado: {hora_reporte:02d}:00 hrs (Chile UTC-3)")
+            
+            # ===== Campo Condicional: Día de la Semana =====
+            dia_semana_texto = None
+            if frecuencia == "Semanal":
+                st.markdown("### 📆 Día de la Semana")
+                dia_semana_texto = st.selectbox(
+                    "Selecciona el día en que deseas recibir tu reporte",
+                    options=list(DIAS_SEMANA.keys()),
+                    index=0,
+                )
+                st.caption(f"📍 Recibirás tu reporte cada {dia_semana_texto}")
+            
+            st.markdown("---")
+            
+            # ===== Botón Submit =====
+            submitted = st.form_submit_button(
+                "✅ Guardar Configuración",
+                use_container_width=True,
+                type="primary"
+            )
+        
+        # ===== Procesar envío del formulario =====
+        if submitted:
+            # Validaciones
+            if not chat_id or not chat_id.strip():
+                st.error("❌ Por favor, ingresa tu Chat ID de Telegram.")
+            else:
+                try:
+                    int(chat_id)
+                except ValueError:
+                    st.error(f"❌ El Chat ID debe ser un número. Recibiste: {chat_id}")
+                    st.stop()
                 
-                st.markdown("### 📬 Configuración de Reportes Automáticos por Telegram")
-                st.info("Aquí puedes ver y modificar cuándo quieres recibir tu reporte satelital.")
+                # Si es semanal, validar que haya seleccionado un día
+                if frecuencia == "Semanal" and not dia_semana_texto:
+                    st.error("❌ Por favor, selecciona un día de la semana.")
+                    st.stop()
                 
+                # Guardar en Supabase
+                if guardar_reporte(
+                    nombre_empresa=nombre_empresa,
+                    chat_id=chat_id.strip(),
+                    frecuencia=frecuencia.lower(),
+                    hora_reporte=hora_reporte,
+                    dia_semana_texto=dia_semana_texto
+                ):
+                    st.success(
+                        f"""
+                        ✅ **¡Configuración guardada correctamente!**
+                        
+                        📊 Empresa: {nombre_empresa}
+                        💬 Chat ID: {chat_id}
+                        📅 Frecuencia: {frecuencia}
+                        🕐 Hora: {hora_reporte:02d}:00 (Chile)
+                        {f"📆 Día: {dia_semana_texto}" if frecuencia == "semanal" else ""}
+                        
+                        Comenzarás a recibir reportes en tu próximo horario programado.
+                        """
+                    )
+                    st.balloons()
+                else:
+                    st.error("❌ No se pudo guardar la configuración. Intenta de nuevo.")
+        
+        # ===== Resumen de configuración actual =====
+        st.markdown("---")
+        st.markdown("### 📋 Tu Configuración Actual")
+        
+        try:
+            config_actual = obtener_reporte_existente(chat_id if chat_id else "", nombre_empresa)
+            
+            if config_actual:
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("🕐 Hora de envío actual", hora_actual)
+                    st.metric("🕐 Hora configurada", f"{config_actual.get('hora_reporte', 'N/A'):02d}:00")
                 with col2:
-                    st.metric("📅 Frecuencia actual", freq_actual)
+                    freq_mostrar = config_actual.get('frecuencia', 'N/A').capitalize()
+                    st.metric("📅 Frecuencia", freq_mostrar)
                 
-                st.markdown("---")
-                st.markdown("#### ✏️ Modificar preferencias")
-                
-                with st.form("form_config_cliente"):
-                    try:
-                        h, m = map(int, hora_actual.split(":"))
-                        hora_default = time(h, m)
-                    except:
-                        hora_default = time(8, 0)
-                    
-                    nueva_hora = st.time_input("Nueva hora de envío", value=hora_default)
-                    nueva_freq = st.selectbox("Nueva frecuencia", ["Diario", "Semanal"],
-                                              index=0 if freq_actual == "Diario" else 1)
-                    
-                    if st.form_submit_button("💾 Guardar cambios"):
-                        try:
-                            supabase.table("usuarios").update({
-                                "hora_reporte": nueva_hora.strftime("%H:%M"),
-                                "frecuencia_reporte": nueva_freq
-                            }).eq("Proyecto", proyecto_cliente).execute()
-                            st.success("✅ Preferencias actualizadas correctamente")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error al guardar: {str(e)}")
+                if config_actual.get('frecuencia') == 'semanal':
+                    dia_idx = config_actual.get('dia_semana', 0)
+                    dia_nombre = DIAS_SEMANA_REVERSE.get(dia_idx, 'N/A')
+                    st.metric("📆 Día de semana", dia_nombre)
             else:
-                st.warning("No se encontraron datos de configuración")
+                st.info("📭 Aún no tienes configuración guardada. ¡Usa el formulario de arriba para crear una!")
+        
         except Exception as e:
-            st.error(f"Error al cargar configuración: {e}")
+            st.warning(f"⚠️ No se pudo cargar la configuración: {str(e)}")
     
     with tab_guia:
         mostrar_guia()

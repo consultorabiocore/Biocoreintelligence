@@ -3473,19 +3473,6 @@ if not st.session_state.get('admin_mode'):
         except:
             nombre_empresa = proyecto_cliente
         
-        
-        # Mapeo de días
-        DIAS_SEMANA = {
-            "Lunes": 0,
-            "Martes": 1,
-            "Miércoles": 2,
-            "Jueves": 3,
-            "Viernes": 4,
-            "Sábado": 5,
-            "Domingo": 6,
-        }
-        DIAS_SEMANA_REVERSE = {v: k for k, v in DIAS_SEMANA.items()}
-        
         # ===== LLAMAR AL MÓDULO TELEGRAM_REPORTER =====
         mostrar_formulario_reportes()
         st.markdown("---")

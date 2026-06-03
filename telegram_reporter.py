@@ -31,8 +31,8 @@ DIAS_SEMANA_REVERSE = {v: k for k, v in DIAS_SEMANA.items()}
 @st.cache_resource
 def init_supabase_client() -> Client:
     """Inicializa el cliente de Supabase una sola vez."""
-    supabase_url = st.secrets.get("supabase_url") or os.getenv("SUPABASE_URL")
-    supabase_key = st.secrets.get("supabase_key") or os.getenv("SUPABASE_KEY")
+    supabase_url = st.secrets.get("connections", {}).get("supabase", {}).get("url") or os.getenv("SUPABASE_URL")
+    supabase_key = st.secrets.get("connections", {}).get("supabase", {}).get("key") or os.getenv("SUPABASE_KEY")
     
     if not supabase_url or not supabase_key:
         st.error("❌ Falta configurar SUPABASE_URL o SUPABASE_KEY en secrets")
@@ -63,7 +63,6 @@ def obtener_reporte_existente(chat_id: str, nombre_empresa: str) -> dict | None:
         
         return response.data if response.data else None
     except Exception as e:
-        st.warning(f"⚠️ No hay configuración anterior (normal en primer acceso): {str(e)}")
         return None
 
 def guardar_reporte(

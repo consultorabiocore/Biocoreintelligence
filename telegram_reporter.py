@@ -56,6 +56,9 @@ def obtener_reporte_existente(chat_id: str, nombre_empresa: str) -> dict | None:
         Dict con la configuración o None si no existe
     """
     try:
+        if not chat_id or not chat_id.strip():
+            return None
+            
         supabase = init_supabase_client()
         response = supabase.table("clientes_reportes").select("*").eq(
             "chat_id", int(chat_id)
@@ -125,7 +128,6 @@ def guardar_reporte(
         return False
     except Exception as e:
         st.error(f"❌ Error al guardar la configuración: {str(e)}")
-        st.write(f"Detalles técnicos: {e}")
         return False
 
 # ============================================================================
@@ -141,73 +143,68 @@ def mostrar_formulario_reportes():
     st.markdown("""
     ---
     ⏱️ **Nota de Zona Horaria:** Todos los horarios se guardan en **Hora de Chile (UTC-3)**.
-    El backend de GitHub Actions consultará esta tabla cada hora para enviar reportes.
+    El backend de GitHub Actions consultará esta tabla cada hora para enviar reportes automáticos.
     """)
     
     # Crear formulario con st.form
     with st.form("form_reportes_telegram", clear_on_submit=True):
         
-        # ===== Campo: Nombre de Empresa =====
-        nombre_empresa = st.text_input(
-            "📊 Nombre de la Empresa",
-            placeholder="Ej: Minera Los Andes",
-            help="Nombre único que identifica tu empresa en el sistema"
-        )
-        
         # ===== Campo: Chat ID de Telegram =====
+        st.markdown("### 💬 Tu Chat ID de Telegram")
         col1, col2 = st.columns([3, 1])
+        
         with col1:
             chat_id = st.text_input(
-                "💬 Chat ID de Telegram",
+                "Chat ID",
                 placeholder="Ej: 123456789",
                 help="ID numérico de tu conversación privada con el bot"
             )
         
         with col2:
-            st.markdown("### ❓ Cómo obtenerlo:")
-            with st.expander("Ver instrucciones"):
+            with st.expander("❓ ¿Cómo obtenerlo?"):
                 st.markdown("""
                 **Opción 1: @userinfobot**
                 1. Abre Telegram
-                2. Busca y abre el bot: `@userinfobot`
+                2. Busca: `@userinfobot`
                 3. Envía cualquier mensaje
-                4. El bot responderá tu User ID (cópialo)
+                4. El bot te responderá tu User ID
                 
                 **Opción 2: @GetIdsBot**
-                1. Busca en Telegram: `@GetIdsBot`
+                1. Busca: `@GetIdsBot`
                 2. Inicia el bot
                 3. Tu ID aparecerá automáticamente
                 """)
         
         # ===== Campo: Frecuencia =====
+        st.markdown("### 📅 Frecuencia de Reportes")
         frecuencia = st.radio(
-            "📅 Frecuencia de Reportes",
+            "¿Con qué frecuencia recibirás los reportes?",
             options=["Diario", "Semanal"],
             horizontal=True,
-            help="¿Con qué frecuencia recibirás los reportes?"
         )
         
         # ===== Campo: Hora del Reporte =====
+        st.markdown("### 🕐 Hora del Reporte (Zona Horaria Chile)")
         hora_reporte = st.slider(
-            "🕐 Hora del Reporte (Zona Horaria Chile)",
+            "Selecciona la hora (formato 24h)",
             min_value=0,
             max_value=23,
             value=9,
             step=1,
             format="%d:00",
-            help="Hora en formato 24h (0=00:00, 9=09:00, 23=23:00)"
         )
+        st.caption(f"📍 Horario seleccionado: {hora_reporte:02d}:00 hrs (Chile UTC-3)")
         
         # ===== Campo Condicional: Día de la Semana =====
         dia_semana_texto = None
         if frecuencia == "Semanal":
-            st.markdown("---")
+            st.markdown("### 📆 Día de la Semana")
             dia_semana_texto = st.selectbox(
-                "📆 Día de la Semana (solo aplica si es Semanal)",
+                "Selecciona el día en que deseas recibir tu reporte",
                 options=list(DIAS_SEMANA.keys()),
                 index=0,
-                help="Selecciona el día en que deseas recibir tu reporte"
             )
+            st.caption(f"📍 Recibirás tu reporte cada {dia_semana_texto}")
         
         st.markdown("---")
         
@@ -220,11 +217,14 @@ def mostrar_formulario_reportes():
     
     # Procesar envío del formulario
     if submitted:
-        # Validaciones básicas
-        if not nombre_empresa or not nombre_empresa.strip():
-            st.error("❌ Por favor, ingresa el nombre de tu empresa.")
+        # Obtener nombre de empresa desde session state
+        proyecto_cliente = st.session_state.get('proyecto_cliente')
+        
+        if not proyecto_cliente:
+            st.error("❌ No se pudo identificar tu proyecto.")
             return
         
+        # Validaciones básicas
         if not chat_id or not chat_id.strip():
             st.error("❌ Por favor, ingresa tu Chat ID de Telegram.")
             return
@@ -243,7 +243,7 @@ def mostrar_formulario_reportes():
         
         # Guardar en Supabase
         if guardar_reporte(
-            nombre_empresa=nombre_empresa.strip(),
+            nombre_empresa=proyecto_cliente,
             chat_id=chat_id.strip(),
             frecuencia=frecuencia.lower(),
             hora_reporte=hora_reporte,
@@ -251,9 +251,9 @@ def mostrar_formulario_reportes():
         ):
             st.success(
                 f"""
-                ✅ **Configuración guardada correctamente!**
+                ✅ **¡Configuración guardada correctamente!**
                 
-                📊 Empresa: {nombre_empresa}
+                📊 Empresa: {proyecto_cliente}
                 💬 Chat ID: {chat_id}
                 📅 Frecuencia: {frecuencia}
                 🕐 Hora: {hora_reporte:02d}:00 (Chile)
@@ -262,28 +262,35 @@ def mostrar_formulario_reportes():
                 Comenzarás a recibir reportes en tu próximo horario programado.
                 """
             )
+            st.balloons()
         else:
             st.error("❌ No se pudo guardar la configuración. Intenta de nuevo.")
 
 def mostrar_resumen_reportes():
     """
-    Muestra un resumen de las configuraciones guardadas (opcional).
+    Muestra un resumen de las configuraciones guardadas.
     """
-    st.subheader("📋 Mis Configuraciones de Reporte")
+    st.subheader("📋 Mi Configuración Actual")
+    
+    proyecto_cliente = st.session_state.get('proyecto_cliente')
+    
+    if not proyecto_cliente:
+        st.warning("No se pudo cargar tu configuración.")
+        return
     
     try:
         supabase = init_supabase_client()
-        response = supabase.table("clientes_reportes").select("*").execute()
+        response = supabase.table("clientes_reportes").select("*").eq(
+            "nombre_empresa", proyecto_cliente
+        ).execute()
         
         if response.data and len(response.data) > 0:
-            # Convertir a DataFrame para visualización más clara
             import pandas as pd
             
             datos = []
             for row in response.data:
                 dia_nombre = DIAS_SEMANA_REVERSE.get(row.get("dia_semana"), "-")
                 datos.append({
-                    "Empresa": row.get("nombre_empresa", "-"),
                     "Chat ID": row.get("chat_id", "-"),
                     "Frecuencia": row.get("frecuencia", "-").capitalize(),
                     "Hora": f"{row.get('hora_reporte', '-'):02d}:00",
@@ -293,7 +300,7 @@ def mostrar_resumen_reportes():
             df = pd.DataFrame(datos)
             st.dataframe(df, use_container_width=True, hide_index=True)
         else:
-            st.info("📭 No hay configuraciones guardadas aún.")
+            st.info("📭 Aún no tienes configuración guardada. ¡Usa el formulario de arriba para crear una!")
     
     except Exception as e:
         st.warning(f"⚠️ No se pudo cargar el resumen: {str(e)}")

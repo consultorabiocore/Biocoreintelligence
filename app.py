@@ -3492,10 +3492,11 @@ if not st.session_state.get('admin_mode'):
         }
         DIAS_SEMANA_REVERSE = {v: k for k, v in DIAS_SEMANA.items()}
         
-# ===== LLAMAR AL MÓDULO TELEGRAM_REPORTER =====
-mostrar_formulario_reportes()
-st.markdown("---")
-mostrar_resumen_reportes()
+        # ===== LLAMAR AL MÓDULO TELEGRAM_REPORTER =====
+        mostrar_formulario_reportes()
+        st.markdown("---")
+        mostrar_resumen_reportes()
+    
     with tab_guia:
         mostrar_guia()
 

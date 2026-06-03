@@ -31,8 +31,12 @@ DIAS_SEMANA_REVERSE = {v: k for k, v in DIAS_SEMANA.items()}
 @st.cache_resource
 def init_supabase_client() -> Client:
     """Inicializa el cliente de Supabase una sola vez."""
-    supabase_url = st.secrets.get("connections", {}).get("supabase", {}).get("url") or os.getenv("SUPABASE_URL")
-    supabase_key = st.secrets.get("connections", {}).get("supabase", {}).get("key") or os.getenv("SUPABASE_KEY")
+    try:
+        supabase_url = st.secrets["connections"]["supabase"]["url"]
+        supabase_key = st.secrets["connections"]["supabase"]["key"]
+    except:
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
     
     if not supabase_url or not supabase_key:
         st.error("❌ Falta configurar SUPABASE_URL o SUPABASE_KEY en secrets")
@@ -47,13 +51,6 @@ def init_supabase_client() -> Client:
 def obtener_reporte_existente(chat_id: str, nombre_empresa: str) -> dict | None:
     """
     Obtiene la configuración actual de un cliente si existe.
-    
-    Args:
-        chat_id: ID del chat de Telegram
-        nombre_empresa: Nombre de la empresa
-    
-    Returns:
-        Dict con la configuración o None si no existe
     """
     try:
         if not chat_id or not chat_id.strip():
@@ -77,16 +74,6 @@ def guardar_reporte(
 ) -> bool:
     """
     Inserta o actualiza la configuración de reportes (UPSERT).
-    
-    Args:
-        nombre_empresa: Nombre de la empresa
-        chat_id: ID del chat de Telegram
-        frecuencia: 'diario' o 'semanal'
-        hora_reporte: Hora en formato 24h (0-23) en zona horaria de Chile
-        dia_semana_texto: Día en texto ('Lunes', 'Martes', etc.) - solo para semanal
-    
-    Returns:
-        True si la operación fue exitosa, False en caso contrario
     """
     try:
         # Convertir chat_id a entero

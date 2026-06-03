@@ -2,10 +2,9 @@ name: BioCore - Reportes Automáticos Telegram
 
 on:
   schedule:
-    # Todos los días a las 08:00 AM (hora Chile UTC-3)
-    # 08:00 Chile = 11:00 UTC (Considerar horario de verano)
-    - cron: '0 11 * * *'
-  
+    # Corre al minuto 0 de cada hora
+    - cron: '0 * * * *'
+
   workflow_dispatch:
     inputs:
       enviar_todos:

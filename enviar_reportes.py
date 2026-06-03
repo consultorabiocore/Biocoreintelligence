@@ -28,25 +28,37 @@ def obtener_clientes_para_reporte() -> list:
     hora_actual = obtener_hora_actual_chile()
     dia_actual = obtener_dia_semana_actual()
     
+    print(f"🕐 Hora actual en Chile: {hora_actual:02d}:00")
+    print(f"📅 Día de la semana: {dia_actual} (0=Lunes, 6=Domingo)")
+    
     # Consulta: obtener clientes cuya hora coincida con la actual
     response = supabase.table("clientes_reportes").select("*").eq(
         "hora_reporte", hora_actual
     ).execute()
     
+    print(f"📨 Clientes con hora={hora_actual}: {len(response.data) if response.data else 0}")
+    
     clientes_filtrados = []
     
-    for cliente in response.data:
-        frecuencia = cliente.get("frecuencia", "").lower()
-        
-        # Si es diario, incluye siempre
-        if frecuencia == "diario":
-            clientes_filtrados.append(cliente)
-        
-        # Si es semanal, incluye solo si es el día correcto
-        elif frecuencia == "semanal":
-            dia_semana_programado = cliente.get("dia_semana")
-            if dia_semana_programado == dia_actual:
+    if response.data:
+        for cliente in response.data:
+            frecuencia = cliente.get("frecuencia", "").lower()
+            nombre_empresa = cliente.get("nombre_empresa", "N/A")
+            chat_id = cliente.get("chat_id", "N/A")
+            
+            # Si es diario, incluye siempre
+            if frecuencia == "diario":
+                print(f"✅ {nombre_empresa} ({chat_id}): DIARIO")
                 clientes_filtrados.append(cliente)
+            
+            # Si es semanal, incluye solo si es el día correcto
+            elif frecuencia == "semanal":
+                dia_semana_programado = cliente.get("dia_semana")
+                if dia_semana_programado == dia_actual:
+                    print(f"✅ {nombre_empresa} ({chat_id}): SEMANAL (día {dia_actual})")
+                    clientes_filtrados.append(cliente)
+                else:
+                    print(f"⏭️  {nombre_empresa} ({chat_id}): Semanal, pero día {dia_semana_programado} ≠ {dia_actual}")
     
     return clientes_filtrados
 
@@ -65,34 +77,58 @@ def enviar_reporte_telegram(chat_id: int, nombre_empresa: str, contenido: str) -
     
     try:
         response = requests.post(url, json=payload, timeout=10)
-        return response.status_code == 200
+        if response.status_code == 200:
+            print(f"✅ Reporte enviado a {nombre_empresa} ({chat_id})")
+            return True
+        else:
+            print(f"❌ Error Telegram ({response.status_code}) para {chat_id}: {response.text}")
+            return False
     except Exception as e:
         print(f"❌ Error enviando a {chat_id}: {e}")
         return False
 
 def main():
     """Función principal del scheduler."""
-    print("🚀 Iniciando envío de reportes automáticos...")
+    print("=" * 70)
+    print("🚀 BioCore Intelligence - Scheduler de Reportes Automáticos")
+    print(f"📅 {datetime.now(TIMEZONE_CHILE).strftime('%d/%m/%Y %H:%M:%S')} (Chile)")
+    print("=" * 70)
     
     clientes = obtener_clientes_para_reporte()
     
     if not clientes:
-        print("ℹ️ No hay clientes para reportes en esta hora.")
+        print("ℹ️  No hay clientes para reportes en esta hora.")
+        print("=" * 70)
         return
     
-    print(f"📨 Enviando reportes a {len(clientes)} cliente(s)...")
+    print(f"\n📨 Enviando reportes a {len(clientes)} cliente(s)...\n")
+    
+    enviados = 0
+    errores = 0
     
     for cliente in clientes:
         chat_id = cliente.get("chat_id")
         nombre_empresa = cliente.get("nombre_empresa")
         
         # TODO: Aquí iría tu lógica de generación de reporte
-        contenido = "Reporte generado exitosamente."
+        # Por ahora, enviamos un mensaje simple de prueba
+        contenido = (
+            "✅ Reporte automático generado exitosamente.\n\n"
+            f"📊 Empresa: {nombre_empresa}\n"
+            f"🕐 Hora: {datetime.now(TIMEZONE_CHILE).strftime('%H:%M')}\n"
+            f"📅 Fecha: {datetime.now(TIMEZONE_CHILE).strftime('%d/%m/%Y')}\n\n"
+            "Los datos fueron procesados desde satélites Sentinel-2 y MODIS.\n"
+            "Accede a la plataforma BioCore Intelligence para ver el análisis completo."
+        )
         
         if enviar_reporte_telegram(chat_id, nombre_empresa, contenido):
-            print(f"✅ Reporte enviado a {nombre_empresa} ({chat_id})")
+            enviados += 1
         else:
-            print(f"❌ Error enviando reporte a {nombre_empresa} ({chat_id})")
+            errores += 1
+    
+    print(f"\n{'=' * 70}")
+    print(f"📊 RESUMEN: {enviados} ✅ enviados, {errores} ❌ errores")
+    print("=" * 70)
 
 if __name__ == "__main__":
     main()

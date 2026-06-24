@@ -349,13 +349,29 @@ def crear_portada_biocore():
     </div>
     """, unsafe_allow_html=True)
 
-    demo_map = folium.Map(
-        location=[-37.0, -71.5],
-        zoom_start=5,
-        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        attr='Google Satellite'
-    )
-    folium_static(demo_map, width=1200, height=380)
+    # TAB para elegir entre mapa 2D o 3D
+    tab_2d, tab_3d = st.tabs(["🗺️ Mapa 2D (Folium)", "🎯 Mapa 3D (Three.js)"])
+    
+    with tab_2d:
+        demo_map = folium.Map(
+            location=[-37.0, -71.5],
+            zoom_start=5,
+            tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            attr='Google Satellite'
+        )
+        folium_static(demo_map, width=1200, height=380)
+
+    with tab_3d:
+        st.markdown("""
+        <iframe 
+            src="http://localhost:5173" 
+            width="100%" 
+            height="900" 
+            frameborder="0"
+            style="border: none; border-radius: 10px;">
+        </iframe>
+        """, unsafe_allow_html=True)
+        st.info("💡 Asegúrate de que el servidor React está corriendo en http://localhost:5173")
 
     st.markdown("""
     <div class="bc-features">

@@ -24,8 +24,31 @@ import numpy as np
 
 from components.terrain_viewer import terrain_viewer
 
-st.title("BioCore Intelligence")
-terrain_viewer(show_shadow_overlay=True)
+import streamlit as st
+import os
+
+st.set_page_config(page_title="BioCore Intelligence", layout="wide")
+
+st.title("🛰️ BioCore Intelligence - Vigilancia Ambiental")
+
+# Mostrar el mapa 3D compilado
+if os.path.exists("frontend/dist/index.html"):
+    with open("frontend/dist/index.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    st.markdown("""
+        <iframe 
+            srcDoc="%s"
+            width="100%%" 
+            height="900" 
+            frameborder="0"
+            style="border: none; border-radius: 10px;">
+        </iframe>
+        """ % html_content.replace('"', '\\"'), 
+        unsafe_allow_html=True)
+else:
+    st.error("Mapa 3D no encontrado. Ejecuta: npm run build en la carpeta frontend")
+
 
 from telegram_reporter import (
     mostrar_formulario_reportes,
@@ -358,9 +381,6 @@ def crear_portada_biocore():
         attr='Google Satellite'
     )
     folium_static(demo_map, width=1200, height=380)
-
-    st.markdown("### 🗺️ Visualizador 3D de Terreno")
-    terrain_viewer(show_shadow_overlay=True)
     
     st.markdown("""
     <div class="bc-features">

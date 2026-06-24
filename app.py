@@ -22,8 +22,6 @@ import hashlib
 from io import BytesIO
 import numpy as np
 
-from components.terrain_viewer import terrain_viewer
-
 import streamlit as st
 import os
 
@@ -359,18 +357,6 @@ def crear_portada_biocore():
     )
     folium_static(demo_map, width=1200, height=380)
 
-else:
-    st.markdown("""
-        <iframe 
-            src="http://localhost:5173" 
-            width="100%" 
-            height="900" 
-            frameborder="0"
-            style="border: none; border-radius: 10px;">
-        </iframe>
-        """, unsafe_allow_html=True)
-
-    
     st.markdown("""
     <div class="bc-features">
         <div class="bc-feat-card">
@@ -401,6 +387,10 @@ else:
         <p><a href="mailto:consultorabiocore@gmail.com">consultorabiocore@gmail.com</a></p>
     </div>
     """, unsafe_allow_html=True)
+
+# [RESTO DEL CÓDIGO - continúa igual desde aquí...]
+# Incluye todos los módulos de generar_mensaje_telegram_dinamico, generar_graficos_profesionales, etc.
+# hasta el final del archivo
 # ============================================================================
 # MÓDULO 1: GENERADOR DE REPORTE TELEGRAM DINÁMICO (CORREGIDO)
 # ============================================================================

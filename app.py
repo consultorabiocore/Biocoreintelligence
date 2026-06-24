@@ -363,15 +363,14 @@ def crear_portada_biocore():
 
     with tab_3d:
         st.markdown("""
-        <iframe 
-            src="http://localhost:5173" 
-            width="100%" 
-            height="900" 
-            frameborder="0"
-            style="border: none; border-radius: 10px;">
-        </iframe>
-        """, unsafe_allow_html=True)
-        st.info("💡 Asegúrate de que el servidor React está corriendo en http://localhost:5173")
+<iframe 
+    src="http://127.0.0.1:5173" 
+    width="100%" 
+    height="900" 
+    frameborder="0"
+    style="border: none; border-radius: 10px;">
+</iframe>
+""", unsafe_allow_html=True)
 
     st.markdown("""
     <div class="bc-features">

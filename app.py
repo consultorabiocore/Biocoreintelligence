@@ -22,6 +22,11 @@ import hashlib
 from io import BytesIO
 import numpy as np
 
+from components.terrain_viewer import terrain_viewer
+
+st.title("BioCore Intelligence")
+terrain_viewer(show_shadow_overlay=True)
+
 from telegram_reporter import (
     mostrar_formulario_reportes,
     mostrar_resumen_reportes,

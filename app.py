@@ -359,6 +359,9 @@ def crear_portada_biocore():
     )
     folium_static(demo_map, width=1200, height=380)
 
+    st.markdown("### 🗺️ Visualizador 3D de Terreno")
+    terrain_viewer(show_shadow_overlay=True)
+    
     st.markdown("""
     <div class="bc-features">
         <div class="bc-feat-card">

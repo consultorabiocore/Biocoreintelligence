@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@react-three/fiber": "^9.1.0",
+    "@react-three/drei": "^10.0.0",
+    "three": "^0.174.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0"
+  }
+}

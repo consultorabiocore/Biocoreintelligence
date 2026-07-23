@@ -48,6 +48,10 @@ except OrganizationSelectionRequired as selection:
     st.stop()
 except IdentityNotProvisionedError:
     st.error("Tu cuenta no tiene una membresía activa en BioCore.")
+    st.caption(
+        "Identificador de alta (cópialo para que un administrador autorice tu cuenta):"
+    )
+    st.code(identity.subject, language=None)
     st.button("Cerrar sesión", on_click=st.logout)
     st.stop()
 except RuntimeError:

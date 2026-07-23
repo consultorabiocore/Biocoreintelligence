@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "biocore/**"
+      - "assets/brand/**"
+      - "database/migrations/**"
       - "platform_pages/**"
       - "tests/**"
       - "biocore_app.py"
@@ -14,6 +16,8 @@ on:
       - main
     paths:
       - "biocore/**"
+      - "assets/brand/**"
+      - "database/migrations/**"
       - "platform_pages/**"
       - "tests/**"
       - "biocore_app.py"

@@ -1,4 +1,11 @@
-# BioCore Intelligence — Reportes Automáticos vía GitHub Actions
+# BioCore
+
+Este repositorio contiene la nueva plataforma BioCore en `biocore_app.py` y
+mantiene temporalmente la aplicación histórica en `app.py`. La arquitectura,
+el despliegue y el modelo de suscripciones están documentados en
+[`docs/platform_architecture.md`](docs/platform_architecture.md).
+
+## Reportes automáticos vía GitHub Actions
 
 Este repositorio envía reportes satelitales automáticos por Telegram
 a los clientes de BioCore Intelligence, gratis y sin servidor.

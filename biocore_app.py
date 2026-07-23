@@ -14,9 +14,13 @@ from biocore.repositories.memberships import (
     OrganizationSelectionRequired,
     SupabaseMembershipResolver,
 )
+from biocore.repositories.ecological_diagnostics import (
+    SupabaseEcologicalDiagnosticRepository,
+)
 from biocore.repositories.subscriptions import SupabaseSubscriptionRepository
 from biocore.security.identity import AuthenticatedIdentity
 from biocore.services.subscriptions import SubscriptionService
+from biocore.services.ecological_diagnostics import EcologicalDiagnosticService
 
 
 st.set_page_config(
@@ -65,6 +69,12 @@ def subscription_service() -> SubscriptionService:
     return SubscriptionService(repository)
 
 
+@st.cache_resource
+def ecological_diagnostic_service() -> EcologicalDiagnosticService:
+    repository = SupabaseEcologicalDiagnosticRepository(supabase_server_client())
+    return EcologicalDiagnosticService(repository)
+
+
 identity = AuthenticatedIdentity.from_oidc_claims(st.user.to_dict())
 selected_organization = st.session_state.get("organization_id")
 
@@ -95,6 +105,9 @@ subscription = subscription_service().resolve_for(context)
 st.session_state["biocore_identity"] = identity
 st.session_state["biocore_user_context"] = context
 st.session_state["biocore_subscription"] = subscription
+st.session_state["biocore_ecological_diagnostic_service"] = (
+    ecological_diagnostic_service()
+)
 
 render_private_shell(identity, context, subscription)
 

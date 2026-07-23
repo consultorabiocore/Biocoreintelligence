@@ -1,0 +1,7 @@
+from biocore.components.ecological_diagnostic_ui import render_diagnostic_inbox
+from biocore.components.module_access import enforce_module_access
+from biocore.domain.subscriptions import ModuleCode
+
+
+enforce_module_access(ModuleCode.ECOLOGICAL_DIAGNOSTIC)
+render_diagnostic_inbox()

@@ -54,10 +54,12 @@ def client_context() -> UserContext:
     return UserContext("user-1", "org-a", frozenset({Role.CLIENT_READER}))
 
 
-def test_core_plan_allows_platform_and_reports_only() -> None:
+def test_core_plan_includes_brief_diagnostic_but_not_detailed_add_on() -> None:
     current = snapshot()
     assert current.allows(ModuleCode.PLATFORM_CORE)
     assert current.allows(ModuleCode.REPORTS)
+    assert current.allows(ModuleCode.ECOLOGICAL_DIAGNOSTIC)
+    assert not current.allows(ModuleCode.ECOLOGICAL_DIAGNOSTIC_DETAILED)
     assert not current.allows(ModuleCode.INTELLIGENCE)
 
 

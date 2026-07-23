@@ -23,6 +23,13 @@ PAGES = (
         ModuleCode.PLATFORM_CORE,
     ),
     PageDefinition(
+        "Diagnóstico ecológico",
+        "platform_pages/ecological_diagnostic.py",
+        Permission.ECOLOGICAL_DIAGNOSTIC_READ,
+        "BioCore",
+        ModuleCode.ECOLOGICAL_DIAGNOSTIC,
+    ),
+    PageDefinition(
         "Proyectos",
         "platform_pages/projects.py",
         Permission.PROJECTS_READ,
@@ -99,6 +106,13 @@ PAGES = (
         "Sistema",
         ModuleCode.PLATFORM_CORE,
     ),
+    PageDefinition(
+        "Bandeja de diagnósticos",
+        "platform_pages/diagnostic_inbox.py",
+        Permission.PLATFORM_ADMIN,
+        "Sistema",
+        ModuleCode.ECOLOGICAL_DIAGNOSTIC,
+    ),
 )
 
 
@@ -107,6 +121,7 @@ ACCOUNT_PATHS = frozenset(
         "platform_pages/subscription.py",
         "platform_pages/modules.py",
         "platform_pages/admin.py",
+        "platform_pages/diagnostic_inbox.py",
     }
 )
 

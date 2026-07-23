@@ -45,6 +45,7 @@ SUBSCRIPTION_PLANS = (
             "Proyectos y áreas de estudio",
             "Campañas e historial ambiental",
             "Portal privado del cliente",
+            "Diagnóstico Ecológico Digital breve",
             "Informes y dashboard básico",
         ),
     ),
@@ -143,6 +144,7 @@ def render_public_landing() -> None:
     logo_uri = _asset_data_uri(BRAND.master_logo)
     demo_url = BRAND.demo_request_url()
     login_url = "?auth=login"
+    diagnostic_url = "?auth=login"
     logo = (
         f'<img src="{escape(logo_uri)}" alt="{escape(BRAND.name)}">'
         if logo_uri
@@ -160,6 +162,7 @@ def render_public_landing() -> None:
                         <a href="#inicio">Inicio</a>
                         <a href="#plataforma">Plataforma</a>
                         <a href="#soluciones">Soluciones</a>
+                        <a href="#diagnostico">Diagnóstico</a>
                         <a href="#suscripcion">Suscripción</a>
                         <a href="#recursos">Recursos</a>
                     </div>
@@ -187,8 +190,8 @@ def render_public_landing() -> None:
                             <a class="bc-button bc-button-primary" href="{escape(demo_url)}">
                                 Solicitar demostración
                             </a>
-                            <a class="bc-button bc-button-gold" href="#plataforma">
-                                Conocer la plataforma
+                            <a class="bc-button bc-button-gold" href="{diagnostic_url}">
+                                Realizar diagnóstico ecológico
                             </a>
                         </div>
                         <div class="bc-trust-row">
@@ -321,6 +324,44 @@ def render_public_landing() -> None:
                 </div>
             </section>
 
+            <section class="bc-section bc-section-dark" id="diagnostico">
+                <div class="bc-container">
+                    <header class="bc-section-head">
+                        <span class="bc-eyebrow">Nuevo servicio digital</span>
+                        <h2>Diagnóstico Ecológico Digital BioCore</h2>
+                        <p>
+                            Evaluación preliminar de información sobre flora,
+                            vegetación, hongos y líquenes.
+                        </p>
+                    </header>
+                    <div class="bc-split">
+                        <article class="bc-panel">
+                            <h3>Conoce el estado de tus antecedentes</h3>
+                            <p>
+                                Identifica cobertura documental, espacial, temporal
+                                y taxonómica; calidad, trazabilidad y preparación
+                                para mapas o comparación de campañas.
+                            </p>
+                            <a class="bc-button bc-button-gold" href="{diagnostic_url}">
+                                Realizar diagnóstico ecológico
+                            </a>
+                        </article>
+                        <article class="bc-panel bc-solution-panel">
+                            <h3>Resultado explicable y versionado</h3>
+                            <p>
+                                Recibe brechas y recomendaciones relacionadas
+                                únicamente con servicios ecológicos actuales de
+                                BioCore, con opción de solicitar revisión profesional.
+                            </p>
+                            <small>
+                                Orientación preliminar. No reemplaza una campaña de
+                                terreno, una línea de base ni una revisión profesional.
+                            </small>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
             <section class="bc-section bc-section-soft" id="suscripcion">
                 <div class="bc-container">
                     <header class="bc-section-head">
@@ -380,6 +421,9 @@ def render_public_landing() -> None:
                     <div class="bc-final-actions">
                         <a class="bc-button bc-button-gold" href="{escape(demo_url)}">
                             Solicitar una demostración
+                        </a>
+                        <a class="bc-button bc-button-secondary" href="{diagnostic_url}">
+                            Realizar diagnóstico ecológico
                         </a>
                         <a class="bc-button bc-button-secondary" href="{login_url}">
                             Iniciar sesión

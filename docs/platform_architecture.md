@@ -61,11 +61,13 @@ continuidad en una suscripción principal.
 
 1. Ejecutar `database/migrations/0001_identity_and_tenancy.sql`.
 2. Ejecutar `database/migrations/0002_subscriptions_and_entitlements.sql`.
-3. Registrar la suscripción de cada organización desde un contexto
-   administrativo.
-4. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
+3. Ejecutar `database/migrations/0003_ecological_diagnostics.sql`.
+4. Registrar la suscripción de cada organización desde un contexto
+   administrativo. Para staging puede utilizarse
+   `database/seeds/001_biocore_staging_subscription.sql`.
+5. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
    OIDC únicamente en los secretos del despliegue.
-5. Desplegar `biocore_app.py`.
+6. Desplegar `biocore_app.py`.
 
 La clave `service_role` nunca debe enviarse al navegador, guardarse en Git ni
 mostrarse en mensajes de error.
@@ -92,3 +94,8 @@ python -m pytest -q
 
 El workflow `Platform tests` ejecuta estas verificaciones en cada pull request
 que modifica la plataforma, las migraciones o los activos de marca.
+
+## Diagnóstico ecológico
+
+El diseño, alcance, versionado y decisiones del prototipo se describen en
+[`ecological_diagnostic.md`](ecological_diagnostic.md).

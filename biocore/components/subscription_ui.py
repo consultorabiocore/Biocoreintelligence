@@ -82,6 +82,8 @@ def render_modules_page() -> None:
     )
 
     modules = (
+        ModuleCode.ECOLOGICAL_DIAGNOSTIC,
+        ModuleCode.ECOLOGICAL_DIAGNOSTIC_DETAILED,
         ModuleCode.FIELD,
         ModuleCode.DARWINCHECK,
         ModuleCode.INTELLIGENCE,

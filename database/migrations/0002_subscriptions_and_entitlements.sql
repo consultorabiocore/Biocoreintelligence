@@ -37,7 +37,9 @@ begin
         'lidar',
         'reports',
         'academy',
-        'api_access'
+        'api_access',
+        'ecological_diagnostic',
+        'ecological_diagnostic_detailed'
     );
 exception
     when duplicate_object then null;

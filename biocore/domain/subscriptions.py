@@ -28,6 +28,8 @@ class ModuleCode(StrEnum):
     REPORTS = "reports"
     ACADEMY = "academy"
     API_ACCESS = "api_access"
+    ECOLOGICAL_DIAGNOSTIC = "ecological_diagnostic"
+    ECOLOGICAL_DIAGNOSTIC_DETAILED = "ecological_diagnostic_detailed"
 
 
 PLAN_MODULES: dict[SubscriptionPlan, frozenset[ModuleCode]] = {
@@ -35,6 +37,7 @@ PLAN_MODULES: dict[SubscriptionPlan, frozenset[ModuleCode]] = {
         {
             ModuleCode.PLATFORM_CORE,
             ModuleCode.REPORTS,
+            ModuleCode.ECOLOGICAL_DIAGNOSTIC,
         }
     ),
     SubscriptionPlan.PROFESSIONAL: frozenset(
@@ -43,9 +46,12 @@ PLAN_MODULES: dict[SubscriptionPlan, frozenset[ModuleCode]] = {
             ModuleCode.FIELD,
             ModuleCode.DARWINCHECK,
             ModuleCode.REPORTS,
+            ModuleCode.ECOLOGICAL_DIAGNOSTIC,
         }
     ),
-    SubscriptionPlan.ENTERPRISE: frozenset(ModuleCode),
+    SubscriptionPlan.ENTERPRISE: frozenset(
+        set(ModuleCode) - {ModuleCode.ECOLOGICAL_DIAGNOSTIC_DETAILED}
+    ),
 }
 
 

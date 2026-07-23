@@ -19,6 +19,8 @@ MODULE_LABELS: dict[ModuleCode, str] = {
     ModuleCode.REPORTS: "BioCore Reports",
     ModuleCode.ACADEMY: "BioCore Academy",
     ModuleCode.API_ACCESS: "API BioCore",
+    ModuleCode.ECOLOGICAL_DIAGNOSTIC: "Diagnóstico Ecológico Digital",
+    ModuleCode.ECOLOGICAL_DIAGNOSTIC_DETAILED: "Diagnóstico ecológico detallado",
 }
 
 
@@ -32,6 +34,13 @@ MODULE_DESCRIPTIONS: dict[ModuleCode, str] = {
     ModuleCode.REPORTS: "Informes, mapas y productos conectados con la evidencia.",
     ModuleCode.ACADEMY: "Cursos, capacitación y recursos profesionales.",
     ModuleCode.API_ACCESS: "Integraciones seguras con sistemas externos.",
+    ModuleCode.ECOLOGICAL_DIAGNOSTIC: (
+        "Orientación preliminar sobre información de flora, vegetación, "
+        "hongos y líquenes."
+    ),
+    ModuleCode.ECOLOGICAL_DIAGNOSTIC_DETAILED: (
+        "Evaluación ampliada con antecedentes e informe sujeto a revisión."
+    ),
 }
 
 

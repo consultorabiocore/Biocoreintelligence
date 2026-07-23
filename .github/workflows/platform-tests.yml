@@ -5,7 +5,7 @@ on:
     paths:
       - "biocore/**"
       - "assets/brand/**"
-      - "database/migrations/**"
+      - "database/**"
       - "platform_pages/**"
       - "tests/**"
       - "biocore_app.py"
@@ -17,7 +17,7 @@ on:
     paths:
       - "biocore/**"
       - "assets/brand/**"
-      - "database/migrations/**"
+      - "database/**"
       - "platform_pages/**"
       - "tests/**"
       - "biocore_app.py"

@@ -27,6 +27,8 @@ class Permission(StrEnum):
     REPORTS_PUBLISH = "reports:publish"
     ACADEMY_READ = "academy:read"
     SUBSCRIPTIONS_READ = "subscriptions:read"
+    ECOLOGICAL_DIAGNOSTIC_READ = "ecological_diagnostic:read"
+    ECOLOGICAL_DIAGNOSTIC_WRITE = "ecological_diagnostic:write"
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -50,6 +52,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.REPORTS_PUBLISH,
             Permission.ACADEMY_READ,
             Permission.SUBSCRIPTIONS_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_WRITE,
         }
     ),
     Role.CLIENT_ADMIN: frozenset(
@@ -63,6 +67,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.REPORTS_READ,
             Permission.ACADEMY_READ,
             Permission.SUBSCRIPTIONS_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_WRITE,
         }
     ),
     Role.CLIENT_READER: frozenset(
@@ -76,6 +82,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.REPORTS_READ,
             Permission.ACADEMY_READ,
             Permission.SUBSCRIPTIONS_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_READ,
         }
     ),
 }

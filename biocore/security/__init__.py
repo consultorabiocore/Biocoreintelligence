@@ -1,0 +1,1 @@
+"""Authentication-independent authorization primitives."""

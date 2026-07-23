@@ -24,5 +24,7 @@ class AuthenticatedIdentity:
 
 
 class MembershipResolver(Protocol):
-    def resolve_context(self, identity: AuthenticatedIdentity) -> UserContext:
+    def resolve_context(
+        self, identity: AuthenticatedIdentity, organization_id: str | None = None
+    ) -> UserContext:
         """Resolve organization and roles from the database, never from UI input."""

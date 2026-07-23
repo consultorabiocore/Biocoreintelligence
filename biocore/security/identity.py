@@ -12,6 +12,7 @@ class InvalidIdentityError(ValueError):
 class AuthenticatedIdentity:
     subject: str
     email: str | None
+    display_name: str | None = None
 
     @classmethod
     def from_oidc_claims(cls, claims: Mapping[str, object]) -> "AuthenticatedIdentity":
@@ -20,7 +21,9 @@ class AuthenticatedIdentity:
             raise InvalidIdentityError("OIDC claim 'sub' is required")
         email_value = claims.get("email")
         email = str(email_value).strip().lower() if email_value else None
-        return cls(subject=subject, email=email)
+        name_value = claims.get("name")
+        display_name = str(name_value).strip() if name_value else None
+        return cls(subject=subject, email=email, display_name=display_name)
 
 
 class MembershipResolver(Protocol):

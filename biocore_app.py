@@ -1,7 +1,12 @@
-"""Gradual BioCore entrypoint; the legacy application remains in app.py."""
+"""Public website and authenticated BioCore platform entrypoint."""
+
+from typing import Any
+
 import streamlit as st
 from supabase import create_client
 
+from biocore.components.private_shell import render_private_shell
+from biocore.components.public_landing import render_public_landing
 from biocore.config.navigation import pages_for
 from biocore.config.settings import Settings
 from biocore.repositories.memberships import (
@@ -9,20 +14,39 @@ from biocore.repositories.memberships import (
     OrganizationSelectionRequired,
     SupabaseMembershipResolver,
 )
+from biocore.repositories.ecological_diagnostics import (
+    SupabaseEcologicalDiagnosticRepository,
+)
+from biocore.repositories.subscriptions import SupabaseSubscriptionRepository
 from biocore.security.identity import AuthenticatedIdentity
+from biocore.services.subscriptions import SubscriptionService
+from biocore.services.ecological_diagnostics import EcologicalDiagnosticService
 
 
-st.set_page_config(page_title="BioCore", layout="wide")
+st.set_page_config(
+    page_title="BioCore | Inteligencia ecológica",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="auto",
+)
+
+
+def _start_login() -> None:
+    st.query_params.clear()
+    st.login()
 
 
 if not st.user.is_logged_in:
-    st.title("BioCore")
-    st.button("Iniciar sesión", on_click=st.login, use_container_width=True)
+    if st.query_params.get("auth") == "login":
+        _start_login()
+        st.stop()
+    render_public_landing()
     st.stop()
 
 
 @st.cache_resource
-def membership_resolver() -> SupabaseMembershipResolver:
+def supabase_server_client() -> Any:
+    """Create one trusted server-side client; never expose its key to a page."""
     settings = Settings.from_environment()
     connection = st.secrets.get("connections", {}).get("supabase", {})
     supabase_url = settings.supabase_url or connection.get("url")
@@ -31,8 +55,24 @@ def membership_resolver() -> SupabaseMembershipResolver:
     )
     if not supabase_url or not service_role_key:
         raise RuntimeError("Supabase server credentials are not configured")
-    client = create_client(supabase_url, service_role_key)
-    return SupabaseMembershipResolver(client)
+    return create_client(supabase_url, service_role_key)
+
+
+@st.cache_resource
+def membership_resolver() -> SupabaseMembershipResolver:
+    return SupabaseMembershipResolver(supabase_server_client())
+
+
+@st.cache_resource
+def subscription_service() -> SubscriptionService:
+    repository = SupabaseSubscriptionRepository(supabase_server_client())
+    return SubscriptionService(repository)
+
+
+@st.cache_resource
+def ecological_diagnostic_service() -> EcologicalDiagnosticService:
+    repository = SupabaseEcologicalDiagnosticRepository(supabase_server_client())
+    return EcologicalDiagnosticService(repository)
 
 
 identity = AuthenticatedIdentity.from_oidc_claims(st.user.to_dict())
@@ -41,7 +81,10 @@ selected_organization = st.session_state.get("organization_id")
 try:
     context = membership_resolver().resolve_context(identity, selected_organization)
 except OrganizationSelectionRequired as selection:
-    organization_id = st.selectbox("Selecciona una organización", selection.organization_ids)
+    organization_id = st.selectbox(
+        "Selecciona una organización",
+        selection.organization_ids,
+    )
     if st.button("Continuar", type="primary"):
         st.session_state["organization_id"] = organization_id
         st.rerun()
@@ -58,13 +101,21 @@ except RuntimeError:
     st.error("La autenticación de BioCore aún no está configurada en el servidor.")
     st.stop()
 
+subscription = subscription_service().resolve_for(context)
+st.session_state["biocore_identity"] = identity
+st.session_state["biocore_user_context"] = context
+st.session_state["biocore_subscription"] = subscription
+st.session_state["biocore_ecological_diagnostic_service"] = (
+    ecological_diagnostic_service()
+)
 
-with st.sidebar:
-    st.caption(identity.email or identity.subject)
-    st.button("Cerrar sesión", on_click=st.logout, use_container_width=True)
+render_private_shell(identity, context, subscription)
 
 navigation = {
-    section: [st.Page(item.path, title=item.title) for item in items]
-    for section, items in pages_for(context).items()
+    section: [
+        st.Page(item.path, title=item.title, default=item.title == "Inicio")
+        for item in items
+    ]
+    for section, items in pages_for(context, subscription).items()
 }
 st.navigation(navigation).run()

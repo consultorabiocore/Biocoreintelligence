@@ -38,6 +38,8 @@ jobs:
     - name: Deploy to Streamlit Cloud
       run: |
         mkdir -p ~/.streamlit
-        echo "[server]
-server.port = 8501
-server.address = 0.0.0.0" > ~/.streamlit/config.toml
+        printf '%s\n' \
+          '[server]' \
+          'server.port = 8501' \
+          'server.address = "0.0.0.0"' \
+          > ~/.streamlit/config.toml

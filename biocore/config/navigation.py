@@ -16,8 +16,8 @@ PAGES = (
     PageDefinition("Inicio", "platform_pages/home.py", Permission.PROJECTS_READ, "BioCore"),
     PageDefinition("Proyectos", "platform_pages/projects.py", Permission.PROJECTS_READ, "Gestión"),
     PageDefinition("Campañas", "platform_pages/campaigns.py", Permission.CAMPAIGNS_READ, "Gestión"),
-    PageDefinition("Intelligence", "platform_pages/intelligence.py", Permission.INTELLIGENCE_READ, "Intelligence"),
-    PageDefinition("Administración", "platform_pages/admin.py", Permission.PLATFORM_ADMIN, "Administración"),
+    PageDefinition("Inteligencia", "platform_pages/intelligence.py", Permission.INTELLIGENCE_READ, "Análisis"),
+    PageDefinition("Administración", "platform_pages/admin.py", Permission.PLATFORM_ADMIN, "Sistema"),
 )
 
 

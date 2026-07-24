@@ -119,6 +119,30 @@ def _module_cards() -> str:
     )
 
 
+def _ecosystem_strip() -> str:
+    module_logos = (
+        ("BioCore Field", BRAND.field_logo),
+        ("DarwinCheck", BRAND.darwincheck_logo),
+        ("BioCore Intelligence", BRAND.intelligence_logo),
+        ("BioCore Reports", BRAND.reports_logo),
+        ("BioCore Academy", BRAND.academy_logo),
+    )
+    items = []
+    for name, logo_path in module_logos:
+        logo_uri = asset_data_uri(logo_path)
+        if not logo_uri:
+            continue
+        items.append(
+            f"""
+            <span class="bc-ecosystem-brand">
+                <img src="{escape(logo_uri)}" alt="Logo {escape(name)}">
+                <small>{escape(name)}</small>
+            </span>
+            """
+        )
+    return "".join(items)
+
+
 def _plan_cards() -> str:
     cards = []
     for index, (name, copy, features, action_label) in enumerate(SUBSCRIPTION_PLANS):
@@ -197,8 +221,8 @@ def render_public_landing() -> None:
                             <a class="bc-button bc-button-primary" href="{escape(demo_url)}">
                                 Solicitar demostración
                             </a>
-                            <a class="bc-button bc-button-gold" href="#plataforma">
-                                Explorar la plataforma
+                            <a class="bc-button bc-button-gold" href="#suscripcion">
+                                Ver planes BioCore
                             </a>
                         </div>
                         <div class="bc-trust-row">
@@ -245,6 +269,10 @@ def render_public_landing() -> None:
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="bc-container bc-hero-ecosystem">
+                    <strong>Una plataforma · cinco capacidades especializadas</strong>
+                    <div class="bc-ecosystem-brands">{_ecosystem_strip()}</div>
                 </div>
             </section>
 

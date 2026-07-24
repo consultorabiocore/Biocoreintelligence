@@ -29,3 +29,12 @@ def test_compact_sidebar_logo_is_cropped_without_distortion() -> None:
     assert "height: 70px !important;" in logo_rule
     assert "object-fit: cover !important;" in logo_rule
     assert "object-position: center top !important;" in logo_rule
+
+
+def test_private_streamlit_subheaders_keep_contrast() -> None:
+    styles = Path("biocore/components/styles.py").read_text(encoding="utf-8")
+    private_styles = styles.split('PRIVATE_STYLES = """', maxsplit=1)[1]
+
+    assert '[data-testid="stMain"] h2' in private_styles
+    assert '[data-testid="stMain"] h3' in private_styles
+    assert "color: #173a2b !important;" in private_styles

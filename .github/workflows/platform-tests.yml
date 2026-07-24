@@ -12,6 +12,7 @@ on:
       - "app.py"
       - "biocore_app.py"
       - "requirements-dev.txt"
+      - ".streamlit/**"
       - ".github/workflows/platform-tests.yml"
   push:
     branches:
@@ -24,6 +25,7 @@ on:
       - "tests/**"
       - "app.py"
       - "biocore_app.py"
+      - ".streamlit/**"
 
 permissions:
   contents: read

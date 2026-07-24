@@ -6,7 +6,7 @@ import streamlit as st
 
 from biocore.components.module_access import MODULE_DESCRIPTIONS, MODULE_LABELS
 from biocore.components.page_header import render_page_header
-from biocore.config.brand import BRAND
+from biocore.config.brand import BRAND, asset_data_uri
 from biocore.domain.dashboard import DashboardSnapshot
 from biocore.domain.subscriptions import (
     PLAN_LABELS,
@@ -27,6 +27,14 @@ DASHBOARD_MODULES = (
     ModuleCode.REPORTS,
     ModuleCode.ACADEMY,
 )
+
+DASHBOARD_MODULE_LOGOS = {
+    ModuleCode.FIELD: BRAND.field_logo,
+    ModuleCode.DARWINCHECK: BRAND.darwincheck_logo,
+    ModuleCode.INTELLIGENCE: BRAND.intelligence_logo,
+    ModuleCode.REPORTS: BRAND.reports_logo,
+    ModuleCode.ACADEMY: BRAND.academy_logo,
+}
 
 
 def _html(value: str) -> str:
@@ -90,10 +98,18 @@ def _module_cards(
     cards: list[str] = []
     for module_code in DASHBOARD_MODULES:
         label, class_name = module_display_state(context, subscription, module_code)
+        module_name = MODULE_LABELS[module_code]
+        logo_uri = asset_data_uri(DASHBOARD_MODULE_LOGOS[module_code])
+        logo = (
+            f'<img class="bc-dashboard-module-logo" src="{escape(logo_uri)}" '
+            f'alt="Logo {escape(module_name)}">'
+            if logo_uri
+            else ""
+        )
         action = ""
         if class_name == "bc-status-locked":
             action_url = BRAND.demo_request_url(
-                f"Activación de {MODULE_LABELS[module_code]}"
+                f"Activación de {module_name}"
             )
             action = (
                 '<strong class="bc-module-message">'
@@ -106,8 +122,11 @@ def _module_cards(
         cards.append(
             f"""
             <article class="bc-dashboard-module">
-                <span class="bc-module-status {class_name}">{escape(label)}</span>
-                <h3>{escape(MODULE_LABELS[module_code])}</h3>
+                <div class="bc-dashboard-module-brand">
+                    {logo}
+                    <span class="bc-module-status {class_name}">{escape(label)}</span>
+                </div>
+                <h3>{escape(module_name)}</h3>
                 <p>{escape(MODULE_DESCRIPTIONS[module_code])}</p>
                 {action}
             </article>
@@ -218,6 +237,12 @@ def render_private_dashboard(
         st.subheader("Suscripción")
         if not subscription.subscription:
             st.info("La suscripción principal aún no está configurada.")
+            st.link_button(
+                "Solicitar activación de BioCore",
+                BRAND.demo_request_url("Activación de suscripción BioCore"),
+                type="primary",
+                use_container_width=True,
+            )
         else:
             item = subscription.subscription
             st.markdown(

@@ -836,18 +836,18 @@ PRIVATE_STYLES = """
 [data-testid="stSidebarLogo"] {
     display: block !important;
     width: 230px !important;
-    height: 84px !important;
+    height: 70px !important;
     max-height: none !important;
     box-sizing: border-box !important;
     margin: 4px auto 14px !important;
-    padding: 4px !important;
+    padding: 0 !important;
     transform: translateY(8px);
     border: 1px solid rgba(255,255,255,.18);
     border-radius: 12px;
     background: #ffffff;
     box-shadow: 0 12px 28px rgba(0,0,0,.16);
-    object-fit: contain !important;
-    object-position: center !important;
+    object-fit: cover !important;
+    object-position: center top !important;
 }
 
 [data-testid="stSidebarNav"] span {
@@ -860,7 +860,7 @@ PRIVATE_STYLES = """
 
 .block-container {
     max-width: 1240px;
-    padding-top: 2.4rem;
+    padding-top: 5.5rem !important;
     padding-bottom: 3rem;
 }
 
@@ -912,26 +912,31 @@ PRIVATE_STYLES = """
     font-weight: 750;
 }
 
-.bc-page-kicker {
+.bc-page-header {
+    display: block;
+    margin: 0 0 4px;
+}
+
+[data-testid="stAppViewContainer"] .bc-page-kicker {
     margin-bottom: 8px;
-    color: var(--bc-private-green);
+    color: var(--bc-private-green) !important;
     font-size: .76rem;
     font-weight: 800;
     letter-spacing: .1em;
     text-transform: uppercase;
 }
 
-.bc-page-title {
+[data-testid="stAppViewContainer"] .bc-page-title {
     margin: 0;
-    color: #10231a;
+    color: #10231a !important;
     font-size: clamp(2rem, 4vw, 3rem);
     letter-spacing: -.04em;
 }
 
-.bc-page-subtitle {
+[data-testid="stAppViewContainer"] .bc-page-subtitle {
     max-width: 760px;
     margin: 10px 0 30px;
-    color: #68756e;
+    color: #68756e !important;
     line-height: 1.65;
 }
 
@@ -1123,7 +1128,7 @@ PRIVATE_STYLES = """
 }
 
 @media (max-width: 560px) {
-    .block-container { padding: 1.4rem 1rem 2.5rem; }
+    .block-container { padding: 5rem 1rem 2.5rem !important; }
     .bc-stat-grid { grid-template-columns: 1fr; }
     .bc-metadata-strip,
     .bc-dashboard-modules { grid-template-columns: 1fr; }

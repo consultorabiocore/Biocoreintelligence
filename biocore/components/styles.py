@@ -67,14 +67,21 @@ PUBLIC_STYLES = """
 .bc-brand {
     display: flex;
     align-items: center;
-    min-width: 205px;
+    width: 235px;
+    height: 68px;
+    min-width: 235px;
+    overflow: hidden;
+    border: 1px solid rgba(18, 55, 42, 0.1);
+    border-radius: 12px;
+    background: #ffffff;
 }
 
 .bc-brand img {
-    width: 205px;
-    max-height: 58px;
-    object-fit: contain;
-    object-position: left center;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+    object-position: center;
 }
 
 .bc-navlinks {
@@ -719,12 +726,15 @@ PUBLIC_STYLES = """
 }
 
 .bc-footer img {
-    width: 200px;
-    max-height: 60px;
-    object-fit: contain;
-    object-position: left center;
-    filter: brightness(0) invert(1);
-    opacity: .94;
+    width: 260px;
+    height: 80px;
+    max-height: none;
+    object-fit: cover;
+    object-position: center;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(0,0,0,.16);
 }
 
 .bc-footer h4 {
@@ -776,7 +786,11 @@ PUBLIC_STYLES = """
 @media (max-width: 620px) {
     .bc-container { width: min(100% - 24px, 1180px); }
     .bc-navbar-inner { min-height: 72px; }
-    .bc-brand img { width: 158px; }
+    .bc-brand {
+        width: 160px;
+        height: 52px;
+        min-width: 160px;
+    }
     .bc-nav-actions .bc-button-primary { display: none; }
     .bc-button { min-height: 42px; padding: 0 14px; }
     .bc-hero { padding: 48px 0 58px; }
@@ -817,6 +831,21 @@ PRIVATE_STYLES = """
 
 [data-testid="stSidebar"] * {
     color: rgba(255,255,255,.88);
+}
+
+[data-testid="stSidebarLogo"] {
+    display: block !important;
+    width: 230px !important;
+    height: 72px !important;
+    max-height: none !important;
+    margin: 4px auto 14px !important;
+    transform: translateY(8px);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(0,0,0,.16);
+    object-fit: cover !important;
+    object-position: center !important;
 }
 
 [data-testid="stSidebarNav"] span {

@@ -1,3 +1,4 @@
+import base64
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
@@ -5,6 +6,34 @@ from urllib.parse import quote
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BRAND_ASSETS = REPOSITORY_ROOT / "assets" / "brand"
+MODULE_ASSETS = REPOSITORY_ROOT / "assets" / "modules"
+
+BIOCORE_GREEN_DARK = "#12372A"
+BIOCORE_GREEN = "#2F7D4A"
+BIOCORE_GOLD = "#B58A38"
+BIOCORE_BLUE = "#176B87"
+BIOCORE_TEXT = "#14211B"
+BIOCORE_BACKGROUND = "#F4F7F4"
+
+
+def available_logo(preferred: Path, fallback: Path | None = None) -> Path | None:
+    """Resolve a controlled brand fallback without mutating the source asset."""
+    if preferred.is_file():
+        return preferred
+    if fallback is not None and fallback.is_file():
+        return fallback
+    return None
+
+
+def asset_data_uri(preferred: Path, fallback: Path | None = None) -> str:
+    """Encode an existing logo for HTML; return an empty string when unavailable."""
+    path = available_logo(preferred, fallback)
+    if path is None:
+        return ""
+    suffix = path.suffix.lower()
+    media_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{media_type};base64,{encoded}"
 
 
 @dataclass(frozen=True)
@@ -14,6 +43,7 @@ class BrandConfig:
     slogan: str
     master_logo: Path
     compact_logo: Path
+    darwincheck_logo: Path
     intelligence_logo: Path
     field_logo: Path
     reports_logo: Path
@@ -36,15 +66,14 @@ class BrandConfig:
 
 BRAND = BrandConfig(
     name="BioCore",
-    descriptor="Empresa de base científico-tecnológica",
+    descriptor="Plataforma de inteligencia ecológica",
     slogan="Transformamos datos en inteligencia ecológica",
-    master_logo=BRAND_ASSETS / "biocore-logo-horizontal.png",
-    # Hasta recibir el isotipo maestro por separado, la aplicación usa el logo
-    # horizontal oficial también en la navegación privada.
-    compact_logo=BRAND_ASSETS / "biocore-logo-horizontal.png",
-    intelligence_logo=REPOSITORY_ROOT / "logo_biocore.png",
-    field_logo=BRAND_ASSETS / "biocore-field.png",
-    reports_logo=BRAND_ASSETS / "biocore-reports.png",
-    academy_logo=BRAND_ASSETS / "biocore-academy.png",
+    master_logo=BRAND_ASSETS / "biocore_platform_logo.png",
+    compact_logo=BRAND_ASSETS / "biocore_mark.png",
+    darwincheck_logo=MODULE_ASSETS / "darwincheck.png",
+    intelligence_logo=MODULE_ASSETS / "biocore_intelligence.png",
+    field_logo=MODULE_ASSETS / "biocore_field.png",
+    reports_logo=MODULE_ASSETS / "biocore_reports.png",
+    academy_logo=MODULE_ASSETS / "biocore_academy.png",
     sales_email="consultorabiocore@gmail.com",
 )

@@ -117,6 +117,7 @@ class SubscriptionUsage:
     users_used: int = 0
     projects_used: int = 0
     storage_used_gb: float = 0.0
+    processing_minutes: float = 0.0
     measured_on: date | None = None
 
 
@@ -128,12 +129,20 @@ class ProjectAccessGrant:
     ends_on: date
     modules: frozenset[ModuleCode]
     included_users: int
+    status: str = "active"
     renewable: bool = True
     converted_to_subscription: bool = False
 
+    @property
+    def project_id(self) -> str:
+        return self.project_reference
+
     def is_active(self, today: date | None = None) -> bool:
         current_day = today or date.today()
-        return self.starts_on <= current_day <= self.ends_on
+        return self.status == "active" and self.starts_on <= current_day <= self.ends_on
+
+
+ProjectPlatformAccess = ProjectAccessGrant
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,7 @@ on:
       - "database/**"
       - "platform_pages/**"
       - "tests/**"
+      - "app.py"
       - "biocore_app.py"
       - "requirements-dev.txt"
       - ".github/workflows/platform-tests.yml"
@@ -21,6 +22,7 @@ on:
       - "database/**"
       - "platform_pages/**"
       - "tests/**"
+      - "app.py"
       - "biocore_app.py"
 
 permissions:
@@ -44,7 +46,7 @@ jobs:
         run: python -m pip install "pytest>=8,<9"
 
       - name: Compile platform modules
-        run: python -m compileall -q biocore biocore_app.py platform_pages tests
+        run: python -m compileall -q biocore app.py biocore_app.py platform_pages tests
 
       - name: Run unit tests
         run: python -m pytest -q

@@ -2,6 +2,14 @@
 # BIOCORE INTELLIGENCE - SISTEMA COMPLETO (VERSIÓN FINAL INTEGRADA)
 # ============================================================================
 
+# Compatibility entrypoint for the existing Streamlit Community Cloud app.
+# The legacy implementation remains below for rollback/reference, but the
+# deployed `app.py` now executes the professional public/private platform.
+import streamlit as st
+import biocore_app as _biocore_platform  # noqa: F401
+
+st.stop()
+
 import streamlit as st
 import ee
 import folium

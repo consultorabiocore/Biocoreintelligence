@@ -8,7 +8,7 @@ class ModuleAccessDenied(PermissionError):
     """Raised when a user lacks a module entitlement."""
 
 
-def user_can_access_module(
+def can_access_module(
     user_id: str,
     organization_id: str,
     module_code: ModuleCode | str,
@@ -33,7 +33,7 @@ def require_module_access(
     subscription: SubscriptionSnapshot,
     module_code: ModuleCode | str,
 ) -> None:
-    if not user_can_access_module(
+    if not can_access_module(
         context.user_id,
         context.organization_id,
         module_code,
@@ -41,6 +41,10 @@ def require_module_access(
         subscription=subscription,
     ):
         raise ModuleAccessDenied(f"Module not enabled: {module_code}")
+
+
+# Compatibility for existing pages and integrations.
+user_can_access_module = can_access_module
 
 
 class SubscriptionService:
@@ -64,7 +68,7 @@ class SubscriptionService:
         subscription: SubscriptionSnapshot,
         module_code: ModuleCode | str,
     ) -> bool:
-        return user_can_access_module(
+        return can_access_module(
             context.user_id,
             context.organization_id,
             module_code,

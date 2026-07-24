@@ -1,38 +1,42 @@
-import base64
 from html import escape
-from pathlib import Path
+from textwrap import dedent
 
 import streamlit as st
 
 from biocore.components.styles import PUBLIC_STYLES
-from biocore.config.brand import BRAND
+from biocore.config.brand import BRAND, asset_data_uri
+
+
+def _html(value: str) -> str:
+    """Keep Markdown from interpreting indented HTML fragments as code."""
+    return "\n".join(line.lstrip() for line in value.splitlines())
 
 
 ECOSYSTEM_MODULES = (
     (
-        "⌖",
+        "FIELD",
         "BioCore Field",
-        "Captura y organización de datos de terreno con continuidad desde la campaña.",
+        "Captura y organización de datos directamente en terreno.",
     ),
     (
-        "✓",
+        "CHECK",
         "DarwinCheck",
-        "Validación y gobierno de calidad para datos ambientales trazables.",
+        "Validación, auditoría y gobierno de calidad de datos ambientales.",
     ),
     (
-        "◫",
+        "INTELLIGENCE",
         "BioCore Intelligence",
-        "Analítica, satélites, LiDAR, drones y monitoreo especializado.",
+        "Satélites, LiDAR, analítica, monitoreo y detección de cambios.",
     ),
     (
-        "▤",
+        "REPORTS",
         "BioCore Reports",
-        "Informes, mapas y productos conectados directamente con los datos.",
+        "Informes, mapas y productos actualizados desde una fuente común.",
     ),
     (
-        "◇",
+        "ACADEMY",
         "BioCore Academy",
-        "Cursos, capacitación y recursos para fortalecer equipos profesionales.",
+        "Cursos y formación científico-tecnológica para profesionales y empresas.",
     ),
 )
 
@@ -42,12 +46,14 @@ SUBSCRIPTION_PLANS = (
         "Plan BioCore Core",
         "La base para ordenar y conservar la gestión ambiental.",
         (
-            "Proyectos y áreas de estudio",
-            "Campañas e historial ambiental",
             "Portal privado del cliente",
+            "Proyectos, áreas y campañas",
+            "Repositorio de informes",
+            "Dashboard e historial ambiental",
             "Diagnóstico Ecológico Digital breve",
-            "Informes y dashboard básico",
+            "Usuarios básicos",
         ),
+        "Solicitar cotización",
     ),
     (
         "Plan BioCore Professional",
@@ -60,6 +66,7 @@ SUBSCRIPTION_PLANS = (
             "Dashboards avanzados y automatizaciones",
             "Mayor almacenamiento",
         ),
+        "Solicitar demostración",
     ),
     (
         "Plan BioCore Enterprise",
@@ -70,30 +77,25 @@ SUBSCRIPTION_PLANS = (
             "Monitoreo satelital y LiDAR",
             "API e integraciones",
             "Múltiples equipos y soporte prioritario",
+            "Personalización",
         ),
+        "Hablar con BioCore",
     ),
 )
-
-
-def _asset_data_uri(path: Path) -> str:
-    if not path.is_file():
-        return ""
-    suffix = path.suffix.lower()
-    media_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{media_type};base64,{encoded}"
 
 
 def _module_cards() -> str:
     module_logos = {
         "BioCore Field": BRAND.field_logo,
+        "DarwinCheck": BRAND.darwincheck_logo,
+        "BioCore Intelligence": BRAND.intelligence_logo,
         "BioCore Reports": BRAND.reports_logo,
         "BioCore Academy": BRAND.academy_logo,
     }
 
     def card_media(icon: str, name: str) -> str:
         logo_path = module_logos.get(name)
-        logo_uri = _asset_data_uri(logo_path) if logo_path else ""
+        logo_uri = asset_data_uri(logo_path) if logo_path else ""
         if logo_uri:
             return (
                 f'<img class="bc-module-logo" src="{escape(logo_uri)}" '
@@ -117,12 +119,13 @@ def _module_cards() -> str:
     )
 
 
-def _plan_cards(demo_url: str) -> str:
+def _plan_cards() -> str:
     cards = []
-    for index, (name, copy, features) in enumerate(SUBSCRIPTION_PLANS):
+    for index, (name, copy, features, action_label) in enumerate(SUBSCRIPTION_PLANS):
         featured = " bc-plan-featured" if index == 1 else ""
-        badge = '<span class="bc-plan-badge">Más elegido</span>' if index == 1 else ""
+        badge = '<span class="bc-plan-badge">Recomendado</span>' if index == 1 else ""
         items = "".join(f"<li>{escape(feature)}</li>" for feature in features)
+        action_url = BRAND.demo_request_url(f"{action_label}: {name}")
         cards.append(
             f"""
             <article class="bc-plan{featured}">
@@ -131,8 +134,8 @@ def _plan_cards(demo_url: str) -> str:
                 <h3>{escape(name)}</h3>
                 <p class="bc-plan-copy">{escape(copy)}</p>
                 <ul class="bc-list">{items}</ul>
-                <a class="bc-button bc-button-secondary" href="{escape(demo_url)}">
-                    Solicitar cotización
+                <a class="bc-button bc-button-secondary" href="{escape(action_url)}">
+                    {escape(action_label)}
                 </a>
             </article>
             """
@@ -141,7 +144,7 @@ def _plan_cards(demo_url: str) -> str:
 
 
 def render_public_landing() -> None:
-    logo_uri = _asset_data_uri(BRAND.master_logo)
+    logo_uri = asset_data_uri(BRAND.master_logo)
     demo_url = BRAND.demo_request_url()
     login_url = "?auth=login"
     diagnostic_url = "?auth=login"
@@ -153,16 +156,17 @@ def render_public_landing() -> None:
 
     st.markdown(PUBLIC_STYLES, unsafe_allow_html=True)
     st.markdown(
-        f"""
+        _html(
+            dedent(
+                f"""
         <main class="bc-public">
             <nav class="bc-navbar" aria-label="Navegación principal">
                 <div class="bc-container bc-navbar-inner">
                     <a class="bc-brand" href="#inicio">{logo}</a>
                     <div class="bc-navlinks">
-                        <a href="#inicio">Inicio</a>
                         <a href="#plataforma">Plataforma</a>
                         <a href="#soluciones">Soluciones</a>
-                        <a href="#diagnostico">Diagnóstico</a>
+                        <a href="#proyectos">Proyectos ambientales</a>
                         <a href="#suscripcion">Suscripción</a>
                         <a href="#recursos">Recursos</a>
                     </div>
@@ -186,12 +190,15 @@ def render_public_landing() -> None:
                             Gestiona proyectos, campañas, mapas, informes y monitoreo
                             ambiental desde una plataforma científica integrada.
                         </p>
+                        <p class="bc-hero-note">
+                            Cada campaña aumenta el conocimiento histórico de tu territorio.
+                        </p>
                         <div class="bc-hero-actions">
                             <a class="bc-button bc-button-primary" href="{escape(demo_url)}">
                                 Solicitar demostración
                             </a>
-                            <a class="bc-button bc-button-gold" href="{diagnostic_url}">
-                                Realizar diagnóstico ecológico
+                            <a class="bc-button bc-button-gold" href="#plataforma">
+                                Explorar la plataforma
                             </a>
                         </div>
                         <div class="bc-trust-row">
@@ -217,16 +224,22 @@ def render_public_landing() -> None:
                                 </div>
                                 <div class="bc-demo-panel">
                                     <div class="bc-demo-metric">
+                                        <small>Proyectos activos</small><strong>4</strong>
+                                    </div>
+                                    <div class="bc-demo-metric">
                                         <small>Campañas</small><strong>12</strong>
                                     </div>
                                     <div class="bc-demo-metric">
-                                        <small>Informes</small><strong>8</strong>
+                                        <small>Informes</small><strong>28</strong>
                                     </div>
                                     <div class="bc-demo-metric">
-                                        <small>Riqueza de especies</small><strong>147</strong>
+                                        <small>Especies registradas</small><strong>184</strong>
                                     </div>
                                     <div class="bc-demo-metric">
-                                        <small>Alertas en revisión</small><strong>3</strong>
+                                        <small>Alertas ambientales</small><strong>2</strong>
+                                    </div>
+                                    <div class="bc-demo-comparison">
+                                        <span>Otoño</span><i></i><strong>vs.</strong><i></i><span>Verano</span>
                                     </div>
                                 </div>
                             </div>
@@ -294,6 +307,7 @@ def render_public_landing() -> None:
                     </header>
                     <div class="bc-flow">
                         <div class="bc-flow-step">Proyecto</div>
+                        <div class="bc-flow-step">Área de estudio</div>
                         <div class="bc-flow-step">Campaña</div>
                         <div class="bc-flow-step">Captura</div>
                         <div class="bc-flow-step">Validación</div>
@@ -312,12 +326,12 @@ def render_public_landing() -> None:
                         <h2>Menos tareas manuales. Más continuidad y trazabilidad.</h2>
                     </header>
                     <div class="bc-benefits-grid">
-                        <article class="bc-benefit-card"><h3>Historial centralizado</h3><p>Conserva campañas, evidencia e informes en un solo lugar.</p></article>
-                        <article class="bc-benefit-card"><h3>Comparación temporal</h3><p>Contrasta campañas y temporadas con el mismo contexto.</p></article>
-                        <article class="bc-benefit-card"><h3>Acceso privado</h3><p>Organizaciones y roles mantienen la información separada.</p></article>
-                        <article class="bc-benefit-card"><h3>Mapas interactivos</h3><p>Explora áreas, capas y resultados geoespaciales conectados.</p></article>
-                        <article class="bc-benefit-card"><h3>Informes versionados</h3><p>Recupera productos y su relación con los datos de origen.</p></article>
-                        <article class="bc-benefit-card"><h3>Automatización</h3><p>Reduce tareas repetitivas y concentra tiempo en el análisis.</p></article>
+                        <article class="bc-benefit-card"><h3>Información centralizada</h3><p>Conserva datos, evidencias e informes ambientales en un solo lugar.</p></article>
+                        <article class="bc-benefit-card"><h3>Historial de campañas</h3><p>Recupera el contexto técnico de cada temporada y salida a terreno.</p></article>
+                        <article class="bc-benefit-card"><h3>Mapas e informes conectados</h3><p>Relaciona productos geoespaciales con sus datos de origen.</p></article>
+                        <article class="bc-benefit-card"><h3>Comparación temporal</h3><p>Contrasta campañas y estaciones usando una fuente común.</p></article>
+                        <article class="bc-benefit-card"><h3>Menos tareas manuales</h3><p>Reduce procesos repetitivos y concentra tiempo en el análisis.</p></article>
+                        <article class="bc-benefit-card"><h3>Acceso privado</h3><p>Entrega al cliente un espacio seguro, separado por organización.</p></article>
                         <article class="bc-benefit-card"><h3>Trazabilidad</h3><p>Sigue el recorrido de la captura al producto final.</p></article>
                         <article class="bc-benefit-card"><h3>Continuidad</h3><p>El conocimiento permanece disponible después de la entrega.</p></article>
                     </div>
@@ -372,42 +386,56 @@ def render_public_landing() -> None:
                             Los módulos especializados pueden activarse como complementos.
                         </p>
                     </header>
-                    <div class="bc-plans">{_plan_cards(demo_url)}</div>
+                    <div class="bc-plans">{_plan_cards()}</div>
                     <div class="bc-addons" aria-label="Complementos disponibles">
                         <span class="bc-addon">LiDAR</span>
                         <span class="bc-addon">Monitoreo satelital</span>
-                        <span class="bc-addon">Almacenamiento ampliado</span>
+                        <span class="bc-addon">Almacenamiento adicional</span>
                         <span class="bc-addon">Usuarios adicionales</span>
-                        <span class="bc-addon">API</span>
-                        <span class="bc-addon">Capacitaciones</span>
-                        <span class="bc-addon">Procesamiento especializado</span>
+                        <span class="bc-addon">Acceso API</span>
+                        <span class="bc-addon">Capacitación</span>
+                        <span class="bc-addon">Procesamiento geoespacial especializado</span>
                     </div>
                 </div>
             </section>
 
-            <section class="bc-section" id="recursos">
+            <section class="bc-section" id="proyectos">
                 <div class="bc-container bc-continuity">
                     <div>
                         <span class="bc-eyebrow">Proyectos más plataforma</span>
-                        <h2>El valor del proyecto continúa después de la entrega</h2>
+                        <h2>Un proyecto ambiental que continúa generando valor</h2>
                         <p>
-                            Los proyectos ambientales pueden incluir acceso a BioCore durante
-                            su ejecución. Después de la entrega, el cliente puede conservar
-                            su historial, dashboards e informes mediante una suscripción de
-                            continuidad.
+                            Cuando BioCore ejecuta una línea de base, monitoreo u otro servicio,
+                            el cliente puede recibir acceso privado a la plataforma durante el
+                            proyecto. Sus campañas, mapas, informes y evidencias quedan
+                            organizados para futuras consultas y comparaciones.
                         </p>
                         <a class="bc-button bc-button-secondary" href="{escape(demo_url)}">
                             Hablar con BioCore
                         </a>
                     </div>
                     <div class="bc-continuity-flow">
-                        <div class="bc-continuity-step">01 · Proyecto ganado</div>
-                        <div class="bc-continuity-step">02 · Plataforma activa</div>
+                        <div class="bc-continuity-step">01 · Proyecto adjudicado</div>
+                        <div class="bc-continuity-step">02 · Acceso a BioCore</div>
                         <div class="bc-continuity-step">03 · Campañas organizadas</div>
-                        <div class="bc-continuity-step">04 · Informes publicados</div>
-                        <div class="bc-continuity-step">05 · Monitoreo</div>
-                        <div class="bc-continuity-step">06 · Renovación</div>
+                        <div class="bc-continuity-step">04 · Informe publicado</div>
+                        <div class="bc-continuity-step">05 · Monitoreo posterior</div>
+                        <div class="bc-continuity-step">06 · Suscripción de continuidad</div>
                     </div>
+                </div>
+            </section>
+
+            <section class="bc-section bc-section-soft" id="recursos">
+                <div class="bc-container">
+                    <header class="bc-section-head">
+                        <span class="bc-eyebrow">Continuidad de la información</span>
+                        <h2>Conserva el conocimiento construido por tu organización</h2>
+                        <p>
+                            Al finalizar un acceso incluido por proyecto, BioCore mantiene
+                            los datos bajo la política acordada y ofrece una ruta de
+                            continuidad sin pagos automáticos.
+                        </p>
+                    </header>
                 </div>
             </section>
 
@@ -470,6 +498,8 @@ def render_public_landing() -> None:
                 </div>
             </footer>
         </main>
-        """,
+                """
+            )
+        ),
         unsafe_allow_html=True,
     )

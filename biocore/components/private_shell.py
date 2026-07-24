@@ -3,7 +3,7 @@ from html import escape
 import streamlit as st
 
 from biocore.components.styles import PRIVATE_STYLES
-from biocore.config.brand import BRAND
+from biocore.config.brand import BRAND, available_logo
 from biocore.domain.subscriptions import PLAN_LABELS, STATUS_LABELS, SubscriptionSnapshot
 from biocore.security.identity import AuthenticatedIdentity
 from biocore.security.authorization import UserContext
@@ -39,8 +39,9 @@ def render_private_shell(
     subscription: SubscriptionSnapshot,
 ) -> None:
     st.markdown(PRIVATE_STYLES, unsafe_allow_html=True)
-    if BRAND.compact_logo.is_file():
-        st.logo(str(BRAND.compact_logo), size="large")
+    logo = available_logo(BRAND.compact_logo, BRAND.master_logo)
+    if logo:
+        st.logo(str(logo), size="large")
 
     plan_label = "Plan por configurar"
     plan_state = "Acceso administrativo" if Role.SUPERADMIN in context.roles else "Sin suscripción activa"
@@ -60,8 +61,16 @@ def render_private_shell(
             unsafe_allow_html=True,
         )
         st.markdown("---")
-        st.caption(identity.display_name or "Cuenta BioCore")
-        st.caption(_primary_role(context))
+        st.markdown(
+            f"""
+            <div class="bc-account-card">
+                <strong>{escape(identity.display_name or "Cuenta BioCore")}</strong>
+                <span>{escape(identity.email or "Correo no disponible")}</span>
+                <span>{escape(_primary_role(context))}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.button(
             "Cerrar sesión",
             on_click=st.logout,

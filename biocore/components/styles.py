@@ -67,14 +67,21 @@ PUBLIC_STYLES = """
 .bc-brand {
     display: flex;
     align-items: center;
-    min-width: 205px;
+    width: 235px;
+    height: 68px;
+    min-width: 235px;
+    overflow: hidden;
+    border: 1px solid rgba(18, 55, 42, 0.1);
+    border-radius: 12px;
+    background: #ffffff;
 }
 
 .bc-brand img {
-    width: 205px;
-    max-height: 58px;
-    object-fit: contain;
-    object-position: left center;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+    object-position: center;
 }
 
 .bc-navlinks {
@@ -202,6 +209,13 @@ PUBLIC_STYLES = """
     line-height: 1.7;
 }
 
+.bc-hero-note {
+    margin: -14px 0 28px;
+    color: var(--bc-forest);
+    font-size: .92rem;
+    font-weight: 720;
+}
+
 .bc-hero-actions {
     display: flex;
     flex-wrap: wrap;
@@ -326,6 +340,28 @@ PUBLIC_STYLES = """
     margin-top: 3px;
     color: white;
     font-size: 1.18rem;
+}
+
+.bc-demo-comparison {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 9px 6px 2px;
+    color: rgba(255,255,255,.62);
+    font-size: .62rem;
+    text-align: center;
+}
+
+.bc-demo-comparison i {
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--bc-green-bright), var(--bc-gold));
+}
+
+.bc-demo-comparison strong {
+    color: white;
+    font-size: .65rem;
 }
 
 .bc-section {
@@ -493,7 +529,7 @@ PUBLIC_STYLES = """
 
 .bc-flow {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(9, 1fr);
     gap: 8px;
     align-items: center;
 }
@@ -603,13 +639,14 @@ PUBLIC_STYLES = """
 }
 
 .bc-addon {
-    padding: 8px 12px;
+    padding: 14px 16px;
     border: 1px solid rgba(18,55,42,.12);
-    border-radius: 999px;
-    background: #f7faf7;
+    border-radius: 13px;
+    background: white;
     color: #52635a;
-    font-size: .78rem;
-    font-weight: 650;
+    box-shadow: 0 8px 24px rgba(18,55,42,.045);
+    font-size: .8rem;
+    font-weight: 720;
 }
 
 .bc-continuity {
@@ -689,12 +726,15 @@ PUBLIC_STYLES = """
 }
 
 .bc-footer img {
-    width: 200px;
-    max-height: 60px;
-    object-fit: contain;
-    object-position: left center;
-    filter: brightness(0) invert(1);
-    opacity: .94;
+    width: 260px;
+    height: 80px;
+    max-height: none;
+    object-fit: cover;
+    object-position: center;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(0,0,0,.16);
 }
 
 .bc-footer h4 {
@@ -728,8 +768,8 @@ PUBLIC_STYLES = """
 @media (max-width: 1050px) {
     .bc-navlinks { display: none; }
     .bc-card-grid { grid-template-columns: repeat(3, 1fr); }
-    .bc-flow { grid-template-columns: repeat(4, 1fr); }
-    .bc-flow-step:nth-child(4)::after { display: none; }
+    .bc-flow { grid-template-columns: repeat(3, 1fr); }
+    .bc-flow-step:nth-child(3n)::after { display: none; }
 }
 
 @media (max-width: 820px) {
@@ -746,7 +786,11 @@ PUBLIC_STYLES = """
 @media (max-width: 620px) {
     .bc-container { width: min(100% - 24px, 1180px); }
     .bc-navbar-inner { min-height: 72px; }
-    .bc-brand img { width: 158px; }
+    .bc-brand {
+        width: 160px;
+        height: 52px;
+        min-width: 160px;
+    }
     .bc-nav-actions .bc-button-primary { display: none; }
     .bc-button { min-height: 42px; padding: 0 14px; }
     .bc-hero { padding: 48px 0 58px; }
@@ -761,7 +805,7 @@ PUBLIC_STYLES = """
     .bc-continuity-flow,
     .bc-footer-grid { grid-template-columns: 1fr; }
     .bc-flow { grid-template-columns: repeat(2, 1fr); }
-    .bc-flow-step:nth-child(even)::after { display: none; }
+    .bc-flow-step::after { display: none !important; }
     .bc-module-card p { min-height: auto; }
     .bc-panel,
     .bc-plan { padding: 24px; }
@@ -787,6 +831,21 @@ PRIVATE_STYLES = """
 
 [data-testid="stSidebar"] * {
     color: rgba(255,255,255,.88);
+}
+
+[data-testid="stSidebarLogo"] {
+    display: block !important;
+    width: 230px !important;
+    height: 72px !important;
+    max-height: none !important;
+    margin: 4px auto 14px !important;
+    transform: translateY(8px);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(0,0,0,.16);
+    object-fit: cover !important;
+    object-position: center !important;
 }
 
 [data-testid="stSidebarNav"] span {
@@ -821,6 +880,22 @@ PRIVATE_STYLES = """
     margin-top: 4px;
     color: rgba(255,255,255,.58);
     font-size: .75rem;
+}
+
+.bc-account-card {
+    display: grid;
+    gap: 3px;
+    margin: 16px 0 10px;
+}
+
+.bc-account-card strong {
+    color: white;
+    font-size: .86rem;
+}
+
+.bc-account-card span {
+    color: rgba(255,255,255,.56);
+    font-size: .72rem;
 }
 
 .bc-plan-pill {
@@ -860,9 +935,45 @@ PRIVATE_STYLES = """
 
 .bc-stat-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 14px;
     margin: 18px 0 28px;
+}
+
+.bc-metadata-strip {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(4, 1fr);
+    gap: 1px;
+    overflow: hidden;
+    margin: 8px 0 22px;
+    border: 1px solid #dfe7e1;
+    border-radius: 16px;
+    background: #dfe7e1;
+}
+
+.bc-metadata-strip div {
+    min-width: 0;
+    padding: 14px 16px;
+    background: white;
+}
+
+.bc-metadata-strip small,
+.bc-metadata-strip strong {
+    display: block;
+}
+
+.bc-metadata-strip small {
+    color: #7a8780;
+    font-size: .68rem;
+}
+
+.bc-metadata-strip strong {
+    overflow: hidden;
+    margin-top: 5px;
+    color: #173a2b;
+    font-size: .82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .bc-stat {
@@ -937,13 +1048,84 @@ PRIVATE_STYLES = """
     background: rgba(255,255,255,.65);
 }
 
+.bc-dashboard-modules {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+.bc-dashboard-module {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid #dfe7e1;
+    border-radius: 16px;
+    background: white;
+}
+
+.bc-dashboard-module h3 {
+    margin: 13px 0 8px;
+    color: #173a2b;
+    font-size: .98rem;
+}
+
+.bc-dashboard-module p {
+    min-height: 86px;
+    color: #6b7770;
+    font-size: .78rem;
+    line-height: 1.5;
+}
+
+.bc-dashboard-module a {
+    display: block;
+    margin-top: 8px;
+    color: var(--bc-private-green);
+    font-size: .76rem;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.bc-module-message {
+    display: block;
+    color: #596961;
+    font-size: .71rem;
+    line-height: 1.4;
+}
+
+.bc-module-status {
+    display: inline-flex;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: .66rem;
+    font-weight: 800;
+}
+
+.bc-status-active {
+    background: #e9f5ec;
+    color: #25683d;
+}
+
+.bc-status-locked {
+    background: #f4ecda;
+    color: #85631f;
+}
+
+.bc-status-soon {
+    background: #e8eef5;
+    color: #355b7a;
+}
+
 @media (max-width: 900px) {
     .bc-stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .bc-metadata-strip { grid-template-columns: repeat(2, 1fr); }
+    .bc-dashboard-modules { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 560px) {
     .block-container { padding: 1.4rem 1rem 2.5rem; }
     .bc-stat-grid { grid-template-columns: 1fr; }
+    .bc-metadata-strip,
+    .bc-dashboard-modules { grid-template-columns: 1fr; }
+    .bc-dashboard-module p { min-height: auto; }
 }
 </style>
 """

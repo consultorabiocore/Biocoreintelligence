@@ -26,12 +26,13 @@ def test_public_and_private_routing_remain_separated() -> None:
 
 def test_legacy_cloud_entrypoint_delegates_to_professional_platform() -> None:
     entrypoint = Path("app.py").read_text(encoding="utf-8")
-    delegate = entrypoint.index("import biocore_app as _biocore_platform")
+    delegate = entrypoint.index("runpy.run_path(")
+    platform_path = entrypoint.index('"biocore_app.py"', delegate)
     stop = entrypoint.index("st.stop()", delegate)
     legacy_config = entrypoint.index(
         'st.set_page_config(page_title="Biocore Intelligence"', stop
     )
-    assert delegate < stop < legacy_config
+    assert delegate < platform_path < stop < legacy_config
 
 
 def test_public_landing_marks_demo_data_explicitly() -> None:

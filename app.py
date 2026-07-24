@@ -5,8 +5,17 @@
 # Compatibility entrypoint for the existing Streamlit Community Cloud app.
 # The legacy implementation remains below for rollback/reference, but the
 # deployed `app.py` now executes the professional public/private platform.
+# `run_path` is intentional: Streamlit must rebuild the authenticated context
+# on every rerun instead of reusing Python's cached import.
+from pathlib import Path
+import runpy
+
 import streamlit as st
-import biocore_app as _biocore_platform  # noqa: F401
+
+runpy.run_path(
+    str(Path(__file__).with_name("biocore_app.py")),
+    run_name="__main__",
+)
 
 st.stop()
 

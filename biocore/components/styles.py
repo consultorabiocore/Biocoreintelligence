@@ -836,15 +836,17 @@ PRIVATE_STYLES = """
 [data-testid="stSidebarLogo"] {
     display: block !important;
     width: 230px !important;
-    height: 72px !important;
+    height: 84px !important;
     max-height: none !important;
+    box-sizing: border-box !important;
     margin: 4px auto 14px !important;
+    padding: 4px !important;
     transform: translateY(8px);
     border: 1px solid rgba(255,255,255,.18);
     border-radius: 12px;
     background: #ffffff;
     box-shadow: 0 12px 28px rgba(0,0,0,.16);
-    object-fit: cover !important;
+    object-fit: contain !important;
     object-position: center !important;
 }
 

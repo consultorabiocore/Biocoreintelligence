@@ -42,3 +42,17 @@ def test_public_landing_marks_demo_data_explicitly() -> None:
     assert "Datos demostrativos" in landing
     assert "Realizar diagnóstico ecológico" in landing
     assert "184" in landing
+
+
+def test_public_and_private_homepages_show_the_module_brand_system() -> None:
+    landing = Path("biocore/components/public_landing.py").read_text(
+        encoding="utf-8"
+    )
+    dashboard = Path("biocore/components/dashboard.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "_ecosystem_strip()" in landing
+    assert "Ver planes BioCore" in landing
+    assert "bc-dashboard-module-logo" in dashboard
+    assert "Solicitar activación de BioCore" in dashboard

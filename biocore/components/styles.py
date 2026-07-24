@@ -238,6 +238,60 @@ PUBLIC_STYLES = """
     color: var(--bc-green);
 }
 
+.bc-hero-ecosystem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+    margin-top: 42px;
+    padding: 18px 22px;
+    border: 1px solid rgba(18, 55, 42, 0.1);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 14px 34px rgba(18, 55, 42, 0.06);
+}
+
+.bc-hero-ecosystem > strong {
+    max-width: 210px;
+    color: var(--bc-forest);
+    font-size: .82rem;
+    line-height: 1.45;
+}
+
+.bc-ecosystem-brands {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.bc-ecosystem-brand {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    color: var(--bc-forest);
+}
+
+.bc-ecosystem-brand img {
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    border: 1px solid var(--bc-line);
+    border-radius: 12px;
+    background: #fff;
+    object-fit: contain;
+}
+
+.bc-ecosystem-brand small {
+    max-width: 90px;
+    color: #52635a;
+    font-size: .66rem;
+    font-weight: 750;
+    line-height: 1.25;
+}
+
 .bc-demo-shell {
     position: relative;
     padding: 15px;
@@ -770,6 +824,7 @@ PUBLIC_STYLES = """
     .bc-card-grid { grid-template-columns: repeat(3, 1fr); }
     .bc-flow { grid-template-columns: repeat(3, 1fr); }
     .bc-flow-step:nth-child(3n)::after { display: none; }
+    .bc-ecosystem-brand small { display: none; }
 }
 
 @media (max-width: 820px) {
@@ -781,6 +836,15 @@ PUBLIC_STYLES = """
     .bc-plans { grid-template-columns: 1fr; }
     .bc-plan-copy { min-height: auto; }
     .bc-footer-grid { grid-template-columns: 1fr 1fr; }
+    .bc-hero-ecosystem {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .bc-ecosystem-brands {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
 }
 
 @media (max-width: 620px) {
@@ -809,6 +873,7 @@ PUBLIC_STYLES = """
     .bc-module-card p { min-height: auto; }
     .bc-panel,
     .bc-plan { padding: 24px; }
+    .bc-hero-ecosystem { margin-top: 28px; }
 }
 </style>
 """
@@ -940,6 +1005,11 @@ PRIVATE_STYLES = """
     line-height: 1.65;
 }
 
+[data-testid="stMain"] h2,
+[data-testid="stMain"] h3 {
+    color: #173a2b !important;
+}
+
 .bc-stat-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1069,6 +1139,24 @@ PRIVATE_STYLES = """
     background: white;
 }
 
+.bc-dashboard-module-brand {
+    display: flex;
+    min-height: 52px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.bc-dashboard-module-logo {
+    display: block;
+    width: 52px;
+    height: 52px;
+    border: 1px solid #dfe7e1;
+    border-radius: 13px;
+    background: #fff;
+    object-fit: contain;
+}
+
 .bc-dashboard-module h3 {
     margin: 13px 0 8px;
     color: #173a2b;
@@ -1119,6 +1207,45 @@ PRIVATE_STYLES = """
 .bc-status-soon {
     background: #e8eef5;
     color: #355b7a;
+}
+
+.bc-integration-card {
+    margin: 12px 0;
+    padding: 24px;
+    border: 1px solid #dfe7e1;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(18,55,42,.045);
+}
+
+.bc-integration-card h3 {
+    margin: 14px 0 8px;
+    color: #173a2b;
+}
+
+.bc-integration-card p {
+    max-width: 760px;
+    margin: 0;
+    color: #6b7770;
+    line-height: 1.6;
+}
+
+.bc-integration-status {
+    display: inline-flex;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 800;
+}
+
+.bc-integration-ready {
+    background: #e9f5ec;
+    color: #25683d;
+}
+
+.bc-integration-pending {
+    background: #f4ecda;
+    color: #85631f;
 }
 
 @media (max-width: 900px) {

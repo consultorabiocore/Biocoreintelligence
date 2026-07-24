@@ -36,7 +36,9 @@ def _start_login() -> None:
     st.login()
 
 
-if not st.user.is_logged_in:
+is_logged_in = bool(getattr(st.user, "is_logged_in", False))
+
+if not is_logged_in:
     if st.query_params.get("auth") == "login":
         _start_login()
         st.stop()

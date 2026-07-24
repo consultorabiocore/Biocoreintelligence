@@ -13,6 +13,7 @@ from biocore.security.authorization import UserContext
 from biocore.security.roles import Role
 from biocore.services.subscriptions import (
     SubscriptionService,
+    can_access_module,
     user_can_access_module,
 )
 
@@ -61,6 +62,7 @@ def test_core_plan_includes_brief_diagnostic_but_not_detailed_add_on() -> None:
     assert current.allows(ModuleCode.ECOLOGICAL_DIAGNOSTIC)
     assert not current.allows(ModuleCode.ECOLOGICAL_DIAGNOSTIC_DETAILED)
     assert not current.allows(ModuleCode.INTELLIGENCE)
+    assert not current.allows(ModuleCode.LIDAR)
 
 
 def test_entitlement_can_enable_or_disable_a_plan_module() -> None:
@@ -124,6 +126,13 @@ def test_module_authorization_rejects_user_and_organization_mismatch() -> None:
     )
     assert not user_can_access_module(
         "another-user",
+        "org-a",
+        ModuleCode.PLATFORM_CORE,
+        context=context,
+        subscription=current,
+    )
+    assert can_access_module(
+        "user-1",
         "org-a",
         ModuleCode.PLATFORM_CORE,
         context=context,

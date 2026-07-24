@@ -78,6 +78,20 @@ def external_applications(
             ),
             secret_key="darwincheck_url",
         ),
+        "intelligence": ExternalApplication(
+            code="intelligence",
+            label="BioCore Intelligence",
+            module_code=ModuleCode.INTELLIGENCE,
+            url=_configured_url(
+                values,
+                "intelligence_url",
+                settings.intelligence_url,
+            ),
+            description=(
+                "Analítica ecológica y herramientas científicas especializadas."
+            ),
+            secret_key="intelligence_url",
+        ),
         "geot_radar": ExternalApplication(
             code="geot_radar",
             label="Simulador de cobertura radar geotécnico",

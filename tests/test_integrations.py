@@ -13,6 +13,7 @@ def _settings(**overrides: str | None) -> Settings:
         "supabase_service_role_key": None,
         "field_url": None,
         "darwincheck_url": None,
+        "intelligence_url": None,
         "geot_radar_url": None,
     }
     values.update(overrides)
@@ -29,6 +30,22 @@ def test_external_application_urls_can_be_configured_without_secrets_in_code() -
     assert catalog["darwincheck"].url == "https://check.example.com"
     assert catalog["field"].is_configured
     assert catalog["darwincheck"].is_configured
+
+
+def test_official_public_deployments_are_available_as_safe_defaults(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("BIOCORE_FIELD_URL", raising=False)
+    monkeypatch.delenv("DARWINCHECK_URL", raising=False)
+    monkeypatch.delenv("BIOCORE_INTELLIGENCE_URL", raising=False)
+
+    catalog = external_applications(Settings.from_environment())
+
+    assert catalog["field"].url == "https://hongos.streamlit.app/"
+    assert catalog["darwincheck"].url == "https://darwin-check.streamlit.app/"
+    assert catalog["intelligence"].url == (
+        "https://biocoreintelligence.streamlit.app/"
+    )
 
 
 def test_secret_configuration_overrides_environment_url() -> None:

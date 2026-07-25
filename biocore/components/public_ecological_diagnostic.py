@@ -12,11 +12,10 @@ from biocore.services.public_diagnostic_leads import (
     validate_public_lead_contact,
 )
 
-
 LeadRecorder = Callable[[dict[str, object]], str]
-_RESULT_KEY = "biocore_initial_diagnostic_result_v2"
-QUESTIONNAIRE_VERSION = "initial-2.0"
-RULES_VERSION = "initial-readiness-2.0"
+_RESULT_KEY = "biocore_initial_diagnostic_result_v3"
+QUESTIONNAIRE_VERSION = "initial-2.1"
+RULES_VERSION = "initial-readiness-2.1"
 
 PROJECT_TYPES = (
     "Predio agrícola, forestal o rural",
@@ -77,8 +76,10 @@ def _apply_styles() -> None:
         [data-testid="stMain"] h3,
         [data-testid="stMain"] h4,
         [data-testid="stMain"] p,
+        [data-testid="stMain"] small,
         [data-testid="stMain"] label,
         [data-testid="stMain"] label p,
+        [data-testid="stMain"] span,
         [data-testid="stMain"] [data-testid="stCaptionContainer"],
         [data-testid="stMain"] [data-testid="stMarkdownContainer"] {
             color: #14211b !important;
@@ -90,23 +91,6 @@ def _apply_styles() -> None:
             color: #24342c !important;
         }
 
-        [data-testid="stMain"] [data-testid="stTextInput"] [data-baseweb="input"],
-        [data-testid="stMain"] [data-testid="stTextInput"] input,
-        [data-testid="stMain"] [data-testid="stTextArea"] [data-baseweb="textarea"],
-        [data-testid="stMain"] [data-testid="stTextArea"] textarea {
-            background: #ffffff !important;
-            color: #14211b !important;
-            -webkit-text-fill-color: #14211b !important;
-            border-color: #aebfb5 !important;
-        }
-
-        [data-testid="stMain"] input::placeholder,
-        [data-testid="stMain"] textarea::placeholder {
-            color: #6b7c73 !important;
-            -webkit-text-fill-color: #6b7c73 !important;
-            opacity: 1 !important;
-        }
-
         [data-testid="stMain"] [data-testid="stForm"] {
             padding: 1.25rem;
             border: 1px solid #dbe5de;
@@ -114,12 +98,67 @@ def _apply_styles() -> None:
             background: #fbfdfb;
         }
 
-        [data-testid="stMain"] [data-testid="stRadio"] {
-            padding: 10px 14px;
-            margin-bottom: 8px;
-            border: 1px solid #dce6df;
-            border-radius: 13px;
-            background: #ffffff;
+        /* Input, textarea, select, multiselect */
+        [data-testid="stMain"] [data-testid="stTextInput"] input,
+        [data-testid="stMain"] [data-testid="stTextArea"] textarea,
+        [data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+        [data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+        [data-testid="stMain"] [data-baseweb="input"] > div,
+        [data-testid="stMain"] [data-baseweb="textarea"] > div,
+        [data-testid="stMain"] [data-baseweb="select"] > div {
+            background: #ffffff !important;
+            color: #14211b !important;
+            -webkit-text-fill-color: #14211b !important;
+            border: 1px solid #aebfb5 !important;
+        }
+
+        [data-testid="stMain"] [data-testid="stTextInput"] input::placeholder,
+        [data-testid="stMain"] [data-testid="stTextArea"] textarea::placeholder {
+            color: #6b7c73 !important;
+            -webkit-text-fill-color: #6b7c73 !important;
+            opacity: 1 !important;
+        }
+
+        [data-testid="stMain"] [data-testid="stSelectbox"] *,
+        [data-testid="stMain"] [data-testid="stMultiSelect"] *,
+        [data-testid="stMain"] [data-baseweb="select"] *,
+        [data-testid="stMain"] [role="listbox"] *,
+        [data-testid="stMain"] [role="option"] *,
+        [data-testid="stMain"] [data-baseweb="popover"] * {
+            color: #14211b !important;
+            -webkit-text-fill-color: #14211b !important;
+        }
+
+        [data-testid="stMain"] [role="listbox"],
+        [data-testid="stMain"] [role="option"],
+        [data-testid="stMain"] [data-baseweb="popover"] {
+            background: #ffffff !important;
+        }
+
+        [data-testid="stMain"] [data-baseweb="tag"] {
+            background: #e9f5ec !important;
+            color: #12372a !important;
+            border: 1px solid #b7d2bf !important;
+        }
+
+        /* Radio blocks */
+        [data-testid="stMain"] [data-testid="stRadio"] > div {
+            gap: 8px !important;
+        }
+
+        [data-testid="stMain"] [data-testid="stRadio"] label {
+            display: block !important;
+            padding: 10px 14px !important;
+            margin-bottom: 8px !important;
+            border: 1px solid #dce6df !important;
+            border-radius: 13px !important;
+            background: #ffffff !important;
+        }
+
+        [data-testid="stMain"] [data-testid="stRadio"] label *,
+        [data-testid="stMain"] [data-testid="stCheckbox"] label * {
+            color: #24342c !important;
+            -webkit-text-fill-color: #24342c !important;
         }
 
         .bc-readiness-card {
@@ -163,11 +202,7 @@ def _apply_styles() -> None:
     )
 
 
-def _professional_url(
-    project_name: str,
-    organization_name: str,
-    contact_name: str,
-) -> str:
+def _professional_url(project_name: str, organization_name: str, contact_name: str) -> str:
     subject = "Solicitud de Diagnóstico Profesional BioCore"
     body = (
         "Hola BioCore,\n\n"
@@ -178,10 +213,7 @@ def _professional_url(
         f"Proyecto: {project_name}\n\n"
         "Quedo atenta/o a los próximos pasos."
     )
-    return (
-        f"mailto:{BRAND.sales_email}"
-        f"?subject={quote(subject)}&body={quote(body)}"
-    )
+    return f"mailto:{BRAND.sales_email}?subject={quote(subject)}&body={quote(body)}"
 
 
 def _evaluate(responses: dict[str, object]) -> dict[str, Any]:
@@ -204,81 +236,46 @@ def _evaluate(responses: dict[str, object]) -> dict[str, Any]:
     timeline = str(responses["timeline"])
     component = str(responses["component"])
 
-    score = (
-        information_scores[information_level]
-        + stage_scores[project_stage]
-        + (0 if component == "No lo sé todavía" else 1)
-    )
+    score = information_scores[information_level] + stage_scores[project_stage] + (0 if component == "No lo sé todavía" else 1)
 
     if score <= 2:
         level_label = "Nivel inicial"
         headline = "Tu proyecto necesita definir mejor su punto de partida"
-        summary = (
-            "Todavía faltan antecedentes básicos para decidir con seguridad qué "
-            "estudio, revisión o servicio ambiental conviene realizar."
-        )
+        summary = "Todavía faltan antecedentes básicos para decidir con seguridad qué estudio, revisión o servicio ambiental conviene realizar."
     elif score <= 5:
         level_label = "Nivel intermedio"
         headline = "Tu proyecto ya tiene antecedentes, pero requiere orden y revisión"
-        summary = (
-            "Existe información útil, aunque conviene revisar su vigencia, cobertura "
-            "y capacidad para responder al objetivo actual."
-        )
+        summary = "Existe información útil, aunque conviene revisar su vigencia, cobertura y capacidad para responder al objetivo actual."
     else:
         level_label = "Preparado para revisión profesional"
         headline = "Tu proyecto parece listo para una revisión técnica"
-        summary = (
-            "Cuentas con una base que BioCore puede evaluar profesionalmente para "
-            "definir brechas, prioridades y el alcance del siguiente servicio."
-        )
+        summary = "Cuentas con una base que BioCore puede evaluar profesionalmente para definir brechas, prioridades y el alcance del siguiente servicio."
 
     gaps: list[str] = []
     if information_level == INFORMATION_LEVELS[0]:
-        gaps.append(
-            "Reunir o identificar los antecedentes disponibles antes de definir un estudio."
-        )
+        gaps.append("Reunir o identificar los antecedentes disponibles antes de definir un estudio.")
     elif information_level == INFORMATION_LEVELS[1]:
-        gaps.append(
-            "Revisar si los archivos existentes son suficientes, vigentes y utilizables."
-        )
+        gaps.append("Revisar si los archivos existentes son suficientes, vigentes y utilizables.")
     elif information_level == INFORMATION_LEVELS[2]:
-        gaps.append(
-            "Ordenar y clasificar la información para evitar duplicidades y vacíos."
-        )
+        gaps.append("Ordenar y clasificar la información para evitar duplicidades y vacíos.")
     else:
-        gaps.append(
-            "Validar profesionalmente la cobertura y calidad de la información organizada."
-        )
+        gaps.append("Validar profesionalmente la cobertura y calidad de la información organizada.")
 
     if component == "No lo sé todavía":
-        gaps.append(
-            "Definir qué componentes ambientales deberían incluirse en el alcance."
-        )
+        gaps.append("Definir qué componentes ambientales deberían incluirse en el alcance.")
     else:
-        gaps.append(
-            "Confirmar si los componentes seleccionados requieren revisión documental o terreno."
-        )
+        gaps.append("Confirmar si los componentes seleccionados requieren revisión documental o terreno.")
 
     if timeline == TIMELINES[0]:
-        gaps.append(
-            "Priorizar una revisión temprana para evitar decisiones urgentes con información incompleta."
-        )
+        gaps.append("Priorizar una revisión temprana para evitar decisiones urgentes con información incompleta.")
     elif main_need == MAIN_NEEDS[1]:
-        gaps.append(
-            "Determinar técnicamente si se necesita terreno y cuál debería ser su alcance."
-        )
+        gaps.append("Determinar técnicamente si se necesita terreno y cuál debería ser su alcance.")
     elif main_need == MAIN_NEEDS[3]:
-        gaps.append(
-            "Comprobar que los datos disponibles permiten elaborar mapas o informes confiables."
-        )
+        gaps.append("Comprobar que los datos disponibles permiten elaborar mapas o informes confiables.")
     elif main_need == MAIN_NEEDS[4]:
-        gaps.append(
-            "Definir indicadores, frecuencia y antecedentes base antes de iniciar el monitoreo."
-        )
+        gaps.append("Definir indicadores, frecuencia y antecedentes base antes de iniciar el monitoreo.")
     else:
-        gaps.append(
-            "Transformar la necesidad general en un alcance técnico, plazo y producto concreto."
-        )
+        gaps.append("Transformar la necesidad general en un alcance técnico, plazo y producto concreto.")
 
     return {
         "level_label": level_label,
@@ -287,19 +284,11 @@ def _evaluate(responses: dict[str, object]) -> dict[str, Any]:
         "score": score,
         "maximum_score": 7,
         "gaps": gaps[:3],
-        "next_step": (
-            "Solicitar un Diagnóstico Profesional BioCore para revisar los antecedentes "
-            "y determinar exactamente qué sirve, qué falta y cuál debería ser el siguiente paso."
-        ),
+        "next_step": "Solicitar un Diagnóstico Profesional BioCore para revisar los antecedentes y determinar exactamente qué sirve, qué falta y cuál debería ser el siguiente paso.",
     }
 
 
-def _report(
-    project_name: str,
-    organization_name: str,
-    responses: dict[str, object],
-    result: dict[str, Any],
-) -> bytes:
+def _report(project_name: str, organization_name: str, result: dict[str, Any]) -> bytes:
     items = "".join(f"<li>{escape(str(x))}</li>" for x in result["gaps"])
     html = f"""<!doctype html>
 <html lang="es">
@@ -314,11 +303,7 @@ h1,h2{{color:#12372a}} .box{{padding:18px;border:1px solid #d9e4dc;border-radius
 </head>
 <body>
 <h1>Diagnóstico Inicial BioCore</h1>
-<div class="notice">
-Este resultado es automático y orientativo. No identifica especies, no confirma
-presencia o ausencia, no evalúa impactos y no reemplaza una revisión profesional
-ni una campaña de terreno.
-</div>
+<div class="notice">Este resultado es automático y orientativo. No identifica especies, no confirma presencia o ausencia, no evalúa impactos y no reemplaza una revisión profesional ni una campaña de terreno.</div>
 <p>
 <strong>Organización:</strong> {escape(organization_name or "No informada")}<br>
 <strong>Proyecto:</strong> {escape(project_name)}<br>
@@ -409,10 +394,7 @@ def _render_result(bundle: dict[str, Any]) -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.progress(
-        int(result["score"]) / int(result["maximum_score"]),
-        text="Preparación general para una revisión profesional",
-    )
+    st.progress(int(result["score"]) / int(result["maximum_score"]), text="Preparación general para una revisión profesional")
 
     st.markdown("### Aspectos que conviene revisar")
     for gap in result["gaps"]:
@@ -420,23 +402,14 @@ def _render_result(bundle: dict[str, Any]) -> None:
 
     st.info(str(result["next_step"]))
     if saved:
-        st.caption(
-            "BioCore recibió tus datos y podrá orientarte sobre el siguiente paso."
-        )
+        st.caption("BioCore recibió tus datos y podrá orientarte sobre el siguiente paso.")
     else:
-        st.warning(
-            "El resultado se generó, pero el registro comercial no pudo guardarse. "
-            "Puedes descargarlo y contactar directamente a BioCore."
-        )
+        st.warning("El resultado se generó, pero el registro comercial no pudo guardarse. Puedes descargarlo y contactar directamente a BioCore.")
 
     st.download_button(
         "Descargar resumen inicial",
         data=report,
-        file_name=(
-            "diagnostico-inicial-"
-            + project_name.strip().lower().replace(" ", "-")
-            + ".html"
-        ),
+        file_name="diagnostico-inicial-" + project_name.strip().lower().replace(" ", "-") + ".html",
         mime="text/html",
         use_container_width=True,
     )
@@ -460,34 +433,18 @@ def _render_result(bundle: dict[str, Any]) -> None:
         _professional_url(project_name, organization_name, contact_name),
         use_container_width=True,
     )
-    st.caption(
-        "Servicio pagado sujeto a cotización. El diagnóstico inicial no confirma "
-        "especies ni reemplaza trabajo profesional."
-    )
 
 
-def render_public_ecological_diagnostic(
-    record_lead: LeadRecorder | None = None,
-) -> None:
+def render_public_ecological_diagnostic(record_lead: LeadRecorder | None = None) -> None:
     _apply_styles()
-    st.markdown(
-        '<a href="?" style="text-decoration:none;font-weight:700;">← Volver a BioCore</a>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<a href="?" style="text-decoration:none;font-weight:700;">← Volver a BioCore</a>', unsafe_allow_html=True)
     st.title("Diagnóstico Inicial BioCore")
     st.subheader("Descubre qué necesita tu proyecto y cuál debería ser el próximo paso")
-    st.write(
-        "Responde seis preguntas simples. Recibirás una orientación automática "
-        "sobre el nivel de preparación de tu proyecto."
-    )
+    st.write("Responde seis preguntas simples. Recibirás una orientación automática sobre el nivel de preparación de tu proyecto.")
     st.info("Gratuito · aproximadamente 3 minutos · no requiere suscripción")
-    st.warning(
-        "No identifica especies, no confirma presencia o ausencia, no evalúa "
-        "impactos y no reemplaza una campaña de terreno ni una revisión profesional.",
-        icon="⚠️",
-    )
+    st.warning("No identifica especies, no confirma presencia o ausencia, no evalúa impactos y no reemplaza una campaña de terreno ni una revisión profesional.", icon="⚠️")
 
-    with st.form("public_initial_diagnostic_form_v2"):
+    with st.form("public_initial_diagnostic_form_v3"):
         st.markdown("### Tus datos")
         left, right = st.columns(2)
         with left:
@@ -501,82 +458,34 @@ def render_public_ecological_diagnostic(
             commune = st.text_input("Comuna (opcional)")
 
         st.markdown("### Seis preguntas rápidas")
-        st.caption("Selecciona una alternativa en cada pregunta.")
+        st.caption("Marca una alternativa por pregunta.")
 
-        project_type = st.radio(
-            "1. ¿Qué tipo de proyecto o actividad tienes?",
-            PROJECT_TYPES,
-            index=None,
-            key="initial_project_type_v2",
-        )
-        project_stage = st.radio(
-            "2. ¿En qué etapa se encuentra?",
-            PROJECT_STAGES,
-            index=None,
-            key="initial_project_stage_v2",
-        )
-        information_level = st.radio(
-            "3. ¿Qué información ecológica previa tienes?",
-            INFORMATION_LEVELS,
-            index=None,
-            key="initial_information_level_v2",
-        )
-        main_need = st.radio(
-            "4. ¿Qué necesitas principalmente?",
-            MAIN_NEEDS,
-            index=None,
-            key="initial_main_need_v2",
-        )
-        component = st.radio(
-            "5. ¿Qué componentes podrían estar involucrados?",
-            COMPONENT_OPTIONS,
-            index=None,
-            key="initial_component_v2",
-        )
-        timeline = st.radio(
-            "6. ¿Cuándo necesitas avanzar?",
-            TIMELINES,
-            index=None,
-            key="initial_timeline_v2",
-        )
+        project_type = st.radio("1. ¿Qué tipo de proyecto o actividad tienes?", PROJECT_TYPES, index=None, key="initial_project_type_v3")
+        project_stage = st.radio("2. ¿En qué etapa se encuentra?", PROJECT_STAGES, index=None, key="initial_project_stage_v3")
+        information_level = st.radio("3. ¿Qué información ecológica previa tienes?", INFORMATION_LEVELS, index=None, key="initial_information_level_v3")
+        main_need = st.radio("4. ¿Qué necesitas principalmente?", MAIN_NEEDS, index=None, key="initial_main_need_v3")
+        component = st.radio("5. ¿Qué componentes podrían estar involucrados?", COMPONENT_OPTIONS, index=None, key="initial_component_v3")
+        timeline = st.radio("6. ¿Cuándo necesitas avanzar?", TIMELINES, index=None, key="initial_timeline_v3")
 
-        scope_accepted = st.checkbox(
-            "Comprendo que el resultado es una orientación inicial y no reemplaza "
-            "una revisión profesional."
-        )
-        contact_consent = st.checkbox(
-            "Autorizo a BioCore a guardar estos antecedentes y contactarme sobre "
-            "este diagnóstico."
-        )
-        submitted = st.form_submit_button(
-            "Ver mi orientación inicial",
-            type="primary",
-            use_container_width=True,
-        )
+        scope_accepted = st.checkbox("Comprendo que el resultado es una orientación inicial y no reemplaza una revisión profesional.")
+        contact_consent = st.checkbox("Autorizo a BioCore a guardar estos antecedentes y contactarme sobre este diagnóstico.")
+        submitted = st.form_submit_button("Ver mi orientación inicial", type="primary", use_container_width=True)
 
     if submitted:
         try:
             if not scope_accepted:
-                raise PublicLeadValidationError(
-                    "Debes aceptar el alcance del diagnóstico inicial."
-                )
+                raise PublicLeadValidationError("Debes aceptar el alcance del diagnóstico inicial.")
 
-            missing = [
-                label
-                for value, label in (
-                    (project_type, "tipo de proyecto"),
-                    (project_stage, "etapa del proyecto"),
-                    (information_level, "información disponible"),
-                    (main_need, "necesidad principal"),
-                    (component, "componentes involucrados"),
-                    (timeline, "plazo"),
-                )
-                if value is None
-            ]
+            missing = [label for value, label in (
+                (project_type, "tipo de proyecto"),
+                (project_stage, "etapa del proyecto"),
+                (information_level, "información disponible"),
+                (main_need, "necesidad principal"),
+                (component, "componentes involucrados"),
+                (timeline, "plazo"),
+            ) if value is None]
             if missing:
-                raise PublicLeadValidationError(
-                    "Completa estas respuestas: " + ", ".join(missing) + "."
-                )
+                raise PublicLeadValidationError("Completa estas respuestas: " + ", ".join(missing) + ".")
 
             responses: dict[str, object] = {
                 "project_type": project_type,
@@ -610,12 +519,7 @@ def render_public_ecological_diagnostic(
                 except Exception:
                     saved = False
 
-            report = _report(
-                project_name.strip(),
-                organization_name.strip(),
-                responses,
-                result,
-            )
+            report = _report(project_name.strip(), organization_name.strip(), result)
             st.session_state[_RESULT_KEY] = {
                 "result": result,
                 "project_name": project_name.strip(),

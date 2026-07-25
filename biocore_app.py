@@ -61,12 +61,16 @@ def record_public_diagnostic_lead(payload: dict[str, object]) -> str:
     return save_public_lead(supabase_server_client(), payload)
 
 
+# The public diagnostic must remain available even when the browser already
+# has an authenticated BioCore session. This also lets administrators test the
+# prospect experience without logging out.
+if st.query_params.get("diagnostico") == "publico":
+    render_public_ecological_diagnostic(record_public_diagnostic_lead)
+    st.stop()
+
 is_logged_in = bool(getattr(st.user, "is_logged_in", False))
 
 if not is_logged_in:
-    if st.query_params.get("diagnostico") == "publico":
-        render_public_ecological_diagnostic(record_public_diagnostic_lead)
-        st.stop()
     if st.query_params.get("auth") == "login":
         _start_login()
         st.stop()
@@ -123,6 +127,9 @@ st.session_state["biocore_user_context"] = context
 st.session_state["biocore_subscription"] = subscription
 st.session_state["biocore_ecological_diagnostic_service"] = (
     ecological_diagnostic_service()
+)
+st.session_state["biocore_public_diagnostic_lead_recorder"] = (
+    record_public_diagnostic_lead
 )
 
 render_private_shell(identity, context, subscription)

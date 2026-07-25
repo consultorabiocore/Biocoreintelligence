@@ -40,6 +40,65 @@ LeadRecorder = Callable[[dict[str, object]], str]
 _RESULT_KEY = "biocore_public_diagnostic_result"
 
 
+def _apply_public_diagnostic_styles() -> None:
+    """Keep the public form readable inside the light BioCore private shell."""
+    st.markdown(
+        """
+        <style>
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] h1,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] h2,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] h3,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] h4,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] p,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] small,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] label,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] label p,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-testid="stCaptionContainer"],
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"] {
+            color: #14211b !important;
+        }
+
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-testid="stAlert"] *,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [role="radiogroup"] label p,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-testid="stCheckbox"] label p {
+            color: #24342c !important;
+        }
+
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-baseweb="input"] > div,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-baseweb="textarea"] > div,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-baseweb="select"] > div {
+            background: #ffffff !important;
+            border-color: #aebfb5 !important;
+            color: #14211b !important;
+        }
+
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] input,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] textarea,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-baseweb="select"] span,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-baseweb="select"] div {
+            color: #14211b !important;
+            -webkit-text-fill-color: #14211b !important;
+        }
+
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] input::placeholder,
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] textarea::placeholder {
+            color: #6b7c73 !important;
+            -webkit-text-fill-color: #6b7c73 !important;
+            opacity: 1 !important;
+        }
+
+        body [data-testid="stMain"] [data-testid="stMainBlockContainer"] [data-testid="stForm"] {
+            padding: 1.25rem;
+            border: 1px solid #dbe5de;
+            border-radius: 18px;
+            background: #fbfdfb;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _assessment_service() -> EcologicalDiagnosticService:
     # The deterministic assessment method does not access the repository. The
     # private module continues using its normal Supabase-backed repository.
@@ -197,6 +256,7 @@ def _render_result(result: dict[str, Any]) -> None:
 def render_public_ecological_diagnostic(
     record_lead: LeadRecorder | None = None,
 ) -> None:
+    _apply_public_diagnostic_styles()
     st.markdown(
         '<a href="?" style="text-decoration:none;font-weight:700;">← Volver a BioCore</a>',
         unsafe_allow_html=True,

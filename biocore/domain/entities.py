@@ -1,17 +1,12 @@
 from dataclasses import dataclass
 from datetime import date
 
+from .projects import Project
+
 
 @dataclass(frozen=True)
 class Organization:
     id: str
-    name: str
-
-
-@dataclass(frozen=True)
-class Project:
-    id: str
-    organization_id: str
     name: str
 
 

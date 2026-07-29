@@ -15,6 +15,7 @@ ROLE_LABELS: dict[Role, str] = {
     Role.BIOCORE_ADMIN: "Administración BioCore",
     Role.BIOCORE_SPECIALIST: "Especialista BioCore",
     Role.CLIENT_ADMIN: "Administración cliente",
+    Role.CLIENT_EDITOR: "Edición cliente",
     Role.CLIENT_READER: "Consulta cliente",
 }
 
@@ -25,6 +26,7 @@ def _primary_role(context: UserContext) -> str:
         Role.BIOCORE_ADMIN,
         Role.BIOCORE_SPECIALIST,
         Role.CLIENT_ADMIN,
+        Role.CLIENT_EDITOR,
         Role.CLIENT_READER,
     )
     for role in ordered_roles:
@@ -37,6 +39,8 @@ def render_private_shell(
     identity: AuthenticatedIdentity,
     context: UserContext,
     subscription: SubscriptionSnapshot,
+    *,
+    logout_callback=st.logout,
 ) -> None:
     st.markdown(PRIVATE_STYLES, unsafe_allow_html=True)
     logo = available_logo(BRAND.compact_logo, BRAND.master_logo)
@@ -73,7 +77,7 @@ def render_private_shell(
         )
         st.button(
             "Cerrar sesión",
-            on_click=st.logout,
+            on_click=logout_callback,
             use_container_width=True,
             type="secondary",
         )

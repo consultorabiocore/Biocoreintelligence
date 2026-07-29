@@ -5,6 +5,12 @@ mantiene temporalmente la aplicación histórica en `app.py`. La arquitectura,
 el despliegue y el modelo de suscripciones están documentados en
 [`docs/platform_architecture.md`](docs/platform_architecture.md).
 
+La autenticación central multiaplicación y su despliegue gradual se documentan
+en [`docs/central_authentication.md`](docs/central_authentication.md).
+
+La sesión privada y el módulo de Proyectos conectado a Supabase se documentan
+en [`docs/project_management.md`](docs/project_management.md).
+
 ## Reportes automáticos vía GitHub Actions
 
 Este repositorio envía reportes satelitales automáticos por Telegram

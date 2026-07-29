@@ -5,6 +5,10 @@ import streamlit as st
 from biocore.components.page_header import render_page_header
 from biocore.config.brand import BRAND
 from biocore.domain.subscriptions import ModuleCode, SubscriptionSnapshot
+from biocore.platform_session import (
+    PlatformSessionUnavailable,
+    load_platform_session,
+)
 from biocore.security.authorization import UserContext
 from biocore.services.subscriptions import user_can_access_module
 
@@ -45,14 +49,16 @@ MODULE_DESCRIPTIONS: dict[ModuleCode, str] = {
 
 
 def current_platform_state() -> tuple[UserContext, SubscriptionSnapshot]:
-    context = st.session_state.get("biocore_user_context")
-    subscription = st.session_state.get("biocore_subscription")
-    if not isinstance(context, UserContext) or not isinstance(
-        subscription, SubscriptionSnapshot
-    ):
+    try:
+        session = load_platform_session(st.session_state)
+    except PlatformSessionUnavailable:
         st.error("La sesión de plataforma no está disponible.")
+        st.caption(
+            "Actualiza la página. Si el problema continúa, cierra sesión e "
+            "ingresa nuevamente."
+        )
         st.stop()
-    return context, subscription
+    return session.context, session.subscription
 
 
 def module_is_enabled(module_code: ModuleCode) -> bool:

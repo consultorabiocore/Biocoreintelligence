@@ -107,6 +107,11 @@ def project_input(
         objective="Consolidar información para análisis técnico.",
         status=status,
         start_date=date(2026, 8, 1),
+        current_stage="Preparación",
+        progress_percent=15,
+        responsible_name="Especialista BioCore",
+        next_activity="Revisar antecedentes",
+        next_activity_date=date(2026, 8, 5),
     )
 
 
@@ -119,6 +124,9 @@ def test_create_normalizes_code_and_records_creator_and_history() -> None:
     assert project.code == "BIO-2026-001"
     assert project.organization_id == "org-a"
     assert project.created_by_user_id == "user-1"
+    assert project.current_stage == "Preparación"
+    assert project.progress_percent == 15
+    assert project.next_activity_date == date(2026, 8, 5)
     assert service.history(context(), project.id)[0].event_type == "created"
 
 
@@ -190,6 +198,12 @@ def test_edit_status_and_archive_keep_a_basic_history() -> None:
         ProjectChanges(
             name="Línea base ecológica actualizada",
             objective="Preparar campañas comparables.",
+            current_stage="Campaña de terreno",
+            progress_percent=45,
+            responsible_name="Equipo de terreno",
+            next_activity="Validar registros",
+            next_activity_date=date(2026, 9, 1),
+            next_activity_date_supplied=True,
         ),
     )
     active = service.change_status(
@@ -198,6 +212,9 @@ def test_edit_status_and_archive_keep_a_basic_history() -> None:
     archived = service.archive(context(), project.id)
 
     assert updated.name == "Línea base ecológica actualizada"
+    assert updated.current_stage == "Campaña de terreno"
+    assert updated.progress_percent == 45
+    assert updated.next_activity == "Validar registros"
     assert active.status == ProjectStatus.ACTIVE
     assert archived.status == ProjectStatus.ARCHIVED
     assert archived.archived_at is not None
@@ -252,4 +269,12 @@ def test_required_fields_and_initial_status_are_validated() -> None:
         service.create(
             context(),
             replace(project_input(), status=ProjectStatus.ARCHIVED),
+        )
+    with pytest.raises(ProjectValidationError):
+        service.validate_input(
+            replace(project_input(), progress_percent=101)
+        )
+    with pytest.raises(ProjectValidationError):
+        service.validate_input(
+            replace(project_input(), responsible_name="  ")
         )

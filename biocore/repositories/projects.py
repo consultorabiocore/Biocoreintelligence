@@ -74,6 +74,11 @@ def project_from_row(row: dict[str, Any]) -> Project:
         objective=str(row.get("objective") or ""),
         status=ProjectStatus(str(row.get("status") or "active")),
         start_date=_parse_date(row.get("start_date")),
+        current_stage=str(row.get("current_stage") or "Inicio"),
+        progress_percent=int(row.get("progress_percent") or 0),
+        responsible_name=str(row.get("responsible_name") or "Por asignar"),
+        next_activity=str(row.get("next_activity") or "Por definir"),
+        next_activity_date=_parse_date(row.get("next_activity_date")),
         created_by_user_id=str(row.get("created_by_user_id") or ""),
         updated_by_user_id=str(row.get("updated_by_user_id") or ""),
         created_at=_parse_datetime(row.get("created_at")) or now,
@@ -98,6 +103,15 @@ def project_payload(project: Project) -> dict[str, object]:
         "objective": project.objective,
         "status": project.status.value,
         "start_date": project.start_date.isoformat() if project.start_date else None,
+        "current_stage": project.current_stage,
+        "progress_percent": project.progress_percent,
+        "responsible_name": project.responsible_name,
+        "next_activity": project.next_activity,
+        "next_activity_date": (
+            project.next_activity_date.isoformat()
+            if project.next_activity_date
+            else None
+        ),
         "created_by_user_id": project.created_by_user_id or None,
         "updated_by_user_id": project.updated_by_user_id or None,
         "archived_at": (

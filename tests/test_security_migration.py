@@ -28,3 +28,14 @@ def test_central_permission_seed_uses_existing_source_columns() -> None:
 
     assert "select admin_roles.role_code, permissions.code" in migration
     assert "select role_code, permission_code\nfrom (" not in migration
+
+
+def test_staging_subscription_seed_links_the_configurable_plan() -> None:
+    seed = Path(
+        "database/seeds/001_biocore_staging_subscription.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "plan_id," in seed
+    assert "configured_plan.id" in seed
+    assert "configured_plan.slug = 'enterprise'" in seed
+    assert "plan_id = excluded.plan_id" in seed

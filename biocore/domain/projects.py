@@ -52,6 +52,11 @@ class Project:
     objective: str
     status: ProjectStatus
     start_date: date | None
+    current_stage: str
+    progress_percent: int
+    responsible_name: str
+    next_activity: str
+    next_activity_date: date | None
     created_by_user_id: str
     updated_by_user_id: str
     created_at: datetime

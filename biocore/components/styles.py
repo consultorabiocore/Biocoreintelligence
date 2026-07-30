@@ -484,6 +484,25 @@ PUBLIC_STYLES = """
     font-size: 1.25rem;
 }
 
+.bc-section-dark .bc-panel {
+    color: var(--bc-ink);
+}
+
+.bc-section-dark .bc-panel h2,
+.bc-section-dark .bc-panel h3,
+.bc-section-dark .bc-panel h4 {
+    color: var(--bc-forest) !important;
+}
+
+.bc-section-dark .bc-panel p,
+.bc-section-dark .bc-panel li {
+    color: var(--bc-muted);
+}
+
+.bc-section-dark .bc-panel small {
+    color: #52665d;
+}
+
 .bc-list {
     display: grid;
     gap: 11px;

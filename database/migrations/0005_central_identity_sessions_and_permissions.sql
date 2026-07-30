@@ -111,7 +111,7 @@ set description = excluded.description;
 
 -- Platform administrators receive every current permission.
 insert into role_permissions (role_code, permission_code)
-select role_code, permission_code
+select admin_roles.role_code, permissions.code
 from (
     values ('superadmin'), ('administradora_biocore')
 ) as admin_roles(role_code)

@@ -19,3 +19,12 @@ def test_legacy_admin_password_is_not_hardcoded() -> None:
     assert "pbkdf2_hmac" in admin_function
     assert "compare_digest" in admin_function
     assert "== \"" not in admin_function
+
+
+def test_central_permission_seed_uses_existing_source_columns() -> None:
+    migration = Path(
+        "database/migrations/0005_central_identity_sessions_and_permissions.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "select admin_roles.role_code, permissions.code" in migration
+    assert "select role_code, permission_code\nfrom (" not in migration

@@ -1,4 +1,4 @@
--- Roll back only the additive changes introduced by 0007.
+-- Roll back only the additive changes introduced by 0008.
 -- Existing projects and the base table from 0004 are intentionally preserved.
 
 drop policy if exists project_history_authorized_insert on project_history;

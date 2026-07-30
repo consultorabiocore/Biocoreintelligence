@@ -3,7 +3,7 @@ from pathlib import Path
 
 def test_project_migration_defines_required_fields_history_and_soft_delete() -> None:
     migration = Path(
-        "database/migrations/0007_project_management.sql"
+        "database/migrations/0008_project_management.sql"
     ).read_text(encoding="utf-8")
     for field in (
         "client_name",
@@ -25,7 +25,7 @@ def test_project_migration_defines_required_fields_history_and_soft_delete() -> 
 
 def test_project_rls_has_tenant_select_and_role_restricted_writes() -> None:
     migration = Path(
-        "database/migrations/0007_project_management.sql"
+        "database/migrations/0008_project_management.sql"
     ).read_text(encoding="utf-8")
     assert "has_organization_access(organization_id)" in migration
     assert "has_project_write_access(organization_id)" in migration
@@ -37,7 +37,7 @@ def test_project_rls_has_tenant_select_and_role_restricted_writes() -> None:
 
 def test_project_migration_has_a_non_destructive_rollback() -> None:
     rollback = Path(
-        "database/rollbacks/0007_project_management_down.sql"
+        "database/rollbacks/0008_project_management_down.sql"
     ).read_text(encoding="utf-8")
     assert "drop table if exists project_history" in rollback
     assert "drop table if exists projects" not in rollback

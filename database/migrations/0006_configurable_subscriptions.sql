@@ -1,6 +1,6 @@
 -- BioCore configurable plans, add-ons and billing boundary.
 -- Additive migration: no prices and no payment provider are configured here.
--- Apply after 0002_subscriptions_and_entitlements.sql and 0004.
+-- Apply after 0002_subscriptions_and_entitlements.sql and 0005.
 
 alter type subscription_status add value if not exists 'pending_activation';
 alter type subscription_status add value if not exists 'grace_period';

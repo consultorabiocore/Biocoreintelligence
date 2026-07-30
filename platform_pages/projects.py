@@ -44,7 +44,7 @@ def _show_error(error: Exception) -> None:
     else:
         st.error(
             "No fue posible completar la operación. Verifica que la migración "
-            "0007 esté aplicada e inténtalo nuevamente."
+            "0008 esté aplicada e inténtalo nuevamente."
         )
 
 

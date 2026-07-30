@@ -22,8 +22,8 @@ biocore/domain/projects.py        modelos y estados
 biocore/repositories/projects.py  consultas Supabase con organization_id
 biocore/services/projects.py      permisos, validaciones e historial
 platform_pages/projects.py        interfaz Streamlit
-database/migrations/0007_*        esquema, índices y RLS
-database/rollbacks/0007_*         reversión no destructiva del incremento
+database/migrations/0008_*        esquema, índices y RLS
+database/rollbacks/0008_*         reversión no destructiva del incremento
 ```
 
 La tabla `projects` mantiene la clave compuesta `(id, organization_id)`. Las
@@ -47,11 +47,11 @@ clave nunca debe exponerse a las páginas ni al navegador.
 ## Despliegue
 
 1. Respaldar Supabase.
-2. Aplicar las migraciones `0001` a `0006` en orden si aún no están instaladas.
-3. Ejecutar `database/migrations/0007_project_management.sql`.
+2. Aplicar las migraciones `0001` a `0007` en orden si aún no están instaladas.
+3. Ejecutar `database/migrations/0008_project_management.sql`.
 4. Desplegar `biocore_app.py`.
 5. Mantener disponible
-   `database/rollbacks/0007_project_management_down.sql` para revertir solo las
+   `database/rollbacks/0008_project_management_down.sql` para revertir solo las
    columnas, políticas e historial de esta entrega. El rollback conserva la
    tabla base y los proyectos.
 

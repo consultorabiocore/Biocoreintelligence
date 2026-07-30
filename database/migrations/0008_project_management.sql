@@ -1,5 +1,5 @@
 -- BioCore project management.
--- Additive and idempotent. Apply after 0004 and before enabling the UI.
+-- Additive and idempotent. Apply after 0005 and before enabling the UI.
 
 alter table projects
     add column if not exists client_name text,

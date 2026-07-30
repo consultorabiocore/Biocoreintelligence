@@ -6,7 +6,12 @@ import streamlit as st
 from supabase import create_client
 
 from biocore.components.private_shell import render_private_shell
-from biocore.components.public_landing import render_public_landing
+from biocore.components.public_ecological_diagnostic import (
+    render_public_ecological_diagnostic,
+)
+from biocore.components.public_landing_gateway import (
+    render_public_landing_with_diagnostic_cta,
+)
 from biocore.config.navigation import pages_for
 from biocore.config.settings import Settings
 from biocore.repositories.memberships import (
@@ -26,6 +31,7 @@ from biocore.security.identity import AuthenticatedIdentity
 from biocore.services.subscriptions import SubscriptionService
 from biocore.services.ecological_diagnostics import EcologicalDiagnosticService
 from biocore.services.projects import ProjectService
+from biocore.services.public_diagnostic_leads import save_public_lead
 
 
 st.set_page_config(
@@ -41,16 +47,6 @@ def _start_login() -> None:
     st.login()
 
 
-is_logged_in = bool(getattr(st.user, "is_logged_in", False))
-
-if not is_logged_in:
-    if st.query_params.get("auth") == "login":
-        _start_login()
-        st.stop()
-    render_public_landing()
-    st.stop()
-
-
 @st.cache_resource
 def supabase_server_client() -> Any:
     """Create one trusted server-side client; never expose its key to a page."""
@@ -63,6 +59,28 @@ def supabase_server_client() -> Any:
     if not supabase_url or not service_role_key:
         raise RuntimeError("Supabase server credentials are not configured")
     return create_client(supabase_url, service_role_key)
+
+
+def record_public_diagnostic_lead(payload: dict[str, object]) -> str:
+    """Persist a consented prospect without creating a client subscription."""
+    return save_public_lead(supabase_server_client(), payload)
+
+
+# The public diagnostic must remain available even when the browser already
+# has an authenticated BioCore session. This also lets administrators test the
+# prospect experience without logging out.
+if st.query_params.get("diagnostico") == "publico":
+    render_public_ecological_diagnostic(record_public_diagnostic_lead)
+    st.stop()
+
+is_logged_in = bool(getattr(st.user, "is_logged_in", False))
+
+if not is_logged_in:
+    if st.query_params.get("auth") == "login":
+        _start_login()
+        st.stop()
+    render_public_landing_with_diagnostic_cta()
+    st.stop()
 
 
 @st.cache_resource
@@ -192,6 +210,9 @@ st.session_state["biocore_ecological_diagnostic_service"] = (
     ecological_diagnostic_service()
 )
 st.session_state["biocore_project_service"] = project_service()
+st.session_state["biocore_public_diagnostic_lead_recorder"] = (
+    record_public_diagnostic_lead
+)
 
 render_private_shell(
     identity,

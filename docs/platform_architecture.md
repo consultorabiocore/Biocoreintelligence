@@ -67,14 +67,15 @@ continuidad en una suscripción principal.
 1. Ejecutar `database/migrations/0001_identity_and_tenancy.sql`.
 2. Ejecutar `database/migrations/0002_subscriptions_and_entitlements.sql`.
 3. Ejecutar `database/migrations/0003_ecological_diagnostics.sql`.
-4. Ejecutar las migraciones de autenticación central `0004` a `0006`.
-5. Ejecutar `database/migrations/0007_project_management.sql`.
-6. Registrar la suscripción de cada organización desde un contexto
+4. Ejecutar la migración pública `0004_public_ecological_diagnostic_leads.sql`.
+5. Ejecutar las migraciones de autenticación central `0005` a `0007`.
+6. Ejecutar `database/migrations/0008_project_management.sql`.
+7. Registrar la suscripción de cada organización desde un contexto
    administrativo. Para staging puede utilizarse
    `database/seeds/001_biocore_staging_subscription.sql`.
-7. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
+8. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
    OIDC únicamente en los secretos del despliegue.
-8. Desplegar `biocore_app.py`.
+9. Desplegar `biocore_app.py`.
 
 La clave `service_role` nunca debe enviarse al navegador, guardarse en Git ni
 mostrarse en mensajes de error.

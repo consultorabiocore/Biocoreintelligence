@@ -20,9 +20,10 @@ biocore/repositories         acceso confiable a Supabase
 biocore/security             tenant scope, auditoría y rate limiting
 biocore/subscriptions        planes, habilitaciones, uso y billing boundary
 packages/biocore_client      cliente compartido para módulos Streamlit
-database/migrations/0004-*   identidad, sesiones, permisos y proyectos
-database/migrations/0005-*   planes y complementos configurables
-database/migrations/0006-*   vinculación de cuentas heredadas
+database/migrations/0005-*   identidad, sesiones, permisos y proyectos
+database/migrations/0006-*   planes y complementos configurables
+database/migrations/0007-*   vinculación de cuentas heredadas
+database/migrations/0008-*   gestión de proyectos
 ```
 
 ## Flujo SSO entre dominios Streamlit
@@ -42,10 +43,10 @@ de manera segura. BioCore usa una sesión central más un código de lanzamiento
 
 1. Respaldar la base de datos.
 2. Ejecutar, en orden:
-   - `0004_central_identity_sessions_and_permissions.sql`
-   - `0005_configurable_subscriptions.sql`
-   - `0006_legacy_identity_mapping.sql`
-   - `0007_project_management.sql`
+   - `0005_central_identity_sessions_and_permissions.sql`
+   - `0006_configurable_subscriptions.sql`
+   - `0007_legacy_identity_mapping.sql`
+   - `0008_project_management.sql`
 3. Mantener `BIOCORE_AUTH_MODE=shadow`.
 4. Configurar Supabase Auth/OIDC y las variables descritas en
    `.streamlit/secrets.example.toml`.

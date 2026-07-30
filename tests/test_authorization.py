@@ -19,6 +19,12 @@ def test_client_reader_cannot_write_projects() -> None:
         require_permission(context(Role.CLIENT_READER), Permission.PROJECTS_WRITE)
 
 
+def test_client_editor_can_write_but_cannot_invite_users() -> None:
+    require_permission(context(Role.CLIENT_EDITOR), Permission.PROJECTS_WRITE)
+    with pytest.raises(AuthorizationError):
+        require_permission(context(Role.CLIENT_EDITOR), Permission.USERS_INVITE)
+
+
 def test_specialist_can_write_intelligence() -> None:
     require_permission(context(Role.BIOCORE_SPECIALIST), Permission.INTELLIGENCE_WRITE)
 

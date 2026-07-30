@@ -6,14 +6,19 @@ class Role(StrEnum):
     BIOCORE_ADMIN = "administradora_biocore"
     BIOCORE_SPECIALIST = "especialista_biocore"
     CLIENT_ADMIN = "cliente_administrador"
+    CLIENT_EDITOR = "cliente_editor"
     CLIENT_READER = "cliente_lector"
 
 
 class Permission(StrEnum):
     PLATFORM_ADMIN = "platform:admin"
     ORGANIZATIONS_READ = "organizations:read"
+    ORGANIZATIONS_MANAGE = "organizations:manage"
+    USERS_INVITE = "users:invite"
+    USERS_MANAGE = "users:manage"
     PROJECTS_READ = "projects:read"
     PROJECTS_WRITE = "projects:write"
+    PROJECTS_GRANT_ACCESS = "projects:grant_access"
     CAMPAIGNS_READ = "campaigns:read"
     CAMPAIGNS_WRITE = "campaigns:write"
     MAPS_READ = "maps:read"
@@ -27,8 +32,10 @@ class Permission(StrEnum):
     REPORTS_PUBLISH = "reports:publish"
     ACADEMY_READ = "academy:read"
     SUBSCRIPTIONS_READ = "subscriptions:read"
+    SUBSCRIPTIONS_MANAGE = "subscriptions:manage"
     ECOLOGICAL_DIAGNOSTIC_READ = "ecological_diagnostic:read"
     ECOLOGICAL_DIAGNOSTIC_WRITE = "ecological_diagnostic:write"
+    DOWNLOADS_SENSITIVE = "downloads:sensitive"
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -58,11 +65,39 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     ),
     Role.CLIENT_ADMIN: frozenset(
         {
+            Permission.ORGANIZATIONS_READ,
+            Permission.ORGANIZATIONS_MANAGE,
+            Permission.USERS_INVITE,
+            Permission.USERS_MANAGE,
             Permission.PROJECTS_READ,
+            Permission.PROJECTS_WRITE,
+            Permission.PROJECTS_GRANT_ACCESS,
             Permission.CAMPAIGNS_READ,
+            Permission.CAMPAIGNS_WRITE,
             Permission.MAPS_READ,
             Permission.FIELD_READ,
+            Permission.FIELD_WRITE,
             Permission.DARWINCHECK_READ,
+            Permission.DARWINCHECK_WRITE,
+            Permission.INTELLIGENCE_READ,
+            Permission.REPORTS_READ,
+            Permission.ACADEMY_READ,
+            Permission.SUBSCRIPTIONS_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_READ,
+            Permission.ECOLOGICAL_DIAGNOSTIC_WRITE,
+        }
+    ),
+    Role.CLIENT_EDITOR: frozenset(
+        {
+            Permission.PROJECTS_READ,
+            Permission.PROJECTS_WRITE,
+            Permission.CAMPAIGNS_READ,
+            Permission.CAMPAIGNS_WRITE,
+            Permission.MAPS_READ,
+            Permission.FIELD_READ,
+            Permission.FIELD_WRITE,
+            Permission.DARWINCHECK_READ,
+            Permission.DARWINCHECK_WRITE,
             Permission.INTELLIGENCE_READ,
             Permission.REPORTS_READ,
             Permission.ACADEMY_READ,

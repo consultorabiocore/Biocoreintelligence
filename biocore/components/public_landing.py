@@ -5,6 +5,7 @@ import streamlit as st
 
 from biocore.components.styles import PUBLIC_STYLES
 from biocore.config.brand import BRAND, asset_data_uri
+from biocore.config.settings import Settings
 
 
 def _html(value: str) -> str:
@@ -170,7 +171,14 @@ def _plan_cards() -> str:
 def render_public_landing() -> None:
     logo_uri = asset_data_uri(BRAND.master_logo)
     demo_url = BRAND.demo_request_url()
-    login_url = "?auth=login"
+    settings = Settings.from_environment()
+    login_url = settings.auth_login_url or "?auth=login"
+    signup_url = (
+        f"{settings.auth_login_url}"
+        f"{'&' if '?' in settings.auth_login_url else '?'}mode=signup"
+        if settings.auth_login_url
+        else "?auth=login"
+    )
     diagnostic_url = "?auth=login"
     logo = (
         f'<img src="{escape(logo_uri)}" alt="{escape(BRAND.name)}">'
@@ -195,11 +203,17 @@ def render_public_landing() -> None:
                         <a href="#recursos">Recursos</a>
                     </div>
                     <div class="bc-nav-actions">
+                        <a class="bc-button bc-button-secondary" href="{escape(signup_url)}">
+                            Crear cuenta
+                        </a>
                         <a class="bc-button bc-button-primary" href="{escape(demo_url)}">
                             Solicitar demostración
                         </a>
-                        <a class="bc-button bc-button-secondary" href="{login_url}">
+                        <a class="bc-button bc-button-secondary" href="{escape(login_url)}">
                             Iniciar sesión
+                        </a>
+                        <a class="bc-button bc-button-secondary" href="{escape(signup_url)}">
+                            Crear cuenta
                         </a>
                     </div>
                 </div>
@@ -384,7 +398,7 @@ def render_public_landing() -> None:
                                 y taxonómica; calidad, trazabilidad y preparación
                                 para mapas o comparación de campañas.
                             </p>
-                            <a class="bc-button bc-button-gold" href="{diagnostic_url}">
+                            <a class="bc-button bc-button-gold" href="{escape(diagnostic_url)}">
                                 Realizar diagnóstico ecológico
                             </a>
                         </article>
@@ -478,10 +492,10 @@ def render_public_landing() -> None:
                         <a class="bc-button bc-button-gold" href="{escape(demo_url)}">
                             Solicitar una demostración
                         </a>
-                        <a class="bc-button bc-button-secondary" href="{diagnostic_url}">
+                        <a class="bc-button bc-button-secondary" href="{escape(diagnostic_url)}">
                             Realizar diagnóstico ecológico
                         </a>
-                        <a class="bc-button bc-button-secondary" href="{login_url}">
+                        <a class="bc-button bc-button-secondary" href="{escape(login_url)}">
                             Iniciar sesión
                         </a>
                     </div>
@@ -508,7 +522,7 @@ def render_public_landing() -> None:
                             <div class="bc-footer-links">
                                 <a href="#plataforma">Plataforma</a>
                                 <a href="#recursos">Continuidad</a>
-                                <a href="{login_url}">Acceso de clientes</a>
+                                <a href="{escape(login_url)}">Acceso de clientes</a>
                             </div>
                         </div>
                         <div>
@@ -516,7 +530,7 @@ def render_public_landing() -> None:
                             <div class="bc-footer-links">
                                 <a href="#privacidad">Privacidad</a>
                                 <a href="#terminos">Términos</a>
-                                <a href="{login_url}">Iniciar sesión</a>
+                                <a href="{escape(login_url)}">Iniciar sesión</a>
                             </div>
                         </div>
                     </div>

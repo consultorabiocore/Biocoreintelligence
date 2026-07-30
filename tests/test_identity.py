@@ -13,12 +13,14 @@ def test_oidc_identity_normalizes_email() -> None:
         {
             "sub": "provider|123",
             "email": " USER@Example.COM ",
+            "email_verified": True,
             "name": " Loreto Campos ",
         }
     )
     assert identity.subject == "provider|123"
     assert identity.email == "user@example.com"
     assert identity.display_name == "Loreto Campos"
+    assert identity.email_verified
 
 
 def test_roles_from_token_are_not_accepted_as_authorization() -> None:

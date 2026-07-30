@@ -11,8 +11,10 @@ class SubscriptionPlan(StrEnum):
 
 class SubscriptionStatus(StrEnum):
     TRIAL = "trial"
+    PENDING_ACTIVATION = "pending_activation"
     ACTIVE = "active"
     PAST_DUE = "past_due"
+    GRACE_PERIOD = "grace_period"
     SUSPENDED = "suspended"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
@@ -64,8 +66,10 @@ PLAN_LABELS: dict[SubscriptionPlan, str] = {
 
 STATUS_LABELS: dict[SubscriptionStatus, str] = {
     SubscriptionStatus.TRIAL: "Prueba",
+    SubscriptionStatus.PENDING_ACTIVATION: "Pendiente de activación",
     SubscriptionStatus.ACTIVE: "Activa",
     SubscriptionStatus.PAST_DUE: "Pago pendiente",
+    SubscriptionStatus.GRACE_PERIOD: "Periodo de gracia",
     SubscriptionStatus.SUSPENDED: "Suspendida",
     SubscriptionStatus.CANCELLED: "Cancelada",
     SubscriptionStatus.EXPIRED: "Expirada",
@@ -89,7 +93,11 @@ class OrganizationSubscription:
         current_day = today or date.today()
         if self.starts_on > current_day:
             return False
-        if self.status not in {SubscriptionStatus.TRIAL, SubscriptionStatus.ACTIVE}:
+        if self.status not in {
+            SubscriptionStatus.TRIAL,
+            SubscriptionStatus.ACTIVE,
+            SubscriptionStatus.GRACE_PERIOD,
+        }:
             return False
         return self.renews_on is None or self.renews_on >= current_day
 
@@ -113,6 +121,22 @@ class ModuleEntitlement:
 
 
 @dataclass(frozen=True)
+class SubscriptionAddon:
+    code: str
+    status: str
+    starts_on: date
+    ends_on: date | None = None
+
+    def is_active(self, today: date | None = None) -> bool:
+        current_day = today or date.today()
+        return (
+            self.status == "active"
+            and self.starts_on <= current_day
+            and (self.ends_on is None or self.ends_on >= current_day)
+        )
+
+
+@dataclass(frozen=True)
 class SubscriptionUsage:
     users_used: int = 0
     projects_used: int = 0
@@ -132,10 +156,11 @@ class ProjectAccessGrant:
     status: str = "active"
     renewable: bool = True
     converted_to_subscription: bool = False
+    project_id_value: str | None = None
 
     @property
     def project_id(self) -> str:
-        return self.project_reference
+        return self.project_id_value or self.project_reference
 
     def is_active(self, today: date | None = None) -> bool:
         current_day = today or date.today()
@@ -154,6 +179,8 @@ class SubscriptionSnapshot:
     project_grants: tuple[ProjectAccessGrant, ...] = ()
     usage: SubscriptionUsage = field(default_factory=SubscriptionUsage)
     data_available: bool = True
+    configured_plan_modules: frozenset[ModuleCode] | None = None
+    addons: tuple[SubscriptionAddon, ...] = ()
 
     @classmethod
     def unconfigured(
@@ -171,10 +198,14 @@ class SubscriptionSnapshot:
         )
 
     @property
-    def enabled_modules(self) -> frozenset[ModuleCode]:
+    def base_enabled_modules(self) -> frozenset[ModuleCode]:
         enabled: set[ModuleCode] = set()
         if self.subscription and self.subscription.grants_access():
-            enabled.update(PLAN_MODULES[self.subscription.plan])
+            enabled.update(
+                self.configured_plan_modules
+                if self.configured_plan_modules is not None
+                else PLAN_MODULES[self.subscription.plan]
+            )
             for entitlement in self.entitlements:
                 if not entitlement.is_within_period():
                     continue
@@ -183,9 +214,33 @@ class SubscriptionSnapshot:
                 else:
                     enabled.discard(entitlement.module_code)
 
-        for grant in self.project_grants:
-            if grant.is_active() and not grant.converted_to_subscription:
-                enabled.update(grant.modules)
+            addon_modules = {
+                "lidar": ModuleCode.LIDAR,
+                "satellite_monitoring": ModuleCode.SATELLITE,
+                "api_access": ModuleCode.API_ACCESS,
+                "advanced_reports": ModuleCode.REPORTS,
+                "academy_training": ModuleCode.ACADEMY,
+                "specialized_processing": ModuleCode.INTELLIGENCE,
+            }
+            for addon in self.addons:
+                module = addon_modules.get(addon.code)
+                if module and addon.is_active():
+                    enabled.add(module)
+        return frozenset(enabled)
+
+    @property
+    def project_module_map(self) -> dict[str, frozenset[ModuleCode]]:
+        return {
+            grant.project_id: grant.modules
+            for grant in self.project_grants
+            if grant.is_active() and not grant.converted_to_subscription
+        }
+
+    @property
+    def enabled_modules(self) -> frozenset[ModuleCode]:
+        enabled = set(self.base_enabled_modules)
+        for modules in self.project_module_map.values():
+            enabled.update(modules)
         return frozenset(enabled)
 
     def allows(self, module_code: ModuleCode) -> bool:

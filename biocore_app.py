@@ -22,10 +22,15 @@ from biocore.repositories.memberships import (
 from biocore.repositories.ecological_diagnostics import (
     SupabaseEcologicalDiagnosticRepository,
 )
+from biocore.repositories.projects import SupabaseProjectRepository
 from biocore.repositories.subscriptions import SupabaseSubscriptionRepository
+from biocore.repositories.central_auth import SupabaseCentralAuthRepository
+from biocore.auth.session_service import SessionService
+from biocore.platform_session import clear_platform_session, store_platform_session
 from biocore.security.identity import AuthenticatedIdentity
 from biocore.services.subscriptions import SubscriptionService
 from biocore.services.ecological_diagnostics import EcologicalDiagnosticService
+from biocore.services.projects import ProjectService
 from biocore.services.public_diagnostic_leads import save_public_lead
 
 
@@ -95,8 +100,40 @@ def ecological_diagnostic_service() -> EcologicalDiagnosticService:
     return EcologicalDiagnosticService(repository)
 
 
+@st.cache_resource
+def project_service() -> ProjectService:
+    repository = SupabaseProjectRepository(supabase_server_client())
+    return ProjectService(repository)
+
+
+@st.cache_resource
+def central_auth_repository() -> SupabaseCentralAuthRepository:
+    return SupabaseCentralAuthRepository(supabase_server_client())
+
+
+@st.cache_resource
+def central_session_service() -> SessionService:
+    repository = central_auth_repository()
+    return SessionService(repository, repository)
+
+
+def _logout() -> None:
+    token = st.session_state.get("biocore_central_session_token")
+    if token:
+        try:
+            central_session_service().revoke(str(token))
+        except Exception:
+            # OIDC logout remains available during a migration outage.
+            pass
+    clear_platform_session(st.session_state)
+    st.session_state.clear()
+    st.logout()
+
+
 identity = AuthenticatedIdentity.from_oidc_claims(st.user.to_dict())
-selected_organization = st.session_state.get("organization_id")
+selected_organization = st.session_state.get(
+    "biocore_selected_organization_id"
+) or st.session_state.get("organization_id")
 
 try:
     context = membership_resolver().resolve_context(identity, selected_organization)
@@ -107,6 +144,7 @@ except OrganizationSelectionRequired as selection:
     )
     if st.button("Continuar", type="primary"):
         st.session_state["organization_id"] = organization_id
+        st.session_state["biocore_selected_organization_id"] = organization_id
         st.rerun()
     st.stop()
 except IdentityNotProvisionedError:
@@ -122,17 +160,66 @@ except RuntimeError:
     st.stop()
 
 subscription = subscription_service().resolve_for(context)
-st.session_state["biocore_identity"] = identity
-st.session_state["biocore_user_context"] = context
-st.session_state["biocore_subscription"] = subscription
+settings = Settings.from_environment()
+if settings.auth_mode in {"shadow", "optional", "required"}:
+    try:
+        if identity.email_verified and identity.email:
+            central_auth_repository().mark_verified_oidc_identity(
+                context.user_id,
+                provider="google",
+                subject=identity.subject,
+                email=identity.email,
+            )
+        existing_token = st.session_state.get("biocore_central_session_token")
+        if existing_token:
+            central_context = central_session_service().validate(
+                str(existing_token)
+            )
+            if central_context.organization_id != context.organization_id:
+                central_session_service().revoke(
+                    str(existing_token), reason="organization_switched"
+                )
+                issued_session = central_session_service().issue(
+                    context.user_id,
+                    context.organization_id,
+                    auth_method="streamlit_oidc",
+                )
+                existing_token = issued_session.token
+                central_context = issued_session.context
+        else:
+            issued_session = central_session_service().issue(
+                context.user_id,
+                context.organization_id,
+                auth_method="streamlit_oidc",
+            )
+            existing_token = issued_session.token
+            central_context = issued_session.context
+        st.session_state["biocore_central_session_token"] = existing_token
+        st.session_state["biocore_central_session_context"] = central_context
+    except Exception:
+        st.session_state.pop("biocore_central_session_token", None)
+        st.session_state.pop("biocore_central_session_context", None)
+        if settings.auth_mode == "required":
+            st.error(
+                "La sesión central de BioCore no está disponible. "
+                "Intenta nuevamente en unos minutos."
+            )
+            st.stop()
+store_platform_session(st.session_state, identity, context, subscription)
 st.session_state["biocore_ecological_diagnostic_service"] = (
     ecological_diagnostic_service()
 )
+st.session_state["biocore_project_service"] = project_service()
 st.session_state["biocore_public_diagnostic_lead_recorder"] = (
     record_public_diagnostic_lead
 )
 
-render_private_shell(identity, context, subscription)
+render_private_shell(
+    identity,
+    context,
+    subscription,
+    logout_callback=_logout,
+)
 
 navigation = {
     section: [

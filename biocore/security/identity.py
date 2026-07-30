@@ -13,6 +13,7 @@ class AuthenticatedIdentity:
     subject: str
     email: str | None
     display_name: str | None = None
+    email_verified: bool = False
 
     @classmethod
     def from_oidc_claims(cls, claims: Mapping[str, object]) -> "AuthenticatedIdentity":
@@ -23,7 +24,17 @@ class AuthenticatedIdentity:
         email = str(email_value).strip().lower() if email_value else None
         name_value = claims.get("name")
         display_name = str(name_value).strip() if name_value else None
-        return cls(subject=subject, email=email, display_name=display_name)
+        verified_value = claims.get("email_verified")
+        email_verified = (
+            verified_value is True
+            or str(verified_value).strip().lower() == "true"
+        )
+        return cls(
+            subject=subject,
+            email=email,
+            display_name=display_name,
+            email_verified=email_verified,
+        )
 
 
 class MembershipResolver(Protocol):

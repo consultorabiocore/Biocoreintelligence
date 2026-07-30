@@ -95,6 +95,24 @@ def test_inactive_subscription_denies_modules() -> None:
     assert current.enabled_modules == frozenset()
 
 
+def test_grace_period_keeps_access_without_deleting_subscription_data() -> None:
+    current = snapshot(
+        plan=SubscriptionPlan.PROFESSIONAL,
+        status=SubscriptionStatus.GRACE_PERIOD,
+    )
+    assert current.allows(ModuleCode.FIELD)
+    assert current.subscription is not None
+
+
+def test_cancelled_subscription_denies_modules_but_keeps_record() -> None:
+    current = snapshot(
+        plan=SubscriptionPlan.PROFESSIONAL,
+        status=SubscriptionStatus.CANCELLED,
+    )
+    assert not current.allows(ModuleCode.FIELD)
+    assert current.subscription is not None
+
+
 def test_active_project_grant_can_provide_temporary_module_access() -> None:
     grant = ProjectAccessGrant(
         organization_id="org-a",
@@ -112,6 +130,10 @@ def test_active_project_grant_can_provide_temporary_module_access() -> None:
     )
     assert current.allows(ModuleCode.FIELD)
     assert not current.allows(ModuleCode.INTELLIGENCE)
+    assert current.base_enabled_modules == frozenset()
+    assert current.project_module_map == {
+        "project-2026-01": frozenset({ModuleCode.FIELD})
+    }
 
 
 def test_module_authorization_rejects_user_and_organization_mismatch() -> None:

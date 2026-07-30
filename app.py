@@ -36,6 +36,7 @@ from fpdf import FPDF
 import os
 import tempfile
 import hashlib
+import hmac
 from io import BytesIO
 import numpy as np
 
@@ -103,7 +104,22 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def es_admin(contraseña_admin):
-    return contraseña_admin == "2861701l"
+    """Temporary legacy access; disabled unless a secure hash is configured."""
+    config = st.secrets.get("legacy_admin", {})
+    if not config.get("enabled", False):
+        return False
+    salt = str(config.get("password_salt") or "")
+    expected = str(config.get("password_hash") or "")
+    iterations = int(config.get("iterations") or 600_000)
+    if not salt or not expected:
+        return False
+    derived = hashlib.pbkdf2_hmac(
+        "sha256",
+        contraseña_admin.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations,
+    ).hex()
+    return hmac.compare_digest(derived, expected)
 
 def verificar_credenciales_usuario(email, password):
     try:

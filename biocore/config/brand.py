@@ -56,7 +56,11 @@ class BrandConfig:
             "Quisiera solicitar una demostración de la plataforma.\n\n"
             "Organización:\n"
             "Nombre:\n"
+            "Correo:\n"
             "Teléfono:\n"
+            "Proyecto o necesidad principal:\n"
+            "Módulos de interés:\n"
+            "Horario preferido para la demostración:\n"
         )
         return (
             f"mailto:{self.sales_email}"

@@ -5,6 +5,7 @@ import streamlit as st
 
 from biocore.components.styles import PUBLIC_STYLES
 from biocore.config.brand import BRAND, asset_data_uri
+from biocore.config.integrations import external_applications
 from biocore.config.settings import Settings
 
 
@@ -85,7 +86,9 @@ SUBSCRIPTION_PLANS = (
 )
 
 
-def _module_cards() -> str:
+def _module_cards(
+    destinations: dict[str, tuple[str, str, bool]],
+) -> str:
     module_logos = {
         "BioCore Field": BRAND.field_logo,
         "DarwinCheck": BRAND.darwincheck_logo,
@@ -107,17 +110,27 @@ def _module_cards() -> str:
             f"{escape(icon)}</span>"
         )
 
-    return "\n".join(
-        f"""
-        <article class="bc-module-card">
-            {card_media(icon, name)}
-            <h3>{escape(name)}</h3>
-            <p>{escape(description)}</p>
-            <a class="bc-text-link" href="#suscripcion">Conocer más →</a>
-        </article>
-        """
-        for icon, name, description in ECOSYSTEM_MODULES
-    )
+    cards = []
+    for icon, name, description in ECOSYSTEM_MODULES:
+        url, action_label, external = destinations[name]
+        target = (
+            ' target="_blank" rel="noopener noreferrer"'
+            if external
+            else ""
+        )
+        cards.append(
+            f"""
+            <article class="bc-module-card">
+                {card_media(icon, name)}
+                <h3>{escape(name)}</h3>
+                <p>{escape(description)}</p>
+                <a class="bc-text-link" href="{escape(url)}"{target}>
+                    {escape(action_label)} →
+                </a>
+            </article>
+            """
+        )
+    return "\n".join(cards)
 
 
 def _ecosystem_strip() -> str:
@@ -169,7 +182,7 @@ def _plan_cards() -> str:
 
 
 def render_public_landing() -> None:
-    logo_uri = asset_data_uri(BRAND.master_logo)
+    logo_uri = asset_data_uri(BRAND.compact_logo)
     demo_url = BRAND.demo_request_url()
     settings = Settings.from_environment()
     login_url = settings.auth_login_url or "?auth=login"
@@ -179,7 +192,35 @@ def render_public_landing() -> None:
         if settings.auth_login_url
         else "?auth=login"
     )
-    diagnostic_url = "?auth=login"
+    diagnostic_url = "?diagnostico=publico"
+    applications = external_applications(settings)
+    module_destinations = {
+        "BioCore Field": (
+            applications["field"].url or login_url,
+            "Abrir aplicación" if applications["field"].url else "Iniciar sesión",
+            bool(applications["field"].url),
+        ),
+        "DarwinCheck": (
+            applications["darwincheck"].url or login_url,
+            (
+                "Abrir aplicación"
+                if applications["darwincheck"].url
+                else "Iniciar sesión"
+            ),
+            bool(applications["darwincheck"].url),
+        ),
+        "BioCore Intelligence": (
+            applications["intelligence"].url or login_url,
+            (
+                "Abrir aplicación"
+                if applications["intelligence"].url
+                else "Iniciar sesión"
+            ),
+            bool(applications["intelligence"].url),
+        ),
+        "BioCore Reports": (login_url, "Acceder al módulo", False),
+        "BioCore Academy": (login_url, "Acceder al módulo", False),
+    }
     logo = (
         f'<img src="{escape(logo_uri)}" alt="{escape(BRAND.name)}">'
         if logo_uri
@@ -207,13 +248,10 @@ def render_public_landing() -> None:
                             Crear cuenta
                         </a>
                         <a class="bc-button bc-button-primary" href="{escape(demo_url)}">
-                            Solicitar demostración
+                            Solicitar demostración por correo
                         </a>
                         <a class="bc-button bc-button-secondary" href="{escape(login_url)}">
                             Iniciar sesión
-                        </a>
-                        <a class="bc-button bc-button-secondary" href="{escape(signup_url)}">
-                            Crear cuenta
                         </a>
                     </div>
                 </div>
@@ -233,7 +271,7 @@ def render_public_landing() -> None:
                         </p>
                         <div class="bc-hero-actions">
                             <a class="bc-button bc-button-primary" href="{escape(demo_url)}">
-                                Solicitar demostración
+                                Solicitar demostración por correo
                             </a>
                             <a class="bc-button bc-button-gold" href="#suscripcion">
                                 Ver planes BioCore
@@ -244,6 +282,10 @@ def render_public_landing() -> None:
                             <span>Trazabilidad de extremo a extremo</span>
                             <span>Continuidad después del proyecto</span>
                         </div>
+                        <p class="bc-demo-contact-note">
+                            La solicitud abre un correo prellenado al equipo BioCore.
+                            No realiza cobros ni activa una suscripción.
+                        </p>
                     </div>
 
                     <div class="bc-demo-shell" aria-label="Dashboard demostrativo BioCore">
@@ -336,7 +378,7 @@ def render_public_landing() -> None:
                             ni suscripciones.
                         </p>
                     </header>
-                    <div class="bc-card-grid">{_module_cards()}</div>
+                    <div class="bc-card-grid">{_module_cards(module_destinations)}</div>
                 </div>
             </section>
 
@@ -490,7 +532,7 @@ def render_public_landing() -> None:
                     </p>
                     <div class="bc-final-actions">
                         <a class="bc-button bc-button-gold" href="{escape(demo_url)}">
-                            Solicitar una demostración
+                            Solicitar demostración por correo
                         </a>
                         <a class="bc-button bc-button-secondary" href="{escape(diagnostic_url)}">
                             Realizar diagnóstico ecológico

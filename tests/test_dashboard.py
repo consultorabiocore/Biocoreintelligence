@@ -58,3 +58,30 @@ def test_public_and_private_homepages_show_the_module_brand_system() -> None:
     assert "Ver planes BioCore" in landing
     assert "bc-dashboard-module-logo" in dashboard
     assert "Solicitar activación de BioCore" in dashboard
+
+
+def test_public_landing_uses_compact_logo_and_real_module_destinations() -> None:
+    landing = Path("biocore/components/public_landing.py").read_text(
+        encoding="utf-8"
+    )
+    assert "asset_data_uri(BRAND.compact_logo)" in landing
+    assert "external_applications(settings)" in landing
+    assert "Abrir aplicación" in landing
+    assert "Acceder al módulo" in landing
+    assert 'diagnostic_url = "?diagnostico=publico"' in landing
+    assert "No realiza cobros ni activa una suscripción" in landing
+
+
+def test_private_module_cards_open_the_protected_module_pages() -> None:
+    dashboard = Path("biocore/components/dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    for path in (
+        'ModuleCode.FIELD: "/field"',
+        'ModuleCode.DARWINCHECK: "/darwincheck"',
+        'ModuleCode.INTELLIGENCE: "/intelligence"',
+        'ModuleCode.REPORTS: "/biocore_reports"',
+        'ModuleCode.ACADEMY: "/academy"',
+    ):
+        assert path in dashboard
+    assert "Abrir módulo →" in dashboard

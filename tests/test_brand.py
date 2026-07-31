@@ -28,6 +28,14 @@ def test_brand_message_matches_official_identity() -> None:
     assert BRAND.slogan == "Transformamos datos en inteligencia ecológica"
 
 
+def test_demo_request_explains_the_commercial_information_needed() -> None:
+    url = BRAND.demo_request_url()
+    assert "mailto:consultorabiocore@gmail.com" in url
+    assert "Proyecto%20o%20necesidad%20principal" in url
+    assert "M%C3%B3dulos%20de%20inter%C3%A9s" in url
+    assert "Horario%20preferido" in url
+
+
 def test_brand_palette_matches_approved_tokens() -> None:
     assert BIOCORE_GREEN_DARK == "#12372A"
     assert BIOCORE_GREEN == "#2F7D4A"

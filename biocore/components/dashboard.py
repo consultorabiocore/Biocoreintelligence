@@ -36,6 +36,14 @@ DASHBOARD_MODULE_LOGOS = {
     ModuleCode.ACADEMY: BRAND.academy_logo,
 }
 
+DASHBOARD_MODULE_PATHS = {
+    ModuleCode.FIELD: "/field",
+    ModuleCode.DARWINCHECK: "/darwincheck",
+    ModuleCode.INTELLIGENCE: "/intelligence",
+    ModuleCode.REPORTS: "/biocore_reports",
+    ModuleCode.ACADEMY: "/academy",
+}
+
 
 def _html(value: str) -> str:
     """Keep Markdown from interpreting indented HTML fragments as code."""
@@ -119,6 +127,11 @@ def _module_cards(
             )
         elif class_name == "bc-status-soon":
             action = '<span class="bc-module-message">Lanzamiento gradual</span>'
+        else:
+            action = (
+                f'<a href="{escape(DASHBOARD_MODULE_PATHS[module_code])}" '
+                'target="_self">Abrir módulo →</a>'
+            )
         cards.append(
             f"""
             <article class="bc-dashboard-module">

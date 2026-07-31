@@ -45,7 +45,9 @@ def test_light_cards_inside_dark_sections_keep_readable_text() -> None:
     assert ".bc-section-dark .bc-panel {" in styles
     assert ".bc-section-dark .bc-panel h2," in styles
     assert ".bc-section-dark .bc-panel p," in styles
-    assert "color: var(--bc-muted);" in styles
+    assert "color: #46594f !important;" in styles
+    assert "-webkit-text-fill-color: #46594f !important;" in styles
+    assert "color: #52665d !important;" in styles
 
 
 def test_public_diagnostic_owns_a_light_background() -> None:

@@ -80,7 +80,8 @@ PUBLIC_STYLES = """
     width: 100%;
     height: 100%;
     max-height: none;
-    object-fit: cover;
+    padding: 5px 8px;
+    object-fit: contain;
     object-position: center;
 }
 
@@ -236,6 +237,14 @@ PUBLIC_STYLES = """
     content: "✓";
     margin-right: 7px;
     color: var(--bc-green);
+}
+
+.bc-demo-contact-note {
+    max-width: 620px;
+    margin: 16px 0 0;
+    color: #65766d;
+    font-size: .78rem;
+    line-height: 1.5;
 }
 
 .bc-hero-ecosystem {
@@ -492,15 +501,20 @@ PUBLIC_STYLES = """
 .bc-section-dark .bc-panel h3,
 .bc-section-dark .bc-panel h4 {
     color: var(--bc-forest) !important;
+    -webkit-text-fill-color: var(--bc-forest) !important;
 }
 
 .bc-section-dark .bc-panel p,
 .bc-section-dark .bc-panel li {
-    color: var(--bc-muted);
+    color: #46594f !important;
+    -webkit-text-fill-color: #46594f !important;
+    opacity: 1 !important;
 }
 
 .bc-section-dark .bc-panel small {
-    color: #52665d;
+    color: #52665d !important;
+    -webkit-text-fill-color: #52665d !important;
+    opacity: 1 !important;
 }
 
 .bc-list {
@@ -539,6 +553,7 @@ PUBLIC_STYLES = """
 
 .bc-module-card,
 .bc-benefit-card {
+    position: relative;
     padding: 24px 20px;
     border: 1px solid var(--bc-line);
     border-radius: 18px;
@@ -598,6 +613,12 @@ PUBLIC_STYLES = """
     text-decoration: none;
     font-size: 0.84rem;
     font-weight: 800;
+}
+
+.bc-module-card .bc-text-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
 }
 
 .bc-flow {
@@ -802,7 +823,8 @@ PUBLIC_STYLES = """
     width: 260px;
     height: 80px;
     max-height: none;
-    object-fit: cover;
+    padding: 5px 8px;
+    object-fit: contain;
     object-position: center;
     border: 1px solid rgba(255,255,255,.18);
     border-radius: 12px;
@@ -1151,6 +1173,7 @@ PRIVATE_STYLES = """
 }
 
 .bc-dashboard-module {
+    position: relative;
     min-width: 0;
     padding: 20px;
     border: 1px solid #dfe7e1;
@@ -1196,6 +1219,12 @@ PRIVATE_STYLES = """
     font-size: .76rem;
     font-weight: 750;
     text-decoration: none;
+}
+
+.bc-dashboard-module a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
 }
 
 .bc-module-message {

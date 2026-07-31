@@ -71,6 +71,19 @@ def _apply_styles() -> None:
     st.markdown(
         """
         <style>
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        [data-testid="stMain"] > div,
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stMain"] .block-container {
+            background: #f5f8f5 !important;
+        }
+
+        [data-testid="stMain"] .block-container {
+            max-width: 920px;
+        }
+
         [data-testid="stMain"] h1,
         [data-testid="stMain"] h2,
         [data-testid="stMain"] h3,

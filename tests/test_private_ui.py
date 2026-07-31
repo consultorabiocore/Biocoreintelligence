@@ -38,3 +38,20 @@ def test_private_streamlit_subheaders_keep_contrast() -> None:
     assert '[data-testid="stMain"] h2' in private_styles
     assert '[data-testid="stMain"] h3' in private_styles
     assert "color: #173a2b !important;" in private_styles
+
+
+def test_light_cards_inside_dark_sections_keep_readable_text() -> None:
+    styles = Path("biocore/components/styles.py").read_text(encoding="utf-8")
+    assert ".bc-section-dark .bc-panel {" in styles
+    assert ".bc-section-dark .bc-panel h2," in styles
+    assert ".bc-section-dark .bc-panel p," in styles
+    assert "color: var(--bc-muted);" in styles
+
+
+def test_public_diagnostic_owns_a_light_background() -> None:
+    source = Path(
+        "biocore/components/public_ecological_diagnostic.py"
+    ).read_text(encoding="utf-8")
+    assert '[data-testid="stAppViewContainer"]' in source
+    assert '[data-testid="stMainBlockContainer"]' in source
+    assert "background: #f5f8f5 !important;" in source

@@ -1,8 +1,9 @@
 -- Optional staging seed for the existing BioCore organization.
--- Run only after migrations 0001, 0002 and 0003.
+-- Run only after migrations 0001 through 0008.
 
 insert into organization_subscriptions (
     organization_id,
+    plan_id,
     plan,
     status,
     starts_on,
@@ -13,7 +14,8 @@ insert into organization_subscriptions (
     support_level
 )
 select
-    id,
+    organization.id,
+    configured_plan.id,
     'enterprise'::subscription_plan,
     'active'::subscription_status,
     current_date,
@@ -22,10 +24,13 @@ select
     10,
     50,
     'prioritario'
-from organizations
-where slug = 'biocore'
+from organizations organization
+join subscription_plans configured_plan
+    on configured_plan.slug = 'enterprise'
+where organization.slug = 'biocore'
 on conflict (organization_id) do update
 set
+    plan_id = excluded.plan_id,
     plan = excluded.plan,
     status = excluded.status,
     renews_on = excluded.renews_on,

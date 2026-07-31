@@ -41,3 +41,28 @@ def test_project_migration_has_a_non_destructive_rollback() -> None:
     ).read_text(encoding="utf-8")
     assert "drop table if exists project_history" in rollback
     assert "drop table if exists projects" not in rollback
+
+
+def test_project_experience_migration_is_additive_and_tenant_safe() -> None:
+    migration = Path(
+        "database/migrations/0009_project_experience.sql"
+    ).read_text(encoding="utf-8")
+    for field in (
+        "current_stage",
+        "progress_percent",
+        "responsible_name",
+        "next_activity",
+        "next_activity_date",
+    ):
+        assert f"add column if not exists {field}" in migration
+    assert "progress_percent between 0 and 100" in migration
+    assert "organization_id" in migration
+    assert "no DELETE policy" in migration
+
+
+def test_project_experience_rollback_preserves_business_data() -> None:
+    rollback = Path(
+        "database/rollbacks/0009_project_experience_down.sql"
+    ).read_text(encoding="utf-8")
+    assert "drop table" not in rollback
+    assert "drop column" not in rollback

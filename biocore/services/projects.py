@@ -43,6 +43,11 @@ class ProjectInput:
     objective: str
     status: ProjectStatus = ProjectStatus.PLANNING
     start_date: date | None = None
+    current_stage: str = "Inicio"
+    progress_percent: int = 0
+    responsible_name: str = "Por asignar"
+    next_activity: str = "Por definir"
+    next_activity_date: date | None = None
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,12 @@ class ProjectChanges:
     objective: str | None = None
     start_date: date | None = None
     start_date_supplied: bool = False
+    current_stage: str | None = None
+    progress_percent: int | None = None
+    responsible_name: str | None = None
+    next_activity: str | None = None
+    next_activity_date: date | None = None
+    next_activity_date_supplied: bool = False
 
 
 ALLOWED_STATUS_TRANSITIONS: dict[ProjectStatus, frozenset[ProjectStatus]] = {
@@ -98,6 +109,20 @@ def _normalized_code(value: str) -> str:
     return code
 
 
+def _normalized_progress(value: int) -> int:
+    try:
+        progress = int(value)
+    except (TypeError, ValueError) as error:
+        raise ProjectValidationError(
+            "El avance debe ser un número entre 0 y 100"
+        ) from error
+    if not 0 <= progress <= 100:
+        raise ProjectValidationError(
+            "El avance debe estar entre 0 y 100"
+        )
+    return progress
+
+
 def _serializable(value: object) -> object:
     if isinstance(value, (date, datetime)):
         return value.isoformat()
@@ -131,7 +156,23 @@ class ProjectService:
             objective=_normalized_text(data.objective, "El objetivo", maximum=2000),
             status=ProjectStatus(data.status),
             start_date=data.start_date,
+            current_stage=_normalized_text(
+                data.current_stage, "La etapa actual", maximum=120
+            ),
+            progress_percent=_normalized_progress(data.progress_percent),
+            responsible_name=_normalized_text(
+                data.responsible_name, "El responsable", maximum=160
+            ),
+            next_activity=_normalized_text(
+                data.next_activity, "La próxima actividad", maximum=240
+            ),
+            next_activity_date=data.next_activity_date,
         )
+
+    def validate_input(self, data: ProjectInput) -> ProjectInput:
+        """Validate and normalize a draft without persisting it."""
+
+        return self._validated_input(data)
 
     def _append_history(
         self,
@@ -184,6 +225,11 @@ class ProjectService:
             objective=validated.objective,
             status=validated.status,
             start_date=validated.start_date,
+            current_stage=validated.current_stage,
+            progress_percent=validated.progress_percent,
+            responsible_name=validated.responsible_name,
+            next_activity=validated.next_activity,
+            next_activity_date=validated.next_activity_date,
             created_by_user_id=context.user_id,
             updated_by_user_id=context.user_id,
             created_at=now,
@@ -295,6 +341,31 @@ class ProjectService:
                 if changes.start_date_supplied
                 else current.start_date
             ),
+            "current_stage": (
+                changes.current_stage
+                if changes.current_stage is not None
+                else current.current_stage
+            ),
+            "progress_percent": (
+                changes.progress_percent
+                if changes.progress_percent is not None
+                else current.progress_percent
+            ),
+            "responsible_name": (
+                changes.responsible_name
+                if changes.responsible_name is not None
+                else current.responsible_name
+            ),
+            "next_activity": (
+                changes.next_activity
+                if changes.next_activity is not None
+                else current.next_activity
+            ),
+            "next_activity_date": (
+                changes.next_activity_date
+                if changes.next_activity_date_supplied
+                else current.next_activity_date
+            ),
         }
         validated = self._validated_input(ProjectInput(**values))
         if validated.code != current.code and self._repository.code_exists(
@@ -317,6 +388,11 @@ class ProjectService:
             description=validated.description,
             objective=validated.objective,
             start_date=validated.start_date,
+            current_stage=validated.current_stage,
+            progress_percent=validated.progress_percent,
+            responsible_name=validated.responsible_name,
+            next_activity=validated.next_activity,
+            next_activity_date=validated.next_activity_date,
             updated_by_user_id=context.user_id,
             updated_at=datetime.utcnow(),
         )
@@ -337,6 +413,11 @@ class ProjectService:
                 "description",
                 "objective",
                 "start_date",
+                "current_stage",
+                "progress_percent",
+                "responsible_name",
+                "next_activity",
+                "next_activity_date",
             )
             if getattr(current, field) != getattr(saved, field)
         }

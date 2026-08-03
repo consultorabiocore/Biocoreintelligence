@@ -12,9 +12,14 @@ class ActivityItem:
 
 @dataclass(frozen=True)
 class ProjectSummary:
+    id: str
     name: str
+    code: str
     client: str
-    last_campaign: str
+    current_stage: str
+    progress_percent: int
+    responsible_name: str
+    next_activity: str
     status: str
     updated_at: datetime
 
@@ -46,6 +51,7 @@ class DashboardSnapshot:
     alerts: int | None = None
     pending_reviews: int | None = None
     last_processing_at: datetime | None = None
+    projects_loaded: bool = False
     activities: tuple[ActivityItem, ...] = ()
     recent_projects: tuple[ProjectSummary, ...] = ()
     upcoming_campaign_items: tuple[CampaignSummary, ...] = ()

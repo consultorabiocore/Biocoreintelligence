@@ -26,6 +26,14 @@ database/migrations     esquema y políticas RLS
 Las páginas no deben consultar directamente la base de datos ni aceptar
 organizaciones, roles o permisos provenientes de controles de interfaz.
 
+## Experiencia humana y explicabilidad
+
+Los criterios transversales de dignidad, calidad accesible, orientación al
+problema y explicabilidad se definen en
+[`human_experience_principles.md`](human_experience_principles.md). Estos
+criterios son parte de la aceptación funcional y se aplican a todas las capas,
+no únicamente a los componentes visuales.
+
 ## Autenticación y autorización
 
 La migración hacia sesión única, Auth/API y códigos de lanzamiento se describe

@@ -1,6 +1,8 @@
 from pathlib import Path
+from datetime import datetime
 
 from biocore.domain.dashboard import DashboardSnapshot
+from biocore.domain.projects import Project, ProjectModality, ProjectStatus
 from biocore.domain.subscriptions import SubscriptionSnapshot
 from biocore.services.dashboard import DashboardService
 
@@ -37,16 +39,19 @@ def test_legacy_cloud_entrypoint_delegates_to_professional_platform() -> None:
     assert delegate < platform_path < stop < legacy_config
 
 
-def test_public_landing_marks_demo_data_explicitly() -> None:
+def test_public_landing_states_scope_without_a_fake_dashboard() -> None:
     landing = Path("biocore/components/public_landing.py").read_text(
         encoding="utf-8"
     )
-    assert "Datos demostrativos" in landing
+    assert "Gestiona proyectos de flora, hongos y líquenes" in landing
+    assert "Consultoría ecológica + plataforma digital" in landing
+    assert "Para quién está diseñado" in landing
     assert "Realizar diagnóstico ecológico" in landing
-    assert "184" in landing
+    assert "Datos demostrativos" not in landing
+    assert "bc-demo-shell" not in landing
 
 
-def test_public_and_private_homepages_show_the_module_brand_system() -> None:
+def test_public_and_private_homepages_orient_people_before_modules() -> None:
     landing = Path("biocore/components/public_landing.py").read_text(
         encoding="utf-8"
     )
@@ -54,10 +59,50 @@ def test_public_and_private_homepages_show_the_module_brand_system() -> None:
         encoding="utf-8"
     )
 
-    assert "_ecosystem_strip()" in landing
-    assert "Ver planes BioCore" in landing
+    assert "Siete etapas que siguen la forma real de trabajar" in landing
+    assert "Los módulos aparecen después del objetivo del proyecto" in landing
+    assert "Dashboard demostrativo" not in landing
+    assert "Tus proyectos ecológicos" in dashboard
+    assert "Siguiente acción recomendada" in dashboard
+    assert 'st.subheader("Mis proyectos")' in dashboard
     assert "bc-dashboard-module-logo" in dashboard
-    assert "Solicitar activación de BioCore" in dashboard
+
+
+def test_dashboard_exposes_real_project_context_and_next_action() -> None:
+    subscription = SubscriptionSnapshot.unconfigured("org-a", "Organización A")
+    now = datetime(2026, 7, 31, 10, 30)
+    project = Project(
+        id="project-1",
+        organization_id="org-a",
+        name="Bosque costero",
+        code="BIO-001",
+        client_name="Cliente A",
+        project_type="Caracterización ecológica",
+        region="Los Lagos",
+        commune="Puerto Montt",
+        modality=ProjectModality.MIXED,
+        description="Descripción",
+        objective="Objetivo",
+        status=ProjectStatus.ACTIVE,
+        start_date=None,
+        current_stage="Campaña de terreno",
+        progress_percent=35,
+        responsible_name="Especialista BioCore",
+        next_activity="Validar fotografías",
+        next_activity_date=None,
+        created_by_user_id="user-1",
+        updated_by_user_id="user-1",
+        created_at=now,
+        updated_at=now,
+    )
+
+    dashboard = DashboardService().build(subscription, projects=(project,))
+
+    assert dashboard.projects_loaded is True
+    assert dashboard.active_projects == 1
+    assert dashboard.recent_projects[0].name == "Bosque costero"
+    assert dashboard.recent_projects[0].current_stage == "Campaña de terreno"
+    assert dashboard.recent_projects[0].next_activity == "Validar fotografías"
 
 
 def test_public_landing_uses_compact_logo_and_real_module_destinations() -> None:
@@ -69,7 +114,8 @@ def test_public_landing_uses_compact_logo_and_real_module_destinations() -> None
     assert "Abrir aplicación" in landing
     assert "Acceder al módulo" in landing
     assert 'diagnostic_url = "?diagnostico=publico"' in landing
-    assert "No realiza cobros ni activa una suscripción" in landing
+    assert "No realiza cobros" in landing
+    assert "ni activa una suscripción" in landing
 
 
 def test_private_module_cards_open_the_protected_module_pages() -> None:

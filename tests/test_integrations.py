@@ -27,6 +27,7 @@ def test_external_application_urls_can_be_configured_without_secrets_in_code() -
     )
 
     assert catalog["field"].url == "https://field.example.com"
+    assert catalog["field"].label == "BioCore MycoField"
     assert catalog["darwincheck"].url == "https://check.example.com"
     assert catalog["field"].is_configured
     assert catalog["darwincheck"].is_configured

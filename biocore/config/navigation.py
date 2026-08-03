@@ -65,7 +65,7 @@ PAGES = (
         ModuleCode.PLATFORM_CORE,
     ),
     PageDefinition(
-        "BioCore Field",
+        "BioCore MycoField",
         "platform_pages/field.py",
         Permission.FIELD_READ,
         "MÓDULOS",

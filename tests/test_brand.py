@@ -18,6 +18,7 @@ def test_official_brand_assets_are_available() -> None:
     assert BRAND.darwincheck_logo.is_file()
     assert BRAND.intelligence_logo.is_file()
     assert BRAND.field_logo.is_file()
+    assert BRAND.field_logo.name == "biocore_mycofield.png"
     assert BRAND.reports_logo.is_file()
     assert BRAND.academy_logo.is_file()
 

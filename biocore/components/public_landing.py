@@ -52,26 +52,98 @@ SERVICE_OUTCOMES = (
 
 
 ECOSYSTEM_MODULES = (
-    (
-        "BioCore Field",
-        "Captura de observaciones, fotografías y datos georreferenciados de terreno.",
-    ),
-    (
-        "DarwinCheck",
-        "Validación y revisión de consistencia de conjuntos de datos Darwin Core.",
-    ),
-    (
-        "BioCore Intelligence",
-        "Análisis ecológico y herramientas científicas especializadas.",
-    ),
-    (
-        "BioCore Reports",
-        "Informes y productos conectados con la evidencia y sus versiones.",
-    ),
-    (
-        "BioCore Academy",
-        "Formación científico-tecnológica para equipos y profesionales.",
-    ),
+    {
+        "internal_name": "BioCore Field",
+        "display_name": "BioCore MycoField",
+        "eyebrow": "Hongos en terreno",
+        "description": (
+            "Aplicación especializada para registrar hongos durante campañas de "
+            "terreno, incluso cuando el trabajo ocurre lejos del escritorio."
+        ),
+        "features": (
+            "Fotografías, coordenadas y fecha vinculadas a cada registro.",
+            "Formularios consistentes para ordenar campañas micológicas.",
+            "Trazabilidad desde la observación hasta su revisión posterior.",
+        ),
+        "note": (
+            "Especializado en campañas micológicas; la identificación taxonómica "
+            "definitiva requiere revisión experta cuando corresponda."
+        ),
+        "spotlight": True,
+    },
+    {
+        "internal_name": "DarwinCheck",
+        "display_name": "DarwinCheck",
+        "eyebrow": "Planillas DwC-SMA",
+        "description": (
+            "Revisa planillas de biodiversidad solicitadas por la SMA bajo el "
+            "formato Darwin Core adaptado para Chile (DwC-SMA)."
+        ),
+        "features": (
+            "Detecta campos incompletos, formatos incompatibles e inconsistencias.",
+            "Ayuda a revisar datos de flora, vegetación, hongos y líquenes.",
+            "Entrega hallazgos explicables antes de preparar el reporte.",
+        ),
+        "note": (
+            "Apoya el control de calidad; no certifica cumplimiento ni presenta "
+            "información ante la SMA."
+        ),
+        "reference_url": (
+            "https://portal.sma.gob.cl/index.php/portal-regulados/"
+            "instructivos-y-guias/reporte-datos-biodiversidad/"
+        ),
+        "spotlight": True,
+    },
+    {
+        "internal_name": "BioCore Intelligence",
+        "display_name": "BioCore Intelligence",
+        "eyebrow": "Vigilancia multisatelital",
+        "description": (
+            "Monitorea áreas de proyecto con imágenes de múltiples satélites y "
+            "convierte series temporales en alertas e informes comprensibles."
+        ),
+        "features": (
+            "Históricos descargables de NDVI, EVI y cobertura vegetal.",
+            "Gráficos de cambio, temperatura superficial e indicadores de humedad.",
+            "Reportes automáticos y avisos móviles para revisar cambios a tiempo.",
+        ),
+        "note": (
+            "La frecuencia y disponibilidad dependen de las fuentes y condiciones "
+            "de observación. Las alertas no predicen sanciones ni reemplazan una "
+            "evaluación profesional."
+        ),
+        "spotlight": True,
+    },
+    {
+        "internal_name": "BioCore Reports",
+        "display_name": "BioCore Reports",
+        "eyebrow": "Informes con memoria",
+        "description": (
+            "Reúne informes, mapas y versiones históricas conectadas con la "
+            "evidencia que les dio origen."
+        ),
+        "features": (
+            "Descarga de informes y productos históricos.",
+            "Versiones y trazabilidad visibles para el equipo y el cliente.",
+        ),
+        "note": "Los productos disponibles dependen del proyecto y sus fuentes.",
+        "spotlight": False,
+    },
+    {
+        "internal_name": "BioCore Academy",
+        "display_name": "BioCore Academy",
+        "eyebrow": "Capacidad para el equipo",
+        "description": (
+            "Formación aplicada para interpretar datos ecológicos, usar las "
+            "herramientas BioCore y trabajar con criterios consistentes."
+        ),
+        "features": (
+            "Aprendizaje científico-tecnológico orientado al trabajo real.",
+            "Recursos para profesionales, empresas y equipos de terreno.",
+        ),
+        "note": "La formación acompaña la tecnología y reduce dependencia operativa.",
+        "spotlight": False,
+    },
 )
 
 
@@ -120,11 +192,13 @@ def _module_tools(
         "BioCore Academy": BRAND.academy_logo,
     }
     tools = []
-    for name, description in ECOSYSTEM_MODULES:
-        url, action_label, external = destinations[name]
-        logo_uri = asset_data_uri(module_logos[name])
+    for module in ECOSYSTEM_MODULES:
+        internal_name = str(module["internal_name"])
+        display_name = str(module["display_name"])
+        url, action_label, external = destinations[internal_name]
+        logo_uri = asset_data_uri(module_logos[internal_name])
         logo = (
-            f'<img src="{escape(logo_uri)}" alt="Logo {escape(name)}">'
+            f'<img src="{escape(logo_uri)}" alt="Logo {escape(display_name)}">'
             if logo_uri
             else ""
         )
@@ -133,14 +207,37 @@ def _module_tools(
             if external
             else ""
         )
+        features = "".join(
+            f"<li>{escape(str(feature))}</li>"
+            for feature in module["features"]
+        )
+        reference_url = module.get("reference_url")
+        reference = (
+            f'<a class="bc-tool-reference" href="{escape(str(reference_url))}" '
+            'target="_blank" rel="noopener noreferrer">'
+            "Conocer el formato oficial DwC-SMA ↗</a>"
+            if reference_url
+            else ""
+        )
+        card_class = (
+            "bc-tool bc-tool-spotlight"
+            if module["spotlight"]
+            else "bc-tool"
+        )
         tools.append(
             f"""
-            <article class="bc-tool">
+            <article class="{card_class}">
                 {logo}
                 <div>
-                    <h3>{escape(name)}</h3>
-                    <p>{escape(description)}</p>
-                    <a href="{escape(url)}"{target}>{escape(action_label)} →</a>
+                    <span class="bc-tool-eyebrow">{escape(str(module['eyebrow']))}</span>
+                    <h3>{escape(display_name)}</h3>
+                    <p>{escape(str(module['description']))}</p>
+                    <ul class="bc-tool-features">{features}</ul>
+                    <p class="bc-tool-note">{escape(str(module['note']))}</p>
+                    <div class="bc-tool-actions">
+                        <a class="bc-tool-open" href="{escape(url)}"{target}>{escape(action_label)} →</a>
+                        {reference}
+                    </div>
                 </div>
             </article>
             """
@@ -344,11 +441,12 @@ def render_public_landing() -> None:
             <section class="bc-section bc-section-soft" id="herramientas">
                 <div class="bc-container">
                     <header class="bc-section-head bc-section-head-left">
-                        <span class="bc-eyebrow">Herramientas que acompañan el trabajo</span>
-                        <h2>Los módulos aparecen después del objetivo del proyecto</h2>
+                        <span class="bc-eyebrow">Lo que diferencia a BioCore</span>
+                        <h2>Herramientas propias para problemas ecológicos concretos</h2>
                         <p>
-                            Cada herramienta resuelve una tarea específica. No necesitas elegir
-                            un módulo antes de saber qué quieres lograr.
+                            Desde registrar un hongo en terreno y revisar una planilla DwC-SMA
+                            hasta vigilar cambios con múltiples satélites: BioCore reúne capacidades
+                            especializadas que normalmente quedan separadas en distintas soluciones.
                         </p>
                     </header>
                     <div class="bc-tools">{_module_tools(module_destinations)}</div>

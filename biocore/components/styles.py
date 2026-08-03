@@ -1121,6 +1121,125 @@ PRIVATE_STYLES = """
     font-size: .72rem;
 }
 
+.bc-metadata-strip-compact {
+    grid-template-columns: 1.35fr repeat(3, 1fr);
+}
+
+.bc-guidance-card {
+    margin: 18px 0 16px;
+    padding: 26px 28px;
+    border: 1px solid rgba(47, 125, 74, .25);
+    border-left: 5px solid var(--bc-private-green);
+    border-radius: 18px;
+    background: linear-gradient(145deg, #f8fbf8, #edf6ef);
+}
+
+.bc-guidance-card small {
+    color: var(--bc-private-green);
+    font-size: .72rem;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+[data-testid="stAppViewContainer"] .bc-guidance-card h2 {
+    margin: 8px 0 8px;
+    color: #173a2b !important;
+    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+    letter-spacing: -.025em;
+}
+
+.bc-guidance-card p {
+    max-width: 840px;
+    margin: 0;
+    color: #5e6e65;
+    line-height: 1.6;
+}
+
+.bc-project-overview {
+    margin-top: 14px;
+    padding: 22px;
+    border: 1px solid #dfe7e1;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(18, 55, 42, .045);
+}
+
+.bc-project-overview-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.bc-project-overview-head small {
+    color: #6d7c74;
+    font-size: .72rem;
+    font-weight: 750;
+}
+
+.bc-project-overview-head h3 {
+    margin: 6px 0 3px;
+    color: #173a2b !important;
+    font-size: 1.15rem;
+}
+
+.bc-project-overview-head p {
+    margin: 0;
+    color: #68776f;
+    font-size: .82rem;
+}
+
+.bc-project-overview-head > strong {
+    color: var(--bc-private-green);
+    font-size: 1.2rem;
+}
+
+.bc-project-progress {
+    height: 8px;
+    overflow: hidden;
+    margin: 17px 0;
+    border-radius: 999px;
+    background: #e7eee9;
+}
+
+.bc-project-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--bc-private-green), #65a868);
+}
+
+.bc-project-overview dl {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 0;
+}
+
+.bc-project-overview dl div {
+    min-width: 0;
+}
+
+.bc-project-overview dt {
+    color: #7b8881;
+    font-size: .68rem;
+}
+
+.bc-project-overview dd {
+    overflow: hidden;
+    margin: 4px 0 0;
+    color: #30483c;
+    font-size: .78rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bc-stat-grid-compact {
+    grid-template-columns: repeat(3, 1fr);
+}
+
 .bc-private-card,
 .bc-module-lock {
     padding: 24px;
@@ -1300,6 +1419,7 @@ PRIVATE_STYLES = """
     .bc-stat-grid { grid-template-columns: repeat(2, 1fr); }
     .bc-metadata-strip { grid-template-columns: repeat(2, 1fr); }
     .bc-dashboard-modules { grid-template-columns: repeat(2, 1fr); }
+    .bc-project-overview dl { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 560px) {
@@ -1307,6 +1427,8 @@ PRIVATE_STYLES = """
     .bc-stat-grid { grid-template-columns: 1fr; }
     .bc-metadata-strip,
     .bc-dashboard-modules { grid-template-columns: 1fr; }
+    .bc-stat-grid-compact,
+    .bc-project-overview dl { grid-template-columns: 1fr; }
     .bc-dashboard-module p { min-height: auto; }
 }
 </style>

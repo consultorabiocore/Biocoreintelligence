@@ -1,4 +1,3 @@
-from datetime import date
 from html import escape
 from textwrap import dedent
 
@@ -7,7 +6,7 @@ import streamlit as st
 from biocore.components.module_access import MODULE_DESCRIPTIONS, MODULE_LABELS
 from biocore.components.page_header import render_page_header
 from biocore.config.brand import BRAND, asset_data_uri
-from biocore.domain.dashboard import DashboardSnapshot
+from biocore.domain.dashboard import DashboardSnapshot, ProjectSummary
 from biocore.domain.subscriptions import (
     PLAN_LABELS,
     PLAN_MODULES,
@@ -43,6 +42,9 @@ DASHBOARD_MODULE_PATHS = {
     ModuleCode.REPORTS: "/biocore_reports",
     ModuleCode.ACADEMY: "/academy",
 }
+
+PROJECT_VIEW_KEY = "biocore_projects_view"
+SELECTED_PROJECT_KEY = "biocore_selected_project_id"
 
 
 def _html(value: str) -> str:
@@ -148,17 +150,76 @@ def _module_cards(
     return "".join(cards)
 
 
+def _project_card(project: ProjectSummary) -> str:
+    progress = max(0, min(project.progress_percent, 100))
+    return _html(
+        dedent(
+            f"""
+        <article class="bc-project-overview">
+            <div class="bc-project-overview-head">
+                <div>
+                    <small>{escape(project.code)} · {escape(project.status)}</small>
+                    <h3>{escape(project.name)}</h3>
+                    <p>{escape(project.client)}</p>
+                </div>
+                <strong>{progress}%</strong>
+            </div>
+            <div class="bc-project-progress" aria-label="Avance {progress}%">
+                <span style="width: {progress}%"></span>
+            </div>
+            <dl>
+                <div><dt>Etapa actual</dt><dd>{escape(project.current_stage)}</dd></div>
+                <div><dt>Responsable</dt><dd>{escape(project.responsible_name)}</dd></div>
+                <div><dt>Siguiente actividad</dt><dd>{escape(project.next_activity)}</dd></div>
+                <div><dt>Actualizado</dt><dd>{project.updated_at.strftime('%d/%m/%Y')}</dd></div>
+            </dl>
+        </article>
+            """
+        )
+    )
+
+
+def _recommended_next_step(dashboard: DashboardSnapshot) -> tuple[str, str]:
+    if not dashboard.projects_loaded:
+        return (
+            "Revisa la conexión de tus proyectos",
+            "No pudimos confirmar el listado ahora. Tu información no se modificó; actualiza la página para intentarlo nuevamente.",
+        )
+    if not dashboard.recent_projects:
+        return (
+            "Crea tu primer proyecto ecológico",
+            "Después podrás definir el área de estudio, organizar la campaña de terreno y reunir la evidencia en orden.",
+        )
+    project = dashboard.recent_projects[0]
+    return (
+        f"Continúa con {project.name}",
+        f"Etapa actual: {project.current_stage}. Siguiente actividad: {project.next_activity}.",
+    )
+
+
+def _open_project(project_id: str) -> None:
+    st.session_state[PROJECT_VIEW_KEY] = "detail"
+    st.session_state[SELECTED_PROJECT_KEY] = project_id
+    st.switch_page("platform_pages/projects.py")
+
+
+def _create_project() -> None:
+    st.session_state[PROJECT_VIEW_KEY] = "create"
+    st.session_state.pop(SELECTED_PROJECT_KEY, None)
+    st.switch_page("platform_pages/projects.py")
+
+
 def render_private_dashboard(
     context: UserContext,
     subscription: SubscriptionSnapshot,
     dashboard: DashboardSnapshot,
 ) -> None:
     render_page_header(
-        "Panel de la organización",
-        "Bienvenida a BioCore",
+        "Inicio",
+        "Tus proyectos ecológicos",
         (
-            f"{subscription.organization_name} · Consulta el estado de la operación "
-            "ambiental y las actividades que requieren atención."
+            f"{subscription.organization_name} · Gestiona proyectos de flora, "
+            "vegetación, hongos y líquenes desde un solo lugar."
         ),
     )
 
@@ -177,20 +238,11 @@ def render_private_dashboard(
         _html(
             dedent(
                 f"""
-        <div class="bc-metadata-strip">
+        <div class="bc-metadata-strip bc-metadata-strip-compact">
             <div><small>Organización</small><strong>{escape(subscription.organization_name)}</strong></div>
             <div><small>Plan</small><strong>{escape(plan_label)}</strong></div>
-            <div><small>Estado</small><strong>{escape(plan_state)}</strong></div>
+            <div><small>Estado del acceso</small><strong>{escape(plan_state)}</strong></div>
             <div><small>Renovación</small><strong>{escape(renewal)}</strong></div>
-            <div><small>Módulos habilitados</small><strong>{len(subscription.enabled_modules)}</strong></div>
-        </div>
-        <div class="bc-stat-grid">
-            {_stat_card("Proyectos activos", dashboard.active_projects)}
-            {_stat_card("Campañas realizadas", dashboard.completed_campaigns)}
-            {_stat_card("Campañas pendientes", dashboard.upcoming_campaigns)}
-            {_stat_card("Informes disponibles", dashboard.new_reports)}
-            {_stat_card("Registros validados", dashboard.validated_records)}
-            {_stat_card("Alertas activas", dashboard.alerts)}
         </div>
                 """
             )
@@ -198,94 +250,94 @@ def render_private_dashboard(
         unsafe_allow_html=True,
     )
 
-    quick, plan = st.columns([1.2, 0.8], gap="large")
-    with quick:
-        st.subheader("Accesos rápidos")
-        action_columns = st.columns(2)
-        with action_columns[0]:
+    next_title, next_copy = _recommended_next_step(dashboard)
+    st.markdown(
+        _html(
+            dedent(
+                f"""
+        <section class="bc-guidance-card" aria-label="Siguiente acción recomendada">
+            <small>Siguiente acción recomendada</small>
+            <h2>{escape(next_title)}</h2>
+            <p>{escape(next_copy)}</p>
+        </section>
+                """
+            )
+        ),
+        unsafe_allow_html=True,
+    )
+
+    primary_actions = st.columns(3, gap="medium")
+    with primary_actions[0]:
+        if context.has_permission(Permission.PROJECTS_WRITE):
+            st.button(
+                "Crear proyecto",
+                type="primary",
+                use_container_width=True,
+                on_click=_create_project,
+            )
+        else:
             st.page_link(
                 "platform_pages/projects.py",
                 label="Ver proyectos",
                 icon=":material/folder_open:",
                 use_container_width=True,
             )
-            campaign_label = (
-                "Crear campaña"
-                if context.has_permission(Permission.CAMPAIGNS_WRITE)
-                else "Ver campañas"
-            )
-            st.page_link(
-                "platform_pages/campaigns.py",
-                label=campaign_label,
-                icon=":material/calendar_month:",
-                use_container_width=True,
-            )
-            st.page_link(
-                "platform_pages/reports.py",
-                label="Abrir informes",
-                icon=":material/description:",
-                use_container_width=True,
-            )
-        with action_columns[1]:
-            st.page_link(
-                "platform_pages/maps.py",
-                label="Ver mapa",
-                icon=":material/map:",
-                use_container_width=True,
-            )
-            st.page_link(
-                "platform_pages/campaigns.py",
-                label="Comparar campañas",
-                icon=":material/compare_arrows:",
-                use_container_width=True,
-            )
-            st.page_link(
-                "platform_pages/intelligence.py",
-                label="Abrir BioCore Intelligence",
-                icon=":material/monitoring:",
-                use_container_width=True,
-            )
+    with primary_actions[1]:
+        st.page_link(
+            "platform_pages/projects.py",
+            label="Mis proyectos",
+            icon=":material/folder_open:",
+            use_container_width=True,
+        )
+    with primary_actions[2]:
+        st.page_link(
+            "platform_pages/ecological_diagnostic.py",
+            label="Diagnóstico ecológico",
+            icon=":material/checklist:",
+            use_container_width=True,
+        )
 
-    with plan:
-        st.subheader("Suscripción")
-        if not subscription.subscription:
-            st.info("La suscripción principal aún no está configurada.")
-            st.link_button(
-                "Solicitar activación de BioCore",
-                BRAND.demo_request_url("Activación de suscripción BioCore"),
-                type="primary",
+    st.subheader("Mis proyectos")
+    if not dashboard.projects_loaded:
+        st.warning("No pudimos cargar tus proyectos en este momento.")
+        st.info(
+            "Tu información permanece guardada. Actualiza la página; si continúa, "
+            "cierra sesión e ingresa nuevamente."
+        )
+    elif dashboard.recent_projects:
+        for project in dashboard.recent_projects:
+            st.markdown(_project_card(project), unsafe_allow_html=True)
+            st.button(
+                f"Abrir {project.code}",
+                key=f"open_project_{project.id}",
                 use_container_width=True,
+                on_click=_open_project,
+                args=(project.id,),
             )
-        else:
-            item = subscription.subscription
-            st.markdown(
-                _html(
-                    dedent(
-                        f"""
-                <section class="bc-private-card">
-                    <h3>{escape(PLAN_LABELS[item.plan])}</h3>
-                    <p>Estado: <strong>{escape(STATUS_LABELS[item.status])}</strong></p>
-                    <p>Renovación: <strong>{escape(renewal)}</strong></p>
-                </section>
-                        """
-                    )
-                ),
-                unsafe_allow_html=True,
+    else:
+        st.markdown(
+            _empty_state(
+                "Aún no hay proyectos. Crea el primero para organizar su objetivo, "
+                "área de estudio, campañas y próximos pasos."
+            ),
+            unsafe_allow_html=True,
+        )
+
+    st.subheader("Estado del trabajo")
+    st.markdown(
+        _html(
+            dedent(
+                f"""
+        <div class="bc-stat-grid bc-stat-grid-compact">
+            {_stat_card("Proyectos activos", dashboard.active_projects)}
+            {_stat_card("Próximas campañas", dashboard.upcoming_campaigns)}
+            {_stat_card("Informes disponibles", dashboard.new_reports)}
+        </div>
+                """
             )
-            if item.storage_limit_gb > 0:
-                usage_ratio = min(
-                    subscription.usage.storage_used_gb / item.storage_limit_gb,
-                    1.0,
-                )
-                st.progress(
-                    usage_ratio,
-                    text=(
-                        f"Almacenamiento: {subscription.usage.storage_used_gb:.1f} "
-                        f"de {item.storage_limit_gb:.0f} GB"
-                    ),
-                )
-            if item.renews_on and item.renews_on < date.today():
-                st.warning("La fecha de renovación requiere revisión.")
+        ),
+        unsafe_allow_html=True,
+    )
 
     st.subheader("Actividad reciente")
     if dashboard.activities:
@@ -303,49 +355,11 @@ def render_private_dashboard(
             unsafe_allow_html=True,
         )
 
-    project_column, campaign_column, report_column = st.columns(3, gap="medium")
-    with project_column:
-        st.subheader("Proyectos recientes")
-        if dashboard.recent_projects:
-            for project in dashboard.recent_projects:
-                st.markdown(
-                    f"**{project.name}**  \n{project.client} · "
-                    f"Última campaña: {project.last_campaign} · {project.status}"
-                )
-        else:
-            st.markdown(
-                _empty_state("Aún no hay proyectos conectados para esta organización."),
-                unsafe_allow_html=True,
-            )
-    with campaign_column:
-        st.subheader("Próximas campañas")
-        if dashboard.upcoming_campaign_items:
-            for campaign in dashboard.upcoming_campaign_items:
-                st.markdown(
-                    f"**{campaign.station}**  \n{campaign.project_name} · "
-                    f"{campaign.scheduled_for.strftime('%d/%m/%Y')} · "
-                    f"{campaign.responsible} · {campaign.status}"
-                )
-        else:
-            st.markdown(
-                _empty_state("No hay campañas programadas en la fuente conectada."),
-                unsafe_allow_html=True,
-            )
-    with report_column:
-        st.subheader("Informes recientes")
-        if dashboard.recent_reports:
-            for report in dashboard.recent_reports:
-                st.markdown(
-                    f"**{report.name}**  \nVersión {report.version} · "
-                    f"{report.published_at.strftime('%d/%m/%Y')} · {report.status}"
-                )
-        else:
-            st.markdown(
-                _empty_state("Los informes publicados aparecerán en esta sección."),
-                unsafe_allow_html=True,
-            )
-
-    st.subheader("Módulos BioCore")
+    st.subheader("Herramientas especializadas")
+    st.caption(
+        "Ábrelas cuando una tarea del proyecto las necesite. Su estado depende "
+        "de los permisos y del plan de tu organización."
+    )
     st.markdown(
         _html(
             f'<div class="bc-dashboard-modules">{_module_cards(context, subscription)}</div>'

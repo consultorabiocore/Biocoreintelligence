@@ -41,13 +41,31 @@ def test_private_streamlit_subheaders_keep_contrast() -> None:
 
 
 def test_light_cards_inside_dark_sections_keep_readable_text() -> None:
+    styles = Path("biocore/components/public_styles.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".bc-section-dark h2," in styles
+    assert ".bc-section-dark p" in styles
+    assert "color: #fff;" in styles
+    assert ".bc-service-actions small" in styles
+
+
+def test_public_landing_supports_keyboard_and_mobile_navigation() -> None:
+    styles = Path("biocore/components/public_styles.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".bc-public a:focus-visible" in styles
+    assert "outline: 3px solid" in styles
+    assert "@media (max-width: 620px)" in styles
+    assert ".bc-project-flow" in styles
+
+
+def test_private_home_has_guidance_and_project_progress_styles() -> None:
     styles = Path("biocore/components/styles.py").read_text(encoding="utf-8")
-    assert ".bc-section-dark .bc-panel {" in styles
-    assert ".bc-section-dark .bc-panel h2," in styles
-    assert ".bc-section-dark .bc-panel p," in styles
-    assert "color: #46594f !important;" in styles
-    assert "-webkit-text-fill-color: #46594f !important;" in styles
-    assert "color: #52665d !important;" in styles
+    private_styles = styles.split('PRIVATE_STYLES = """', maxsplit=1)[1]
+    assert ".bc-guidance-card" in private_styles
+    assert ".bc-project-overview" in private_styles
+    assert ".bc-project-progress" in private_styles
 
 
 def test_public_diagnostic_owns_a_light_background() -> None:

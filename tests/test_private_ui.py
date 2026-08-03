@@ -60,6 +60,17 @@ def test_public_landing_supports_keyboard_and_mobile_navigation() -> None:
     assert ".bc-project-flow" in styles
 
 
+def test_specialized_product_cards_remain_readable_and_responsive() -> None:
+    styles = Path("biocore/components/public_styles.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".bc-tool-spotlight" in styles
+    assert ".bc-tool-features" in styles
+    assert ".bc-tool-note" in styles
+    assert ".bc-tool-actions" in styles
+    assert ".bc-tool-reference" in styles
+
+
 def test_private_home_has_guidance_and_project_progress_styles() -> None:
     styles = Path("biocore/components/styles.py").read_text(encoding="utf-8")
     private_styles = styles.split('PRIVATE_STYLES = """', maxsplit=1)[1]

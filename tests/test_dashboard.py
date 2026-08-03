@@ -60,7 +60,7 @@ def test_public_and_private_homepages_orient_people_before_modules() -> None:
     )
 
     assert "Siete etapas que siguen la forma real de trabajar" in landing
-    assert "Los módulos aparecen después del objetivo del proyecto" in landing
+    assert "Herramientas propias para problemas ecológicos concretos" in landing
     assert "Dashboard demostrativo" not in landing
     assert "Tus proyectos ecológicos" in dashboard
     assert "Siguiente acción recomendada" in dashboard
@@ -116,6 +116,30 @@ def test_public_landing_uses_compact_logo_and_real_module_destinations() -> None
     assert 'diagnostic_url = "?diagnostico=publico"' in landing
     assert "No realiza cobros" in landing
     assert "ni activa una suscripción" in landing
+
+
+def test_public_landing_explains_each_specialized_product_value() -> None:
+    landing = Path("biocore/components/public_landing.py").read_text(
+        encoding="utf-8"
+    )
+
+    for value_statement in (
+        "BioCore MycoField",
+        "Hongos en terreno",
+        "planillas de biodiversidad solicitadas por la SMA",
+        "DwC-SMA",
+        "no certifica cumplimiento",
+        "Vigilancia multisatelital",
+        "NDVI, EVI y cobertura vegetal",
+        "temperatura superficial e indicadores de humedad",
+        "Reportes automáticos y avisos móviles",
+        "no predicen sanciones",
+        "Informes con memoria",
+        "Capacidad para el equipo",
+    ):
+        assert value_statement in landing
+
+    assert "evitar multas" not in landing.lower()
 
 
 def test_private_module_cards_open_the_protected_module_pages() -> None:

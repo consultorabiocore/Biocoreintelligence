@@ -1,6 +1,6 @@
 # BioCore platform client
 
-Cliente de servidor compartido por BioCore Field, DarwinCheck e Intelligence.
+Cliente de servidor compartido por BioCore MycoField, DarwinCheck e Intelligence.
 
 - Canjea códigos de lanzamiento de un solo uso.
 - Conserva el token únicamente en la sesión del servidor del módulo.

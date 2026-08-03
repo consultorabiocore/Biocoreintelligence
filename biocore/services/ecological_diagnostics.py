@@ -51,7 +51,7 @@ LEVEL_LABELS = {
 }
 
 MODULE_RECOMMENDATION_TITLES = {
-    "field": "Planificar una revisión o campaña con BioCore Field",
+    "field": "Planificar una revisión o campaña con BioCore MycoField",
     "darwincheck": "Organizar y validar registros con DarwinCheck",
     "intelligence": "Preparar análisis geoespacial con BioCore Intelligence",
     "reports": "Ordenar productos y versiones con BioCore Reports",

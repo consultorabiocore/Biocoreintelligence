@@ -307,8 +307,8 @@ def _render_results(
     )
     product_columns = st.columns(2)
     product_columns[0].link_button(
-        "Conocer BioCore Field",
-        BRAND.demo_request_url("Información sobre BioCore Field"),
+        "Conocer BioCore MycoField",
+        BRAND.demo_request_url("Información sobre BioCore MycoField"),
         use_container_width=True,
     )
     product_columns[1].link_button(

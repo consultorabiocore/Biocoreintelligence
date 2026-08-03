@@ -53,7 +53,7 @@ SERVICE_OUTCOMES = (
 
 ECOSYSTEM_MODULES = (
     {
-        "internal_name": "BioCore Field",
+        "internal_name": "BioCore MycoField",
         "display_name": "BioCore MycoField",
         "eyebrow": "Hongos en terreno",
         "description": (
@@ -185,7 +185,7 @@ def _module_tools(
     destinations: dict[str, tuple[str, str, bool]],
 ) -> str:
     module_logos = {
-        "BioCore Field": BRAND.field_logo,
+        "BioCore MycoField": BRAND.field_logo,
         "DarwinCheck": BRAND.darwincheck_logo,
         "BioCore Intelligence": BRAND.intelligence_logo,
         "BioCore Reports": BRAND.reports_logo,
@@ -260,7 +260,7 @@ def render_public_landing() -> None:
     )
     applications = external_applications(settings)
     module_destinations = {
-        "BioCore Field": (
+        "BioCore MycoField": (
             applications["field"].url or login_url,
             "Abrir aplicación" if applications["field"].url else "Iniciar sesión",
             bool(applications["field"].url),
@@ -322,41 +322,44 @@ def render_public_landing() -> None:
             <section class="bc-hero" id="inicio">
                 <div class="bc-container bc-hero-grid">
                     <div class="bc-hero-copy-block">
-                        <span class="bc-eyebrow">Plataforma para proyectos ecológicos</span>
-                        <h1>Gestiona proyectos de flora, hongos y líquenes en un solo lugar</h1>
+                        <span class="bc-eyebrow">Ecosistema tecnológico propio para proyectos ecológicos</span>
+                        <h1>Conecta el terreno, la calidad de datos y la vigilancia satelital</h1>
                         <p class="bc-hero-copy">
-                            BioCore combina acompañamiento profesional especializado y una
-                            plataforma digital para organizar el trabajo de terreno, la
-                            validación, el análisis y los informes.
+                            BioCore reúne aplicaciones propias para registrar hongos en terreno,
+                            revisar planillas de biodiversidad bajo el estándar DwC-SMA y vigilar
+                            proyectos con imágenes multisatelitales. Todo se conecta con análisis,
+                            trazabilidad e informes en una experiencia moderna creada para
+                            proyectos de flora, hongos y líquenes.
                         </p>
                         <p class="bc-hero-specialty">
-                            Especialistas en flora vascular, vegetación y cobertura vegetal,
-                            hongos y líquenes.
+                            No son herramientas aisladas: cada aplicación acompaña una etapa real
+                            del proyecto y muestra qué ocurrió, qué falta y cuál es el próximo paso.
                         </p>
                         <div class="bc-hero-actions">
                             <a class="bc-button bc-button-primary" href="{escape(signup_url)}">
                                 Crear proyecto
                             </a>
-                            <a class="bc-button bc-button-secondary" href="#servicios">
-                                Ver servicios
+                            <a class="bc-button bc-button-secondary" href="#herramientas">
+                                Descubrir nuestras aplicaciones
                             </a>
                         </div>
                         <p class="bc-action-note">
                             Para crear un proyecto se solicitará iniciar sesión o crear una cuenta.
                         </p>
                     </div>
-                    <aside class="bc-hero-summary" aria-label="Qué reúne BioCore">
-                        <span class="bc-summary-label">Consultoría ecológica + plataforma digital</span>
-                        <h2>Del objetivo del proyecto al informe final</h2>
+                    <aside class="bc-hero-summary" aria-label="Diferencial tecnológico de BioCore">
+                        <span class="bc-summary-label">El diferencial BioCore</span>
+                        <h2>Aplicaciones propias. Un proyecto conectado.</h2>
                         <ul>
-                            <li>Un espacio privado por organización.</li>
-                            <li>Datos, fotografías y cartografía conectados.</li>
-                            <li>Calidad y trazabilidad visibles.</li>
-                            <li>Resultados explicados con sus límites.</li>
+                            <li>MycoField: registros fúngicos georreferenciados desde terreno.</li>
+                            <li>DarwinCheck: revisión de planillas de biodiversidad DwC-SMA.</li>
+                            <li>Intelligence: vigilancia multisatelital e índices ecológicos históricos.</li>
+                            <li>Reports y Academy: informes y formación conectados con el proyecto.</li>
                         </ul>
                         <p>
-                            La plataforma organiza la información. Las conclusiones profesionales
-                            requieren revisión de especialistas cuando corresponda.
+                            Un ecosistema especializado desarrollado por BioCore para reunir
+                            capacidades que las plataformas ambientales generalistas suelen
+                            mantener separadas.
                         </p>
                     </aside>
                 </div>

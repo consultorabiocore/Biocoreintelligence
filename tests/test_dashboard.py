@@ -43,8 +43,8 @@ def test_public_landing_states_scope_without_a_fake_dashboard() -> None:
     landing = Path("biocore/components/public_landing.py").read_text(
         encoding="utf-8"
     )
-    assert "Gestiona proyectos de flora, hongos y líquenes" in landing
-    assert "Consultoría ecológica + plataforma digital" in landing
+    assert "Conecta el terreno, la calidad de datos y la vigilancia satelital" in landing
+    assert "Aplicaciones propias. Un proyecto conectado." in landing
     assert "Para quién está diseñado" in landing
     assert "Realizar diagnóstico ecológico" in landing
     assert "Datos demostrativos" not in landing
@@ -140,6 +140,25 @@ def test_public_landing_explains_each_specialized_product_value() -> None:
         assert value_statement in landing
 
     assert "evitar multas" not in landing.lower()
+
+
+def test_public_hero_leads_with_concrete_biocore_differentiators() -> None:
+    landing = Path("biocore/components/public_landing.py").read_text(
+        encoding="utf-8"
+    )
+
+    for hero_statement in (
+        "Ecosistema tecnológico propio para proyectos ecológicos",
+        "aplicaciones propias para registrar hongos en terreno",
+        "estándar DwC-SMA",
+        "imágenes multisatelitales",
+        "Descubrir nuestras aplicaciones",
+        "Aplicaciones propias. Un proyecto conectado.",
+        "plataformas ambientales generalistas",
+    ):
+        assert hero_statement in landing
+
+    assert "nadie más" not in landing.lower()
 
 
 def test_private_module_cards_open_the_protected_module_pages() -> None:

@@ -15,7 +15,7 @@ from biocore.services.subscriptions import user_can_access_module
 
 MODULE_LABELS: dict[ModuleCode, str] = {
     ModuleCode.PLATFORM_CORE: "Plataforma BioCore",
-    ModuleCode.FIELD: "BioCore Field",
+    ModuleCode.FIELD: "BioCore MycoField",
     ModuleCode.DARWINCHECK: "DarwinCheck",
     ModuleCode.INTELLIGENCE: "BioCore Intelligence",
     ModuleCode.SATELLITE: "Monitoreo satelital",
@@ -30,7 +30,7 @@ MODULE_LABELS: dict[ModuleCode, str] = {
 
 MODULE_DESCRIPTIONS: dict[ModuleCode, str] = {
     ModuleCode.PLATFORM_CORE: "Gestión central de proyectos, campañas e historial ambiental.",
-    ModuleCode.FIELD: "Captura y organización de datos provenientes de terreno.",
+    ModuleCode.FIELD: "Captura y organización de registros micológicos de terreno.",
     ModuleCode.DARWINCHECK: "Validación, consistencia y gobierno de calidad de datos.",
     ModuleCode.INTELLIGENCE: "Analítica ambiental y capacidades científicas especializadas.",
     ModuleCode.SATELLITE: "Monitoreo y comparación temporal con información satelital.",

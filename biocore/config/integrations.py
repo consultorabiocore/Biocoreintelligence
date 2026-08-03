@@ -54,12 +54,12 @@ def external_applications(
     return {
         "field": ExternalApplication(
             code="field",
-            label="BioCore Field",
+            label="BioCore MycoField",
             module_code=ModuleCode.FIELD,
             url=_configured_url(values, "field_url", settings.field_url),
             description=(
-                "Captura y organización de observaciones, fotografías y datos "
-                "georreferenciados de terreno."
+                "Captura y organización de observaciones de hongos, fotografías "
+                "y datos georreferenciados de terreno."
             ),
             secret_key="field_url",
         ),

@@ -118,6 +118,23 @@ def test_public_landing_uses_compact_logo_and_real_module_destinations() -> None
     assert "ni activa una suscripción" in landing
 
 
+def test_public_darwincheck_entry_uses_the_native_protected_page() -> None:
+    landing = Path("biocore/components/public_landing.py").read_text(
+        encoding="utf-8"
+    )
+    darwincheck_destination = landing.split('"DarwinCheck": (', 1)[1].split(
+        '"BioCore Intelligence":', 1
+    )[0]
+    entrypoint = Path("biocore_app.py").read_text(encoding="utf-8")
+
+    assert "darwincheck_login_url" in darwincheck_destination
+    assert 'applications["darwincheck"]' not in darwincheck_destination
+    assert "Abrir en BioCore" in darwincheck_destination
+    assert '"darwincheck": "DarwinCheck"' in entrypoint
+    assert 'st.session_state["biocore_post_login_page"]' in entrypoint
+    assert "requested_default_page in available_page_titles" in entrypoint
+
+
 def test_public_landing_explains_each_specialized_product_value() -> None:
     landing = Path("biocore/components/public_landing.py").read_text(
         encoding="utf-8"

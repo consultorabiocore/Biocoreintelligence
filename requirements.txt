@@ -5,6 +5,8 @@ plotly
 matplotlib
 pandas
 numpy
+openpyxl>=3.1.5
+xlrd>=2.0.1
 requests
 supabase
 st-supabase-connection

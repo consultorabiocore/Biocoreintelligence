@@ -78,12 +78,14 @@ continuidad en una suscripción principal.
 4. Ejecutar la migración pública `0004_public_ecological_diagnostic_leads.sql`.
 5. Ejecutar las migraciones de autenticación central `0005` a `0007`.
 6. Ejecutar `database/migrations/0008_project_management.sql`.
-7. Registrar la suscripción de cada organización desde un contexto
+7. Ejecutar `database/migrations/0009_project_experience.sql`.
+8. Ejecutar `database/migrations/0010_native_darwincheck.sql`.
+9. Registrar la suscripción de cada organización desde un contexto
    administrativo. Para staging puede utilizarse
    `database/seeds/001_biocore_staging_subscription.sql`.
-8. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
+10. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
    OIDC únicamente en los secretos del despliegue.
-9. Desplegar `biocore_app.py`.
+11. Desplegar `biocore_app.py`.
 
 La clave `service_role` nunca debe enviarse al navegador, guardarse en Git ni
 mostrarse en mensajes de error.
@@ -121,3 +123,8 @@ del módulo se describen en
 
 El diseño, alcance, versionado y decisiones del prototipo se describen en
 [`ecological_diagnostic.md`](ecological_diagnostic.md).
+
+## DarwinCheck nativo
+
+La integración de DarwinCheck con la sesión, los proyectos y la trazabilidad
+central se describe en [`native_darwincheck.md`](native_darwincheck.md).

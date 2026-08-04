@@ -1,5 +1,6 @@
 """Public website and authenticated BioCore platform entrypoint."""
 
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -25,12 +26,18 @@ from biocore.repositories.ecological_diagnostics import (
 from biocore.repositories.projects import SupabaseProjectRepository
 from biocore.repositories.subscriptions import SupabaseSubscriptionRepository
 from biocore.repositories.central_auth import SupabaseCentralAuthRepository
+from biocore.repositories.darwincheck import SupabaseDarwinCheckRunRepository
 from biocore.auth.session_service import SessionService
+from biocore.modules.darwincheck.analyzer import (
+    DarwinCheckAnalyzer,
+    TaxonomyReference,
+)
 from biocore.platform_session import clear_platform_session, store_platform_session
 from biocore.security.identity import AuthenticatedIdentity
 from biocore.services.subscriptions import SubscriptionService
 from biocore.services.ecological_diagnostics import EcologicalDiagnosticService
 from biocore.services.projects import ProjectService
+from biocore.services.darwincheck import DarwinCheckService
 from biocore.services.public_diagnostic_leads import save_public_lead
 
 
@@ -104,6 +111,25 @@ def ecological_diagnostic_service() -> EcologicalDiagnosticService:
 def project_service() -> ProjectService:
     repository = SupabaseProjectRepository(supabase_server_client())
     return ProjectService(repository)
+
+
+@st.cache_resource
+def darwincheck_service() -> DarwinCheckService:
+    client = supabase_server_client()
+    reference_path = (
+        Path(__file__).parent
+        / "biocore"
+        / "modules"
+        / "darwincheck"
+        / "data"
+        / "SIMBIO_Especies_2026-02-19.xlsx"
+    )
+    analyzer = DarwinCheckAnalyzer(TaxonomyReference(reference_path))
+    return DarwinCheckService(
+        SupabaseDarwinCheckRunRepository(client),
+        SupabaseProjectRepository(client),
+        analyzer,
+    )
 
 
 @st.cache_resource
@@ -210,6 +236,7 @@ st.session_state["biocore_ecological_diagnostic_service"] = (
     ecological_diagnostic_service()
 )
 st.session_state["biocore_project_service"] = project_service()
+st.session_state["biocore_darwincheck_service"] = darwincheck_service()
 st.session_state["biocore_public_diagnostic_lead_recorder"] = (
     record_public_diagnostic_lead
 )

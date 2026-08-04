@@ -322,18 +322,16 @@ def render_public_landing() -> None:
             <section class="bc-hero" id="inicio">
                 <div class="bc-container bc-hero-grid">
                     <div class="bc-hero-copy-block">
-                        <span class="bc-eyebrow">Ecosistema tecnológico propio para proyectos ecológicos</span>
-                        <h1>Conecta el terreno, la calidad de datos y la vigilancia satelital</h1>
+                        <span class="bc-eyebrow">Consultoría ambiental + tecnología propia</span>
+                        <h1>Consultoría ambiental especializada en flora, hongos y líquenes</h1>
                         <p class="bc-hero-copy">
-                            BioCore reúne aplicaciones propias para registrar hongos en terreno,
-                            revisar planillas de biodiversidad bajo el estándar DwC-SMA y vigilar
-                            proyectos con imágenes multisatelitales. Todo se conecta con análisis,
-                            trazabilidad e informes en una experiencia moderna creada para
-                            proyectos de flora, hongos y líquenes.
+                            BioCore combina acompañamiento profesional especializado y aplicaciones
+                            propias para organizar el trabajo de terreno, la validación, el monitoreo
+                            satelital, el análisis y los informes.
                         </p>
                         <p class="bc-hero-specialty">
-                            No son herramientas aisladas: cada aplicación acompaña una etapa real
-                            del proyecto y muestra qué ocurrió, qué falta y cuál es el próximo paso.
+                            Desde la planificación hasta el informe final, con claridad sobre lo
+                            realizado y el próximo paso.
                         </p>
                         <div class="bc-hero-actions">
                             <a class="bc-button bc-button-primary" href="{escape(signup_url)}">

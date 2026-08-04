@@ -43,7 +43,7 @@ def test_public_landing_states_scope_without_a_fake_dashboard() -> None:
     landing = Path("biocore/components/public_landing.py").read_text(
         encoding="utf-8"
     )
-    assert "Conecta el terreno, la calidad de datos y la vigilancia satelital" in landing
+    assert "Consultoría ambiental especializada en flora, hongos y líquenes" in landing
     assert "Aplicaciones propias. Un proyecto conectado." in landing
     assert "Para quién está diseñado" in landing
     assert "Realizar diagnóstico ecológico" in landing
@@ -148,10 +148,10 @@ def test_public_hero_leads_with_concrete_biocore_differentiators() -> None:
     )
 
     for hero_statement in (
-        "Ecosistema tecnológico propio para proyectos ecológicos",
-        "aplicaciones propias para registrar hongos en terreno",
-        "estándar DwC-SMA",
-        "imágenes multisatelitales",
+        "Consultoría ambiental + tecnología propia",
+        "acompañamiento profesional especializado y aplicaciones",
+        "organizar el trabajo de terreno, la validación, el monitoreo",
+        "Desde la planificación hasta el informe final",
         "Descubrir nuestras aplicaciones",
         "Aplicaciones propias. Un proyecto conectado.",
         "plataformas ambientales generalistas",

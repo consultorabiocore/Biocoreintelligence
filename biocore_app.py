@@ -50,6 +50,12 @@ st.set_page_config(
 
 
 def _start_login() -> None:
+    requested_page = st.query_params.get("next")
+    post_login_pages = {"darwincheck": "DarwinCheck"}
+    if requested_page in post_login_pages:
+        st.session_state["biocore_post_login_page"] = post_login_pages[
+            requested_page
+        ]
     st.query_params.clear()
     st.login()
 
@@ -248,11 +254,28 @@ render_private_shell(
     logout_callback=_logout,
 )
 
+page_groups = pages_for(context, subscription)
+requested_default_page = st.session_state.pop(
+    "biocore_post_login_page", None
+)
+available_page_titles = {
+    item.title for items in page_groups.values() for item in items
+}
+default_page_title = (
+    requested_default_page
+    if requested_default_page in available_page_titles
+    else "Inicio"
+)
+
 navigation = {
     section: [
-        st.Page(item.path, title=item.title, default=item.title == "Inicio")
+        st.Page(
+            item.path,
+            title=item.title,
+            default=item.title == default_page_title,
+        )
         for item in items
     ]
-    for section, items in pages_for(context, subscription).items()
+    for section, items in page_groups.items()
 }
 st.navigation(navigation).run()

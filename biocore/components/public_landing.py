@@ -248,6 +248,9 @@ def _module_tools(
 def render_public_landing() -> None:
     settings = Settings.from_environment()
     login_url = settings.auth_login_url or "?auth=login"
+    darwincheck_login_url = (
+        f"{login_url}{'&' if '?' in login_url else '?'}next=darwincheck"
+    )
     signup_url = (
         f"{settings.auth_login_url}"
         f"{'&' if '?' in settings.auth_login_url else '?'}mode=signup"
@@ -266,13 +269,9 @@ def render_public_landing() -> None:
             bool(applications["field"].url),
         ),
         "DarwinCheck": (
-            applications["darwincheck"].url or login_url,
-            (
-                "Abrir aplicación"
-                if applications["darwincheck"].url
-                else "Iniciar sesión"
-            ),
-            bool(applications["darwincheck"].url),
+            darwincheck_login_url,
+            "Abrir en BioCore",
+            False,
         ),
         "BioCore Intelligence": (
             applications["intelligence"].url or login_url,

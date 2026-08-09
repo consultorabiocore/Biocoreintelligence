@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+import re
 
 from biocore.domain.dashboard import DashboardSnapshot
 from biocore.domain.projects import Project, ProjectModality, ProjectStatus
@@ -190,6 +191,26 @@ def test_public_hero_leads_with_concrete_biocore_differentiators() -> None:
         assert hero_statement in landing
 
     assert "nadie más" not in landing.lower()
+
+
+def test_private_dashboard_navigation_is_clickable_and_readable() -> None:
+    dashboard = Path("biocore/components/dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    styles = Path("biocore/components/styles.py").read_text(encoding="utf-8")
+
+    # Page changes must run during normal script execution. Streamlit treats
+    # reruns triggered inside button callbacks as a no-op.
+    assert "on_click=_create_project" not in dashboard
+    assert "on_click=_open_project" not in dashboard
+    assert re.search(r'if st\.button\(\s*"Crear proyecto"', dashboard)
+    assert re.search(r'if st\.button\(\s*f"Abrir \{project\.code\}"', dashboard)
+
+    # Stable data-testid selectors prevent a dark Streamlit theme from
+    # rendering white labels on the private workspace's light canvas.
+    assert 'a[data-testid="stPageLink-NavLink"]' in styles
+    assert 'button[data-testid="stBaseButton-primary"]' in styles
+    assert 'button[data-testid="stBaseButton-secondary"]' in styles
 
 
 def test_private_module_cards_open_the_protected_module_pages() -> None:

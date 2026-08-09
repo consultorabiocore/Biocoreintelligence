@@ -105,13 +105,13 @@ def test_dashboard_exposes_real_project_context_and_next_action() -> None:
     assert dashboard.recent_projects[0].next_activity == "Validar fotografías"
 
 
-def test_public_landing_uses_compact_logo_and_real_module_destinations() -> None:
+def test_public_landing_uses_compact_logo_and_native_module_destinations() -> None:
     landing = Path("biocore/components/public_landing.py").read_text(
         encoding="utf-8"
     )
     assert "asset_data_uri(BRAND.compact_logo)" in landing
-    assert "external_applications(settings)" in landing
-    assert "Abrir aplicación" in landing
+    assert "external_applications(settings)" not in landing
+    assert "Abrir en BioCore" in landing
     assert "Acceder al módulo" in landing
     assert 'diagnostic_url = "?diagnostico=publico"' in landing
     assert "No realiza cobros" in landing
@@ -133,6 +133,20 @@ def test_public_darwincheck_entry_uses_the_native_protected_page() -> None:
     assert '"darwincheck": "DarwinCheck"' in entrypoint
     assert 'st.session_state["biocore_post_login_page"]' in entrypoint
     assert "requested_default_page in available_page_titles" in entrypoint
+
+
+def test_public_specialized_apps_use_native_protected_pages() -> None:
+    landing = Path("biocore/components/public_landing.py").read_text(
+        encoding="utf-8"
+    )
+    entrypoint = Path("biocore_app.py").read_text(encoding="utf-8")
+
+    assert "mycofield_login_url" in landing
+    assert "intelligence_login_url" in landing
+    assert "hongos.streamlit.app" not in landing
+    assert "biocoreintelligence.streamlit.app" not in landing
+    assert '"mycofield": "BioCore MycoField"' in entrypoint
+    assert '"intelligence": "BioCore Intelligence"' in entrypoint
 
 
 def test_public_landing_explains_each_specialized_product_value() -> None:

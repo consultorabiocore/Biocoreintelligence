@@ -1,13 +1,14 @@
 from pathlib import Path
 
 
-def test_darwincheck_page_is_native_and_keeps_external_fallback_secondary() -> None:
+def test_darwincheck_page_is_fully_native() -> None:
     source = Path("platform_pages/darwincheck.py").read_text(encoding="utf-8")
     assert "biocore_darwincheck_service" in source
     assert "service.analyze_upload" in source
     assert "service.list_runs" in source
     assert "biocore_selected_project_id" in source
-    assert "Acceso temporal a la versión independiente" in source
+    assert "configured_external_applications" not in source
+    assert "streamlit.app" not in source
     assert "render_module_integration(\"darwincheck\")" not in source
 
 

@@ -9,7 +9,6 @@ import plotly.express as px
 import streamlit as st
 
 from biocore.components.module_access import require_module_page
-from biocore.components.module_integration import configured_external_applications
 from biocore.domain.projects import ProjectFilters
 from biocore.domain.subscriptions import ModuleCode
 from biocore.modules.darwincheck.analyzer import DarwinCheckValidationError
@@ -381,12 +380,3 @@ if (
     _render_summary(execution)
 
 _render_history(selected_project_id)
-
-with st.expander("Acceso temporal a la versión independiente"):
-    legacy = configured_external_applications()["darwincheck"]
-    st.caption(
-        "Se conserva como respaldo durante la validación de la versión nativa. "
-        "No comparte automáticamente el proyecto ni el resultado actual."
-    )
-    if legacy.url:
-        st.link_button("Abrir versión independiente", legacy.url)

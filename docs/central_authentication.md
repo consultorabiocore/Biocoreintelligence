@@ -57,7 +57,8 @@ de manera segura. BioCore usa una sesión central más un código de lanzamiento
    ```
 
 6. Confirmar `/health` con `central_auth_configured=true`.
-7. Integrar Field y DarwinCheck con `packages/biocore_client`.
+7. Validar MycoField, DarwinCheck e Intelligence dentro de la sesión central;
+   las versiones independientes no participan en el flujo privado principal.
 8. Cambiar a `optional` para usuarios piloto.
 9. Cambiar a `required` únicamente cuando las pruebas integrales pasen.
 

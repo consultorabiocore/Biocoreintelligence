@@ -5,7 +5,6 @@ import streamlit as st
 
 from biocore.components.public_styles import PUBLIC_STYLES
 from biocore.config.brand import BRAND, asset_data_uri
-from biocore.config.integrations import external_applications
 from biocore.config.settings import Settings
 
 
@@ -251,6 +250,12 @@ def render_public_landing() -> None:
     darwincheck_login_url = (
         f"{login_url}{'&' if '?' in login_url else '?'}next=darwincheck"
     )
+    mycofield_login_url = (
+        f"{login_url}{'&' if '?' in login_url else '?'}next=mycofield"
+    )
+    intelligence_login_url = (
+        f"{login_url}{'&' if '?' in login_url else '?'}next=intelligence"
+    )
     signup_url = (
         f"{settings.auth_login_url}"
         f"{'&' if '?' in settings.auth_login_url else '?'}mode=signup"
@@ -261,12 +266,11 @@ def render_public_landing() -> None:
     demo_url = BRAND.demo_request_url(
         "Servicios profesionales y demostración de BioCore"
     )
-    applications = external_applications(settings)
     module_destinations = {
         "BioCore MycoField": (
-            applications["field"].url or login_url,
-            "Abrir aplicación" if applications["field"].url else "Iniciar sesión",
-            bool(applications["field"].url),
+            mycofield_login_url,
+            "Abrir en BioCore",
+            False,
         ),
         "DarwinCheck": (
             darwincheck_login_url,
@@ -274,13 +278,9 @@ def render_public_landing() -> None:
             False,
         ),
         "BioCore Intelligence": (
-            applications["intelligence"].url or login_url,
-            (
-                "Abrir aplicación"
-                if applications["intelligence"].url
-                else "Iniciar sesión"
-            ),
-            bool(applications["intelligence"].url),
+            intelligence_login_url,
+            "Abrir en BioCore",
+            False,
         ),
         "BioCore Reports": (login_url, "Acceder al módulo", False),
         "BioCore Academy": (login_url, "Acceder al módulo", False),

@@ -80,12 +80,14 @@ continuidad en una suscripción principal.
 6. Ejecutar `database/migrations/0008_project_management.sql`.
 7. Ejecutar `database/migrations/0009_project_experience.sql`.
 8. Ejecutar `database/migrations/0010_native_darwincheck.sql`.
-9. Registrar la suscripción de cada organización desde un contexto
+9. Ejecutar `database/migrations/0011_native_mycofield.sql`.
+10. Ejecutar `database/migrations/0012_native_intelligence.sql`.
+11. Registrar la suscripción de cada organización desde un contexto
    administrativo. Para staging puede utilizarse
    `database/seeds/001_biocore_staging_subscription.sql`.
-10. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y la autenticación
-   OIDC únicamente en los secretos del despliegue.
-11. Desplegar `biocore_app.py`.
+12. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, la autenticación
+   OIDC y Google Earth Engine únicamente en los secretos del despliegue.
+13. Desplegar `biocore_app.py`.
 
 La clave `service_role` nunca debe enviarse al navegador, guardarse en Git ni
 mostrarse en mensajes de error.
@@ -128,3 +130,8 @@ El diseño, alcance, versionado y decisiones del prototipo se describen en
 
 La integración de DarwinCheck con la sesión, los proyectos y la trazabilidad
 central se describe en [`native_darwincheck.md`](native_darwincheck.md).
+
+## Aplicaciones nativas
+
+La captura MycoField, la evidencia privada y el monitoreo multisatelital de
+Intelligence se describen en [`native_apps.md`](native_apps.md).

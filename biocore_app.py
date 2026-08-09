@@ -27,6 +27,8 @@ from biocore.repositories.projects import SupabaseProjectRepository
 from biocore.repositories.subscriptions import SupabaseSubscriptionRepository
 from biocore.repositories.central_auth import SupabaseCentralAuthRepository
 from biocore.repositories.darwincheck import SupabaseDarwinCheckRunRepository
+from biocore.repositories.mycofield import SupabaseMycoFieldRepository
+from biocore.repositories.intelligence import SupabaseIntelligenceRunRepository
 from biocore.auth.session_service import SessionService
 from biocore.modules.darwincheck.analyzer import (
     DarwinCheckAnalyzer,
@@ -38,6 +40,9 @@ from biocore.services.subscriptions import SubscriptionService
 from biocore.services.ecological_diagnostics import EcologicalDiagnosticService
 from biocore.services.projects import ProjectService
 from biocore.services.darwincheck import DarwinCheckService
+from biocore.services.mycofield import MycoFieldService
+from biocore.services.intelligence import IntelligenceService
+from biocore.modules.intelligence.earth_engine import EarthEngineProvider
 from biocore.services.public_diagnostic_leads import save_public_lead
 
 
@@ -51,7 +56,11 @@ st.set_page_config(
 
 def _start_login() -> None:
     requested_page = st.query_params.get("next")
-    post_login_pages = {"darwincheck": "DarwinCheck"}
+    post_login_pages = {
+        "mycofield": "BioCore MycoField",
+        "darwincheck": "DarwinCheck",
+        "intelligence": "BioCore Intelligence",
+    }
     if requested_page in post_login_pages:
         st.session_state["biocore_post_login_page"] = post_login_pages[
             requested_page
@@ -135,6 +144,27 @@ def darwincheck_service() -> DarwinCheckService:
         SupabaseDarwinCheckRunRepository(client),
         SupabaseProjectRepository(client),
         analyzer,
+    )
+
+
+@st.cache_resource
+def mycofield_service() -> MycoFieldService:
+    client = supabase_server_client()
+    return MycoFieldService(
+        SupabaseMycoFieldRepository(client),
+        SupabaseProjectRepository(client),
+    )
+
+
+@st.cache_resource
+def intelligence_service() -> IntelligenceService:
+    client = supabase_server_client()
+    gee = st.secrets.get("gee", {})
+    provider = EarthEngineProvider(gee.get("json") if gee else None)
+    return IntelligenceService(
+        SupabaseIntelligenceRunRepository(client),
+        SupabaseProjectRepository(client),
+        provider,
     )
 
 
@@ -243,6 +273,8 @@ st.session_state["biocore_ecological_diagnostic_service"] = (
 )
 st.session_state["biocore_project_service"] = project_service()
 st.session_state["biocore_darwincheck_service"] = darwincheck_service()
+st.session_state["biocore_mycofield_service"] = mycofield_service()
+st.session_state["biocore_intelligence_service"] = intelligence_service()
 st.session_state["biocore_public_diagnostic_lead_recorder"] = (
     record_public_diagnostic_lead
 )

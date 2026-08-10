@@ -29,6 +29,9 @@ from biocore.repositories.central_auth import SupabaseCentralAuthRepository
 from biocore.repositories.darwincheck import SupabaseDarwinCheckRunRepository
 from biocore.repositories.mycofield import SupabaseMycoFieldRepository
 from biocore.repositories.intelligence import SupabaseIntelligenceRunRepository
+from biocore.repositories.ecological_evidence import (
+    SupabaseEcologicalEvidenceRepository,
+)
 from biocore.auth.session_service import SessionService
 from biocore.modules.darwincheck.analyzer import (
     DarwinCheckAnalyzer,
@@ -42,6 +45,8 @@ from biocore.services.projects import ProjectService
 from biocore.services.darwincheck import DarwinCheckService
 from biocore.services.mycofield import MycoFieldService
 from biocore.services.intelligence import IntelligenceService
+from biocore.services.ecological_evidence import EcologicalEvidenceService
+from biocore.integrations.inaturalist import PublicINaturalistClient
 from biocore.modules.intelligence.earth_engine import EarthEngineProvider
 from biocore.services.public_diagnostic_leads import save_public_lead
 
@@ -169,6 +174,16 @@ def intelligence_service() -> IntelligenceService:
 
 
 @st.cache_resource
+def ecological_evidence_service() -> EcologicalEvidenceService:
+    client = supabase_server_client()
+    return EcologicalEvidenceService(
+        SupabaseEcologicalEvidenceRepository(client),
+        SupabaseProjectRepository(client),
+        PublicINaturalistClient(),
+    )
+
+
+@st.cache_resource
 def central_auth_repository() -> SupabaseCentralAuthRepository:
     return SupabaseCentralAuthRepository(supabase_server_client())
 
@@ -275,6 +290,9 @@ st.session_state["biocore_project_service"] = project_service()
 st.session_state["biocore_darwincheck_service"] = darwincheck_service()
 st.session_state["biocore_mycofield_service"] = mycofield_service()
 st.session_state["biocore_intelligence_service"] = intelligence_service()
+st.session_state["biocore_ecological_evidence_service"] = (
+    ecological_evidence_service()
+)
 st.session_state["biocore_public_diagnostic_lead_recorder"] = (
     record_public_diagnostic_lead
 )

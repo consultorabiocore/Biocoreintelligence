@@ -28,6 +28,7 @@ def test_client_navigation_uses_unrepeated_sections() -> None:
     ]
     assert [page.title for page in navigation["GESTIÓN AMBIENTAL"]] == [
         "Proyectos",
+        "Evidencias ecológicas",
         "Áreas de estudio",
         "Campañas",
         "Mapas",

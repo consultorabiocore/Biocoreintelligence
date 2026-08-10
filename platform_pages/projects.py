@@ -595,9 +595,12 @@ def _render_detail() -> None:
     if project is None:
         return
 
-    back, edit, state, archive, _ = st.columns([1, 1, 1.2, 1, 2])
+    back, evidence, edit, state, archive = st.columns([1, 1.5, 1, 1.2, 1])
     if back.button("← Proyectos", use_container_width=True):
         _go("list")
+    if evidence.button("Evidencias ecológicas", use_container_width=True):
+        st.session_state["biocore_selected_project_id"] = project.id
+        st.switch_page("platform_pages/ecological_evidence.py")
     if edit.button(
         "Editar",
         disabled=not can_write or project.status == ProjectStatus.ARCHIVED,

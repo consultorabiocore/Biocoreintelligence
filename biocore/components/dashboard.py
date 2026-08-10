@@ -269,12 +269,13 @@ def render_private_dashboard(
     primary_actions = st.columns(3, gap="medium")
     with primary_actions[0]:
         if context.has_permission(Permission.PROJECTS_WRITE):
-            st.button(
+            if st.button(
                 "Crear proyecto",
                 type="primary",
                 use_container_width=True,
-                on_click=_create_project,
-            )
+                key="dashboard_create_project",
+            ):
+                _create_project()
         else:
             st.page_link(
                 "platform_pages/projects.py",
@@ -307,13 +308,12 @@ def render_private_dashboard(
     elif dashboard.recent_projects:
         for project in dashboard.recent_projects:
             st.markdown(_project_card(project), unsafe_allow_html=True)
-            st.button(
+            if st.button(
                 f"Abrir {project.code}",
                 key=f"open_project_{project.id}",
                 use_container_width=True,
-                on_click=_open_project,
-                args=(project.id,),
-            )
+            ):
+                _open_project(project.id)
     else:
         st.markdown(
             _empty_state(

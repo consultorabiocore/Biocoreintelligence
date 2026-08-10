@@ -1415,6 +1415,70 @@ PRIVATE_STYLES = """
     color: #85631f;
 }
 
+/* Streamlit can retain text colors from a dark theme even though the private
+   workspace uses a light canvas. Keep native navigation and actions readable
+   without relying on generated class names. */
+[data-testid="stAppViewContainer"] a[data-testid="stPageLink-NavLink"] {
+    min-height: 44px;
+    border: 1px solid #c8d5cd !important;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+    color: #173a2b !important;
+    box-shadow: 0 4px 14px rgba(18, 55, 42, .035);
+    text-decoration: none !important;
+}
+
+[data-testid="stAppViewContainer"] a[data-testid="stPageLink-NavLink"] p,
+[data-testid="stAppViewContainer"] a[data-testid="stPageLink-NavLink"] span,
+[data-testid="stAppViewContainer"] a[data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {
+    color: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] a[data-testid="stPageLink-NavLink"]:hover {
+    border-color: var(--bc-private-green) !important;
+    background: #edf6ef !important;
+}
+
+[data-testid="stAppViewContainer"] a[data-testid="stPageLink-NavLink"]:focus-visible {
+    outline: 3px solid rgba(47, 125, 74, .28);
+    outline-offset: 2px;
+}
+
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"] {
+    border-color: var(--bc-private-green) !important;
+    background: var(--bc-private-green) !important;
+    color: #ffffff !important;
+}
+
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"] p,
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"] span {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"]:hover {
+    border-color: #25683d !important;
+    background: #25683d !important;
+}
+
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-secondary"] {
+    border-color: #b9c9bf !important;
+    background: #ffffff !important;
+    color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-secondary"] p,
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-secondary"] span {
+    color: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] button[data-testid="stBaseButton-secondary"]:hover {
+    border-color: var(--bc-private-green) !important;
+    background: #edf6ef !important;
+}
+
 @media (max-width: 900px) {
     .bc-stat-grid { grid-template-columns: repeat(2, 1fr); }
     .bc-metadata-strip { grid-template-columns: repeat(2, 1fr); }

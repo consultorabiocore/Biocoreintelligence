@@ -19,6 +19,9 @@ class Permission(StrEnum):
     PROJECTS_READ = "projects:read"
     PROJECTS_WRITE = "projects:write"
     PROJECTS_GRANT_ACCESS = "projects:grant_access"
+    EVIDENCE_READ = "evidence:read"
+    EVIDENCE_WRITE = "evidence:write"
+    EVIDENCE_REVIEW = "evidence:review"
     CAMPAIGNS_READ = "campaigns:read"
     CAMPAIGNS_WRITE = "campaigns:write"
     MAPS_READ = "maps:read"
@@ -46,6 +49,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ORGANIZATIONS_READ,
             Permission.PROJECTS_READ,
             Permission.PROJECTS_WRITE,
+            Permission.EVIDENCE_READ,
+            Permission.EVIDENCE_WRITE,
+            Permission.EVIDENCE_REVIEW,
             Permission.CAMPAIGNS_READ,
             Permission.CAMPAIGNS_WRITE,
             Permission.MAPS_READ,
@@ -72,6 +78,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PROJECTS_READ,
             Permission.PROJECTS_WRITE,
             Permission.PROJECTS_GRANT_ACCESS,
+            Permission.EVIDENCE_READ,
+            Permission.EVIDENCE_WRITE,
             Permission.CAMPAIGNS_READ,
             Permission.CAMPAIGNS_WRITE,
             Permission.MAPS_READ,
@@ -91,6 +99,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         {
             Permission.PROJECTS_READ,
             Permission.PROJECTS_WRITE,
+            Permission.EVIDENCE_READ,
+            Permission.EVIDENCE_WRITE,
             Permission.CAMPAIGNS_READ,
             Permission.CAMPAIGNS_WRITE,
             Permission.MAPS_READ,
@@ -109,6 +119,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.CLIENT_READER: frozenset(
         {
             Permission.PROJECTS_READ,
+            Permission.EVIDENCE_READ,
             Permission.CAMPAIGNS_READ,
             Permission.MAPS_READ,
             Permission.FIELD_READ,

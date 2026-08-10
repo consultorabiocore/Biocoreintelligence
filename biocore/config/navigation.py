@@ -37,6 +37,13 @@ PAGES = (
         ModuleCode.PLATFORM_CORE,
     ),
     PageDefinition(
+        "Evidencias ecológicas",
+        "platform_pages/ecological_evidence.py",
+        Permission.EVIDENCE_READ,
+        "GESTIÓN AMBIENTAL",
+        ModuleCode.PLATFORM_CORE,
+    ),
+    PageDefinition(
         "Áreas de estudio",
         "platform_pages/areas.py",
         Permission.PROJECTS_READ,

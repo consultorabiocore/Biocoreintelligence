@@ -1415,6 +1415,82 @@ PRIVATE_STYLES = """
     color: #85631f;
 }
 
+/* The authenticated workspace uses a light canvas even when Streamlit keeps
+   the dark application theme for native widgets. Define the complete private
+   reading surface here so every page and embedded BioCore module has the same
+   accessible contrast. The sidebar remains intentionally dark. */
+[data-testid="stAppViewContainer"] [data-testid="stMain"] {
+    color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] h1,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] h2,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] h3,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] h4,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] h5,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] h6,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] .stMarkdown p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] .stMarkdown li,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stCaptionContainer"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stWidgetLabel"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stMetricLabel"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stMetricValue"] {
+    color: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stCaptionContainer"] p {
+    color: #68756e !important;
+    -webkit-text-fill-color: #68756e !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button p {
+    color: #53675c !important;
+    -webkit-text-fill-color: #53675c !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button[aria-selected="true"],
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button[aria-selected="true"] p {
+    color: var(--bc-private-green) !important;
+    -webkit-text-fill-color: var(--bc-private-green) !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] input,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] textarea,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="select"] > div,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="input"] > div {
+    border-color: #c8d5cd !important;
+    background: #ffffff !important;
+    color: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] input::placeholder,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] textarea::placeholder {
+    color: #87958d !important;
+    -webkit-text-fill-color: #87958d !important;
+    opacity: 1;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="select"] span,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="select"] svg {
+    color: #173a2b !important;
+    fill: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stFileUploaderDropzone"] {
+    border-color: #c8d5cd !important;
+    background: #f8faf8 !important;
+    color: #173a2b !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stFileUploaderDropzone"] * {
+    color: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
+}
+
 /* Streamlit can retain text colors from a dark theme even though the private
    workspace uses a light canvas. Keep native navigation and actions readable
    without relying on generated class names. */

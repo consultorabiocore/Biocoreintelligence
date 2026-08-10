@@ -23,8 +23,19 @@ def test_private_styles_cover_headings_labels_tabs_and_inputs() -> None:
     assert '[data-testid="stMain"] h1' in styles
     assert '[data-testid="stWidgetLabel"] p' in styles
     assert '[data-baseweb="tab-list"] button' in styles
+    assert '[data-testid="stTab"][aria-selected="true"]' in styles
+    assert '[data-testid="stAlertContainer"] [data-testid="stMarkdownContainer"] p' in styles
     assert '[data-testid="stMain"] input' in styles
     assert '#173a2b !important' in styles
+
+
+def test_intelligence_explains_provider_status_without_exposing_technical_errors() -> None:
+    page = Path("platform_pages/intelligence.py").read_text(encoding="utf-8")
+
+    assert "ya está integrado con el proyecto" in page
+    assert "un administrador" in page
+    assert "consultar resultados históricos" in page
+    assert "No se enviarán datos" in page
 
 
 def test_project_portada_links_to_ecological_evidence() -> None:

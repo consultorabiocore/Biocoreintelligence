@@ -1431,6 +1431,8 @@ PRIVATE_STYLES = """
 [data-testid="stAppViewContainer"] [data-testid="stMain"] h6,
 [data-testid="stAppViewContainer"] [data-testid="stMain"] .stMarkdown p,
 [data-testid="stAppViewContainer"] [data-testid="stMain"] .stMarkdown li,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stMarkdownContainer"] li,
 [data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stCaptionContainer"] p,
 [data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stWidgetLabel"] p,
 [data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stMetricLabel"] p,
@@ -1445,15 +1447,27 @@ PRIVATE_STYLES = """
 }
 
 [data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button,
-[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button p {
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stTab"],
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stTab"] p {
     color: #53675c !important;
     -webkit-text-fill-color: #53675c !important;
 }
 
 [data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button[aria-selected="true"],
-[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button[aria-selected="true"] p {
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-baseweb="tab-list"] button[aria-selected="true"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stTab"][aria-selected="true"],
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stTab"][aria-selected="true"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stTab"][data-selected="true"],
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stTab"][data-selected="true"] p {
     color: var(--bc-private-green) !important;
     -webkit-text-fill-color: var(--bc-private-green) !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stAlertContainer"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMain"] [data-testid="stAlertContainer"] [data-testid="stMarkdownContainer"] li {
+    color: #173a2b !important;
+    -webkit-text-fill-color: #173a2b !important;
 }
 
 [data-testid="stAppViewContainer"] [data-testid="stMain"] input,

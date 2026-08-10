@@ -49,6 +49,34 @@ Aplicar `database/migrations/0012_native_intelligence.sql` después de `0011` y
 mantener la credencial de Google Earth Engine solamente en los secretos del
 despliegue bajo `gee.json`.
 
+### Activar el proveedor satelital en Streamlit Community Cloud
+
+La interfaz, el historial, los permisos y la persistencia de Intelligence son
+parte nativa de BioCore. La ejecución de un monitoreo nuevo permanece
+deshabilitada hasta completar esta conexión administrativa:
+
+1. Registrar el proyecto de Google Cloud para usar Earth Engine y habilitar la
+   Earth Engine API.
+2. Crear una cuenta de servicio con acceso al proyecto y descargar su llave
+   JSON. La llave es un secreto y nunca debe subirse a GitHub.
+3. En la aplicación desplegada, abrir **Manage app → Settings → Secrets** y
+   agregar el JSON completo con esta estructura, reemplazando únicamente el
+   marcador:
+
+   ```toml
+   [gee]
+   json = '''PEGAR_AQUÍ_EL_JSON_COMPLETO_DE_LA_CUENTA_DE_SERVICIO'''
+   ```
+
+4. Guardar los secretos y reiniciar la aplicación. El formulario de **Nuevo
+   monitoreo** quedará habilitado; los resultados seguirán ligados a la
+   organización y al proyecto activo.
+
+Referencias operativas:
+
+- https://developers.google.com/earth-engine/guides/service_account
+- https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management
+
 ## Validación mínima
 
 1. Iniciar sesión y seleccionar una organización con los módulos habilitados.

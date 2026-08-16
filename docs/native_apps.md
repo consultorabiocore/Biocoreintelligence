@@ -34,47 +34,63 @@ La versión independiente dejó de formar parte del flujo privado.
 
 El monitoreo nativo recibe un polígono GeoJSON, valida coordenadas WGS84 y
 compara una ventana reciente de 90 días con la misma ventana de un año base.
-Las fuentes actuales son:
+La primera conexión operativa usa Copernicus Data Space Ecosystem (CDSE), sin
+activar una prueba de Google Cloud ni registrar una tarjeta. Los indicadores
+actuales son:
 
-- Sentinel-2 SR para NDVI, EVI, NDMI y cobertura estimada;
-- MODIS MOD11A2 para temperatura superficial diurna;
-- ERA5-Land para humedad volumétrica superficial.
+- Sentinel-2 L2A para NDVI, EVI, NDMI y cobertura vegetal estimada;
+- máscara de nubes y sombras basada en la clasificación SCL;
+- estadísticas calculadas por CDSE sobre el polígono, sin descargar imágenes
+  completas al servidor de Streamlit.
+
+Temperatura superficial y humedad de suelo no se presentan todavía. Se
+incorporarán únicamente cuando sus fuentes reales, unidades, resoluciones y
+límites queden conectados y probados; no se sustituyen por valores sintéticos.
 
 Cada ejecución conserva geometría, períodos, indicadores, fuentes,
 resoluciones, número de imágenes, nubosidad, reglas, confianza, limitaciones y
 recomendaciones. Los umbrales describen magnitud de cambio; no determinan una
 causa, impacto o incumplimiento.
 
-Aplicar `database/migrations/0012_native_intelligence.sql` después de `0011` y
-mantener la credencial de Google Earth Engine solamente en los secretos del
-despliegue bajo `gee.json`.
+Aplicar `database/migrations/0012_native_intelligence.sql` después de `0011`.
 
-### Activar el proveedor satelital en Streamlit Community Cloud
+### Activar Copernicus Data Space en Streamlit Community Cloud
 
 La interfaz, el historial, los permisos y la persistencia de Intelligence son
 parte nativa de BioCore. La ejecución de un monitoreo nuevo permanece
 deshabilitada hasta completar esta conexión administrativa:
 
-1. Registrar el proyecto de Google Cloud para usar Earth Engine y habilitar la
-   Earth Engine API.
-2. Crear una cuenta de servicio con acceso al proyecto y descargar su llave
-   JSON. La llave es un secreto y nunca debe subirse a GitHub.
+1. Crear una cuenta general gratuita en `https://dataspace.copernicus.eu/`.
+2. Abrir el Sentinel Hub Dashboard en
+   `https://shapps.dataspace.copernicus.eu/dashboard/` y crear un OAuth client.
+   Copiar su Client ID y Client Secret. No publicarlos ni subirlos a GitHub.
 3. En la aplicación desplegada, abrir **Manage app → Settings → Secrets** y
-   agregar el JSON completo con esta estructura, reemplazando únicamente el
-   marcador:
+   agregar esta estructura:
 
    ```toml
-   [gee]
-   json = '''PEGAR_AQUÍ_EL_JSON_COMPLETO_DE_LA_CUENTA_DE_SERVICIO'''
+   [copernicus]
+   client_id = "PEGAR_CLIENT_ID"
+   client_secret = "PEGAR_CLIENT_SECRET"
    ```
 
 4. Guardar los secretos y reiniciar la aplicación. El formulario de **Nuevo
    monitoreo** quedará habilitado; los resultados seguirán ligados a la
    organización y al proyecto activo.
 
+CDSE permite construir servicios comerciales sobre sus datos y ofrece cuotas
+mensuales gratuitas para usuarios generales. BioCore controla errores de cuota
+y nunca guarda un resultado parcial. Las cuotas son un límite operativo, no una
+garantía de capacidad ni de nivel de servicio.
+
+Un despliegue que ya cuente con una licencia comercial válida de Earth Engine
+puede conservarla como proveedor alternativo bajo `gee.json`. BioCore no debe
+registrarse como no comercial para desarrollar u ofrecer el producto.
+
 Referencias operativas:
 
-- https://developers.google.com/earth-engine/guides/service_account
+- https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Overview/Authentication.html
+- https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Statistical.html
+- https://documentation.dataspace.copernicus.eu/Quotas.html
 - https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management
 
 ## Validación mínima

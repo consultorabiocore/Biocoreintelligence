@@ -75,7 +75,15 @@ class FakeProvider:
             baseline_image_count=7,
             mean_cloud_percent=12.5,
             provider_version="fake-v1",
+            metadata={"provider": "Fake Satellite", "data_nature": "observed"},
         )
+
+
+class FailingProvider:
+    configured = True
+
+    def analyze(self, coordinates, baseline_year, *, today=None):
+        raise RuntimeError("provider unavailable")
 
 
 def _payload(value=POLYGON) -> bytes:
@@ -121,6 +129,8 @@ def test_specialist_run_is_persisted_with_sources_and_explainable_finding() -> N
     assert run.created_by_user_id == "user-a"
     assert run.provider_version == "fake-v1"
     assert run.evidence["recent_image_count"] == 5
+    assert run.evidence["provider"] == "Fake Satellite"
+    assert run.evidence["data_nature"] == "observed"
     assert run.metrics[0]["source"] == "Sentinel-2 SR"
     assert run.findings[0]["classification"] == "cambio marcado"
     assert "no su causa" in run.findings[0]["explanation"]
@@ -142,6 +152,17 @@ def test_cross_organization_project_is_rejected_before_provider_call() -> None:
     with pytest.raises(IntelligenceProjectNotFound):
         service.run(context, "project-a", _payload(), 2024)
     assert not provider.calls
+    assert not runs.saved
+
+
+def test_provider_failure_never_persists_a_partial_monitoring_run() -> None:
+    runs = FakeRunRepository()
+    service = IntelligenceService(runs, FakeProjectRepository(), FailingProvider())
+    context = UserContext("user-a", "org-a", frozenset({Role.BIOCORE_SPECIALIST}))
+
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        service.run(context, "project-a", _payload(), 2024)
+
     assert not runs.saved
 
 

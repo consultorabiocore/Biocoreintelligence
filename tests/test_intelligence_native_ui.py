@@ -9,12 +9,20 @@ def test_intelligence_page_runs_inside_biocore() -> None:
     assert "service.run(" in source
     assert "service.list_runs(" in source
     assert "Sentinel-2" in source
-    assert "MODIS" in source
-    assert "ERA5-Land" in source
+    assert "Copernicus" in source
     assert "st.download_button(" in source
     assert "render_module_integration" not in source
     assert "streamlit.app" not in source
     assert "cumplimiento" in source
+
+
+def test_intelligence_page_never_presents_synthetic_monitoring() -> None:
+    source = Path("platform_pages/intelligence.py").read_text(encoding="utf-8")
+
+    assert "preview_demo" not in source
+    assert "MODO DEMOSTRACIÓN" not in source
+    assert "datos sintéticos" not in source
+    assert "No necesitas activar una prueba de Google Cloud" in source
 
 
 def test_intelligence_migration_is_tenant_scoped_and_immutable() -> None:

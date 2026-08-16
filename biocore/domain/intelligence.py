@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -79,6 +79,7 @@ class SatelliteSnapshot:
     baseline_image_count: int
     mean_cloud_percent: float | None
     provider_version: str
+    metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

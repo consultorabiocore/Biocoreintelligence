@@ -285,8 +285,13 @@ new_tab, history_tab = st.tabs(["Nuevo monitoreo", "Historial del proyecto"])
 with new_tab:
     if not service.provider_configured:
         st.warning(
-            "El conector satelital aún no tiene credenciales de Google Earth Engine "
-            "en esta instalación. El historial sigue disponible."
+            "BioCore Intelligence ya está integrado con el proyecto y conserva su "
+            "historial. Para ejecutar un monitoreo satelital nuevo, un administrador "
+            "debe conectar las credenciales de Google Earth Engine."
+        )
+        st.caption(
+            "Mientras se completa esa conexión puedes consultar resultados históricos. "
+            "No se enviarán datos ni se ejecutará un análisis incompleto."
         )
     elif not context.has_permission(Permission.INTELLIGENCE_WRITE):
         st.info("Tu acceso es de consulta. Puedes revisar resultados históricos.")

@@ -347,12 +347,13 @@ with new_tab:
     if not service.provider_configured:
         st.warning(
             "BioCore Intelligence ya está integrado con el proyecto y conserva su "
-            "historial. Falta conectar las credenciales gratuitas de Copernicus Data "
-            "Space para ejecutar un monitoreo nuevo con imágenes reales."
+            "historial. Pide a un administrador que conecte las credenciales gratuitas "
+            "de Copernicus Data Space para ejecutar un monitoreo nuevo con imágenes reales."
         )
         st.caption(
             "No necesitas activar una prueba de Google Cloud ni registrar una tarjeta. "
-            "Mientras se completa la conexión, el historial real permanece disponible."
+            "Mientras un administrador completa la conexión, puedes consultar resultados históricos. "
+            "No se enviarán datos ni se crearán resultados simulados."
         )
         st.info(
             "Los resultados solo se habilitarán cuando provengan de observaciones "

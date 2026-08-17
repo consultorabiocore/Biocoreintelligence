@@ -86,7 +86,8 @@ continuidad en una suscripción principal.
    administrativo. Para staging puede utilizarse
    `database/seeds/001_biocore_staging_subscription.sql`.
 12. Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, la autenticación
-   OIDC y Google Earth Engine únicamente en los secretos del despliegue.
+   OIDC y Copernicus Data Space únicamente en los secretos del despliegue;
+   Google Earth Engine queda opcional para instalaciones con licencia comercial.
 13. Desplegar `biocore_app.py`.
 
 La clave `service_role` nunca debe enviarse al navegador, guardarse en Git ni

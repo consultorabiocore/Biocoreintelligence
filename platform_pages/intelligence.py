@@ -17,6 +17,11 @@ from biocore.config.brand import BRAND, available_logo
 from biocore.domain.intelligence import IntelligenceRun
 from biocore.domain.projects import ProjectFilters
 from biocore.domain.subscriptions import ModuleCode
+from biocore.modules.intelligence.copernicus import (
+    CopernicusAnalysisError,
+    CopernicusQuotaExceeded,
+    CopernicusUnavailable,
+)
 from biocore.modules.intelligence.earth_engine import (
     EarthEngineAnalysisError,
     EarthEngineUnavailable,
@@ -60,6 +65,9 @@ def _friendly_error(error: Exception, *, operation: str) -> None:
         (
             IntelligenceValidationError,
             IntelligenceProjectNotFound,
+            CopernicusAnalysisError,
+            CopernicusQuotaExceeded,
+            CopernicusUnavailable,
             EarthEngineAnalysisError,
             EarthEngineUnavailable,
         ),
@@ -120,13 +128,35 @@ def _render_geometry(run: IntelligenceRun) -> None:
 def _export_run(run: IntelligenceRun) -> bytes:
     metadata = pd.DataFrame(
         [
+            {
+                "Campo": "Naturaleza del resultado",
+                "Valor": "Monitoreo satelital calculado con observaciones reales",
+            },
             {"Campo": "Ejecución", "Valor": run.id},
             {"Campo": "Período actual", "Valor": run.current_period},
             {"Campo": "Período de línea base", "Valor": run.baseline_period},
             {"Campo": "Proveedor y reglas", "Valor": run.provider_version},
+            {"Campo": "Proveedor", "Valor": run.evidence.get("provider")},
+            {"Campo": "Colección", "Valor": run.evidence.get("collection")},
+            {
+                "Campo": "Regla de composición",
+                "Valor": run.evidence.get("composite_rule"),
+            },
             {"Campo": "Imágenes actuales", "Valor": run.evidence.get("recent_image_count")},
             {"Campo": "Imágenes línea base", "Valor": run.evidence.get("baseline_image_count")},
             {"Campo": "Nubosidad media", "Valor": run.evidence.get("mean_cloud_percent")},
+            {
+                "Campo": "Muestras válidas actuales",
+                "Valor": run.evidence.get("current_valid_pixel_samples"),
+            },
+            {
+                "Campo": "Muestras válidas línea base",
+                "Valor": run.evidence.get("baseline_valid_pixel_samples"),
+            },
+            {
+                "Campo": "Persistencia",
+                "Valor": "Conservado en el historial del proyecto",
+            },
             {
                 "Campo": "Limitación",
                 "Valor": (
@@ -152,10 +182,19 @@ def _render_run(run: IntelligenceRun, project_code: str) -> None:
     )
     evidence = run.evidence
     current_images, baseline_images, clouds = st.columns(3)
-    current_images.metric("Imágenes actuales", evidence.get("recent_image_count", 0))
-    baseline_images.metric("Imágenes línea base", evidence.get("baseline_image_count", 0))
+    current_images.metric(
+        "Fechas con imágenes actuales",
+        evidence.get("recent_image_count", 0),
+    )
+    baseline_images.metric(
+        "Fechas con imágenes de base",
+        evidence.get("baseline_image_count", 0),
+    )
     cloud_value = evidence.get("mean_cloud_percent")
-    clouds.metric("Nubosidad media", f"{cloud_value:.1f}%" if cloud_value is not None else "No disponible")
+    clouds.metric(
+        "Nubosidad media de escenas",
+        f"{cloud_value:.1f}%" if cloud_value is not None else "No disponible",
+    )
 
     st.markdown("### Indicadores calculados")
     metric_columns = st.columns(3)
@@ -217,6 +256,27 @@ def _render_run(run: IntelligenceRun, project_code: str) -> None:
             use_container_width=True,
             hide_index=True,
         )
+        traceability = pd.DataFrame(
+            [
+                {
+                    "Proveedor": run.evidence.get("provider") or "Histórico",
+                    "Colección": run.evidence.get("collection") or "Ver fuentes",
+                    "Regla de composición": run.evidence.get("composite_rule")
+                    or "Registrada en la versión del proveedor",
+                    "Ventana": (
+                        f"{run.evidence.get('window_days')} días"
+                        if run.evidence.get("window_days")
+                        else "Ver período"
+                    ),
+                    "Nubosidad máxima por escena": (
+                        f"{run.evidence.get('max_scene_cloud_percent')}%"
+                        if run.evidence.get("max_scene_cloud_percent") is not None
+                        else "No registrada"
+                    ),
+                }
+            ]
+        )
+        st.dataframe(traceability, use_container_width=True, hide_index=True)
         st.warning(
             "Resultado calculado y preliminar. No determina la causa del cambio, "
             "no confirma impactos y no reemplaza una campaña o revisión profesional."
@@ -242,9 +302,10 @@ st.markdown(
     <section class="bc-private-card">
         <h3>Vigilancia conectada al proyecto</h3>
         <p>
-            BioCore usa Sentinel-2, MODIS y ERA5-Land para calcular comparaciones
-            reproducibles. Distingue el dato satelital, el cálculo, la comparación
-            y la recomendación; nunca presenta una inferencia como hecho confirmado.
+            BioCore usa imágenes reales Sentinel-2 de Copernicus para comparar
+            vegetación y humedad vegetal. Distingue el dato observado, el cálculo,
+            la comparación y la recomendación; nunca presenta una inferencia como
+            hecho confirmado.
         </p>
     </section>
     """,
@@ -286,12 +347,17 @@ with new_tab:
     if not service.provider_configured:
         st.warning(
             "BioCore Intelligence ya está integrado con el proyecto y conserva su "
-            "historial. Para ejecutar un monitoreo satelital nuevo, un administrador "
-            "debe conectar las credenciales de Google Earth Engine."
+            "historial. Pide a un administrador que conecte las credenciales gratuitas "
+            "de Copernicus Data Space para ejecutar un monitoreo nuevo con imágenes reales."
         )
         st.caption(
-            "Mientras se completa esa conexión puedes consultar resultados históricos. "
-            "No se enviarán datos ni se ejecutará un análisis incompleto."
+            "No necesitas activar una prueba de Google Cloud ni registrar una tarjeta. "
+            "Mientras un administrador completa la conexión, puedes consultar resultados históricos. "
+            "No se enviarán datos ni se crearán resultados simulados."
+        )
+        st.info(
+            "Los resultados solo se habilitarán cuando provengan de observaciones "
+            "satelitales reales y puedan conservar su fuente y período."
         )
     elif not context.has_permission(Permission.INTELLIGENCE_WRITE):
         st.info("Tu acceso es de consulta. Puedes revisar resultados históricos.")
@@ -320,7 +386,7 @@ with new_tab:
         if submitted:
             try:
                 with st.spinner(
-                    "Consultando Sentinel-2, MODIS y ERA5-Land. Esto puede tardar unos minutos…"
+                    "Consultando Sentinel-2 en Copernicus. Esto puede tardar unos minutos…"
                 ):
                     completed = service.run(
                         context,

@@ -161,6 +161,44 @@ class IntelligenceService:
             )
         return project
 
+    @staticmethod
+    def _build_run(
+        context: UserContext,
+        project_id: str,
+        geometry: dict[str, object],
+        baseline_year: int,
+        snapshot: SatelliteSnapshot,
+        *,
+        evidence_extra: dict[str, object] | None = None,
+        run_id: str | None = None,
+    ) -> IntelligenceRun:
+        findings = tuple(
+            _finding(metric, snapshot.recent_image_count)
+            for metric in snapshot.metrics
+        )
+        evidence: dict[str, object] = {
+            "recent_image_count": snapshot.recent_image_count,
+            "baseline_image_count": snapshot.baseline_image_count,
+            "mean_cloud_percent": snapshot.mean_cloud_percent,
+        }
+        evidence.update(snapshot.metadata)
+        evidence.update(evidence_extra or {})
+        return IntelligenceRun(
+            id=run_id or str(uuid4()),
+            organization_id=context.organization_id,
+            project_id=project_id,
+            created_by_user_id=context.user_id,
+            geometry=geometry,
+            baseline_year=baseline_year,
+            current_period=snapshot.current_period,
+            baseline_period=snapshot.baseline_period,
+            metrics=tuple(metric.as_dict() for metric in snapshot.metrics),
+            findings=tuple(finding.as_dict() for finding in findings),
+            provider_version=snapshot.provider_version,
+            evidence=evidence,
+            created_at=datetime.now(timezone.utc),
+        )
+
     def run(
         self,
         context: UserContext,
@@ -177,28 +215,12 @@ class IntelligenceService:
             )
         geometry, coordinates = parse_polygon_geojson(geojson_payload)
         snapshot = self._provider.analyze(coordinates, baseline_year)
-        findings = tuple(
-            _finding(metric, snapshot.recent_image_count)
-            for metric in snapshot.metrics
-        )
-        run = IntelligenceRun(
-            id=str(uuid4()),
-            organization_id=context.organization_id,
-            project_id=project.id,
-            created_by_user_id=context.user_id,
-            geometry=geometry,
-            baseline_year=baseline_year,
-            current_period=snapshot.current_period,
-            baseline_period=snapshot.baseline_period,
-            metrics=tuple(metric.as_dict() for metric in snapshot.metrics),
-            findings=tuple(finding.as_dict() for finding in findings),
-            provider_version=snapshot.provider_version,
-            evidence={
-                "recent_image_count": snapshot.recent_image_count,
-                "baseline_image_count": snapshot.baseline_image_count,
-                "mean_cloud_percent": snapshot.mean_cloud_percent,
-            },
-            created_at=datetime.now(timezone.utc),
+        run = self._build_run(
+            context,
+            project.id,
+            geometry,
+            baseline_year,
+            snapshot,
         )
         return self._runs.create(run)
 

@@ -47,6 +47,7 @@ from biocore.services.mycofield import MycoFieldService
 from biocore.services.intelligence import IntelligenceService
 from biocore.services.ecological_evidence import EcologicalEvidenceService
 from biocore.integrations.inaturalist import PublicINaturalistClient
+from biocore.modules.intelligence.copernicus import CopernicusProvider
 from biocore.modules.intelligence.earth_engine import EarthEngineProvider
 from biocore.services.public_diagnostic_leads import save_public_lead
 
@@ -164,8 +165,18 @@ def mycofield_service() -> MycoFieldService:
 @st.cache_resource
 def intelligence_service() -> IntelligenceService:
     client = supabase_server_client()
+    copernicus = st.secrets.get("copernicus", {})
     gee = st.secrets.get("gee", {})
-    provider = EarthEngineProvider(gee.get("json") if gee else None)
+    if copernicus and copernicus.get("client_id") and copernicus.get("client_secret"):
+        provider = CopernicusProvider(
+            copernicus.get("client_id"),
+            copernicus.get("client_secret"),
+        )
+    elif gee and gee.get("json"):
+        # Preserved only for deployments with a valid commercial Earth Engine setup.
+        provider = EarthEngineProvider(gee.get("json"))
+    else:
+        provider = CopernicusProvider(None, None)
     return IntelligenceService(
         SupabaseIntelligenceRunRepository(client),
         SupabaseProjectRepository(client),

@@ -1,8 +1,14 @@
 # BioCore
 
 Este repositorio contiene la nueva plataforma BioCore en `biocore_app.py` y
-mantiene temporalmente la aplicación histórica en `app.py`. La arquitectura,
-el despliegue y el modelo de suscripciones están documentados en
+mantiene temporalmente la aplicación histórica en `app.py`. La fuente funcional
+vigente de BioCore Intelligence es
+`consultorabiocore/Biocoreintelligenceaparte`; sus capacidades se migran a la
+plataforma nativa sin duplicar autenticación, navegación ni datos. El estado de
+esa migración está documentado en
+[`docs/intelligence_integration.md`](docs/intelligence_integration.md).
+
+La arquitectura, el despliegue y el modelo de suscripciones están documentados en
 [`docs/platform_architecture.md`](docs/platform_architecture.md).
 
 La autenticación central multiaplicación y su despliegue gradual se documentan

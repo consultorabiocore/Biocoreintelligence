@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date
 from io import BytesIO
@@ -10,6 +11,7 @@ import folium
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from folium.plugins import Draw
 from streamlit_folium import st_folium
 
 from biocore.components.module_access import require_module_page
@@ -22,6 +24,7 @@ from biocore.modules.intelligence.copernicus import (
     CopernicusQuotaExceeded,
     CopernicusUnavailable,
 )
+from biocore.modules.intelligence.reporting import build_intelligence_pdf
 from biocore.modules.intelligence.earth_engine import (
     EarthEngineAnalysisError,
     EarthEngineUnavailable,
@@ -123,6 +126,88 @@ def _render_geometry(run: IntelligenceRun) -> None:
         tooltip="Área analizada",
     ).add_to(map_object)
     st_folium(map_object, use_container_width=True, height=380, returned_objects=[])
+
+
+def _geometry_payload(geometry: dict[str, object]) -> bytes:
+    return json.dumps(geometry, ensure_ascii=False).encode("utf-8")
+
+
+def _area_picker(
+    project_id: str,
+    previous_run: IntelligenceRun | None,
+) -> bytes | None:
+    """Let users reuse, draw or upload an AOI without exposing data internals."""
+
+    choices = ["Dibujar en el mapa", "Subir un archivo GeoJSON"]
+    if previous_run is not None:
+        choices.insert(0, "Usar el área del último monitoreo")
+    choice = st.radio(
+        "Área que deseas analizar",
+        choices,
+        horizontal=True,
+        help=(
+            "BioCore enviará a Copernicus únicamente el polígono y las fechas "
+            "necesarias para calcular los indicadores."
+        ),
+        key=f"intelligence_area_mode_{project_id}",
+    )
+    if choice == "Usar el área del último monitoreo" and previous_run is not None:
+        st.success("Usaremos la misma área conservada en el historial del proyecto.")
+        _render_geometry(previous_run)
+        return _geometry_payload(previous_run.geometry)
+
+    if choice == "Subir un archivo GeoJSON":
+        uploaded = st.file_uploader(
+            "Archivo del límite del área",
+            type=("geojson", "json"),
+            help=(
+                "Acepta un polígono WGS84. El archivo se valida y no se guarda "
+                "si el análisis no se completa."
+            ),
+            key=f"intelligence_geojson_{project_id}",
+        )
+        return uploaded.getvalue() if uploaded is not None else None
+
+    st.caption(
+        "Usa la herramienta de polígono del mapa, marca al menos tres puntos y "
+        "cierra la figura seleccionando nuevamente el primer punto."
+    )
+    map_object = folium.Map(
+        location=[-33.45, -70.66],
+        zoom_start=5,
+        tiles="OpenStreetMap",
+    )
+    Draw(
+        position="topleft",
+        export=False,
+        draw_options={
+            "polyline": False,
+            "rectangle": False,
+            "circle": False,
+            "marker": False,
+            "circlemarker": False,
+            "polygon": {"allowIntersection": False, "showArea": True},
+        },
+        edit_options={"edit": False, "remove": True},
+    ).add_to(map_object)
+    map_result = st_folium(
+        map_object,
+        use_container_width=True,
+        height=430,
+        key=f"intelligence_draw_map_{project_id}",
+        returned_objects=["last_active_drawing", "all_drawings"],
+    )
+    state_key = f"intelligence_drawn_geometry_{project_id}"
+    drawing = map_result.get("last_active_drawing") if map_result else None
+    geometry = drawing.get("geometry") if isinstance(drawing, dict) else None
+    if isinstance(geometry, dict) and geometry.get("type") == "Polygon":
+        st.session_state[state_key] = geometry
+    stored = st.session_state.get(state_key)
+    if isinstance(stored, dict) and stored.get("type") == "Polygon":
+        st.success("Área dibujada y lista para revisar.")
+        return _geometry_payload(stored)
+    st.info("Dibuja el límite para habilitar el análisis.")
+    return None
 
 
 def _export_run(run: IntelligenceRun) -> bytes:
@@ -293,6 +378,131 @@ def _render_run(run: IntelligenceRun, project_code: str) -> None:
     )
 
 
+def _run_label(run: IntelligenceRun) -> str:
+    return f"{run.created_at:%d/%m/%Y %H:%M} · base {run.baseline_year}"
+
+
+def _select_run(
+    runs: tuple[IntelligenceRun, ...],
+    *,
+    key: str,
+) -> IntelligenceRun | None:
+    if not runs:
+        st.info(
+            "Este proyecto todavía no tiene monitoreos. El primero aparecerá "
+            "con fechas, fuentes, reglas y limitaciones."
+        )
+        return None
+    selected_run_id = st.selectbox(
+        "Resultado",
+        [run.id for run in runs],
+        format_func=lambda run_id: next(
+            _run_label(run) for run in runs if run.id == run_id
+        ),
+        key=key,
+    )
+    return next(run for run in runs if run.id == selected_run_id)
+
+
+def _render_report_center(
+    runs: tuple[IntelligenceRun, ...],
+    *,
+    project_name: str,
+    project_code: str,
+) -> None:
+    st.markdown("### Informes del proyecto")
+    st.caption(
+        "Los dos formatos se generan desde el mismo resultado conservado. "
+        "Cambiar el formato no modifica los datos ni las reglas aplicadas."
+    )
+    run = _select_run(runs, key="intelligence_report_run")
+    if run is None:
+        return
+    report_type = st.radio(
+        "Qué necesitas entregar",
+        ("Informe ejecutivo", "Informe técnico completo"),
+        horizontal=True,
+    )
+    technical = report_type == "Informe técnico completo"
+    if technical:
+        st.info(
+            "Incluye indicadores, reglas, fuentes, resolución, geometría, "
+            "limitaciones y trazabilidad del cálculo."
+        )
+    else:
+        st.info(
+            "Resume las comparaciones y los siguientes pasos en lenguaje claro "
+            "para acompañar la toma de decisiones."
+        )
+    try:
+        pdf = build_intelligence_pdf(
+            run,
+            project_name=project_name,
+            project_code=project_code,
+            technical=technical,
+        )
+    except Exception as error:
+        LOGGER.exception("Intelligence report failed")
+        st.error("No pudimos preparar el informe seleccionado.")
+        st.caption("El resultado histórico sigue intacto; vuelve a intentarlo.")
+        return
+    suffix = "tecnico" if technical else "ejecutivo"
+    st.download_button(
+        f"Descargar {report_type.lower()}",
+        data=pdf,
+        file_name=(
+            f"BioCore_Intelligence_{suffix}_{project_code}_"
+            f"{run.created_at:%Y%m%d}.pdf"
+        ),
+        mime="application/pdf",
+        type="primary",
+        use_container_width=True,
+    )
+    st.caption(
+        "El informe identifica el período, la línea base, el proveedor, las "
+        "reglas, la confianza y las limitaciones del resultado."
+    )
+
+
+def _render_guide() -> None:
+    st.markdown("### Cómo usar BioCore Intelligence")
+    st.write(
+        "BioCore Intelligence realiza vigilancia ecológica satelital vinculada "
+        "a cada proyecto. Ayuda a observar cambios y decidir qué revisar; no "
+        "sustituye campañas de terreno ni una interpretación profesional."
+    )
+    with st.expander("1. Flujo de trabajo", expanded=True):
+        st.markdown(
+            "1. Selecciona el proyecto.\n"
+            "2. Reutiliza, dibuja o carga el área.\n"
+            "3. Elige el año de comparación.\n"
+            "4. Revisa los indicadores y hallazgos.\n"
+            "5. Descarga un informe y contrasta las señales con antecedentes y terreno."
+        )
+    with st.expander("2. Indicadores disponibles"):
+        st.markdown(
+            "- **NDVI, EVI y SAVI:** señales relacionadas con vegetación.\n"
+            "- **NDWI:** señal espectral de agua superficial.\n"
+            "- **NDMI:** señal de humedad de la vegetación.\n"
+            "- **NDSI:** señal contextual compatible con nieve o hielo.\n"
+            "- **SWIR1 y SWIR1/SWIR2:** respuesta espectral; no prueban por sí "
+            "solas una composición del suelo.\n"
+            "- **Cobertura vegetal:** proporción calculada con NDVI mayor que 0,3."
+        )
+    with st.expander("3. Cómo leer un hallazgo"):
+        st.markdown(
+            "Cada hallazgo separa **dato observado, comparación, regla, "
+            "interpretación, confianza, limitación y recomendación**. Una "
+            "clasificación describe la magnitud del cambio; nunca confirma su causa."
+        )
+    with st.expander("4. Privacidad y fuentes"):
+        st.markdown(
+            "BioCore envía a Copernicus únicamente la geometría y las fechas "
+            "necesarias para el cálculo. La identidad del cliente y los demás datos "
+            "del proyecto no se envían al proveedor satelital."
+        )
+
+
 logo = available_logo(BRAND.intelligence_logo)
 if logo:
     st.image(str(logo), width=180)
@@ -303,9 +513,9 @@ st.markdown(
         <h3>Vigilancia conectada al proyecto</h3>
         <p>
             BioCore usa imágenes reales Sentinel-2 de Copernicus para comparar
-            vegetación y humedad vegetal. Distingue el dato observado, el cálculo,
-            la comparación y la recomendación; nunca presenta una inferencia como
-            hecho confirmado.
+            vegetación, cobertura, agua superficial, humedad y respuesta espectral.
+            Cada resultado conserva su mapa, fuentes, reglas y limitaciones; nunca
+            presenta una inferencia como hecho confirmado.
         </p>
     </section>
     """,
@@ -342,8 +552,19 @@ flash = st.session_state.pop(FLASH_KEY, None)
 if flash:
     st.success(str(flash))
 
-new_tab, history_tab = st.tabs(["Nuevo monitoreo", "Historial del proyecto"])
-with new_tab:
+with st.spinner("Cargando resultados conservados…"):
+    runs = _load_runs(selected_project_id)
+
+monitor_tab, reports_tab, history_tab, guide_tab = st.tabs(
+    ["Vigilar", "Informes", "Historial", "Guía"]
+)
+
+with monitor_tab:
+    st.markdown("### Vigilar el territorio")
+    st.caption(
+        "Define el área una sola vez, compárala con una línea base y conserva "
+        "el resultado dentro del proyecto."
+    )
     if not service.provider_configured:
         st.warning(
             "BioCore Intelligence ya está integrado con el proyecto y conserva su "
@@ -352,7 +573,8 @@ with new_tab:
         )
         st.caption(
             "No necesitas activar una prueba de Google Cloud ni registrar una tarjeta. "
-            "Mientras un administrador completa la conexión, puedes consultar resultados históricos. "
+            "Mientras un administrador completa la conexión, puedes consultar "
+            "resultados históricos. "
             "No se enviarán datos ni se crearán resultados simulados."
         )
         st.info(
@@ -362,27 +584,35 @@ with new_tab:
     elif not context.has_permission(Permission.INTELLIGENCE_WRITE):
         st.info("Tu acceso es de consulta. Puedes revisar resultados históricos.")
     else:
-        st.markdown("### Definir el área y la comparación")
-        with st.form("intelligence_monitoring_form"):
-            geojson = st.file_uploader(
-                "Polígono del área de estudio en GeoJSON *",
-                type=("geojson", "json"),
-                help="Usa coordenadas WGS84. El archivo se valida antes de consultar fuentes satelitales.",
-            )
-            baseline_year = st.selectbox(
-                "Año de línea base *",
-                list(range(date.today().year - 1, 2016, -1)),
-                help="Se compara la misma ventana aproximada de 90 días en ambos períodos.",
-            )
-            accepted = st.checkbox(
-                "Comprendo que es una comparación preliminar y revisaré los cambios con antecedentes y terreno."
-            )
-            submitted = st.form_submit_button(
-                "Analizar área",
-                type="primary",
-                use_container_width=True,
-                disabled=geojson is None or not accepted,
-            )
+        st.markdown("#### 1. Área del proyecto")
+        geometry_payload = _area_picker(
+            selected_project_id,
+            runs[0] if runs else None,
+        )
+        st.markdown("#### 2. Comparación")
+        comparison_col, evidence_col = st.columns(2)
+        baseline_year = comparison_col.selectbox(
+            "Año de línea base *",
+            list(range(date.today().year - 1, 2016, -1)),
+            help=(
+                "BioCore compara la misma ventana aproximada de 90 días en el "
+                "período actual y en el año seleccionado."
+            ),
+        )
+        evidence_col.info(
+            "Fuente actual: Copernicus Data Space · Sentinel-2 L2A. "
+            "Se filtran nubes y píxeles sin datos antes de calcular."
+        )
+        accepted = st.checkbox(
+            "Comprendo que el resultado es preliminar y revisaré las señales "
+            "con antecedentes y terreno."
+        )
+        submitted = st.button(
+            "Analizar área",
+            type="primary",
+            use_container_width=True,
+            disabled=geometry_payload is None or not accepted,
+        )
         if submitted:
             try:
                 with st.spinner(
@@ -391,7 +621,7 @@ with new_tab:
                     completed = service.run(
                         context,
                         selected_project_id,
-                        geojson.getvalue(),
+                        geometry_payload,
                         int(baseline_year),
                     )
                 st.session_state[FLASH_KEY] = (
@@ -402,30 +632,26 @@ with new_tab:
             except Exception as error:
                 _friendly_error(error, operation="run_monitoring")
 
+    if runs:
+        st.markdown("### Último resultado")
+        _render_run(runs[0], selected_project.code)
+
+with reports_tab:
+    _render_report_center(
+        runs,
+        project_name=selected_project.name,
+        project_code=selected_project.code,
+    )
+
 with history_tab:
-    runs = _load_runs(selected_project_id)
-    if not runs:
-        st.info(
-            "Este proyecto todavía no tiene monitoreos. El primero aparecerá aquí "
-            "con período, fuentes, reglas y limitaciones."
-        )
-    else:
-        selected_run_id = st.selectbox(
-            "Resultado histórico",
-            [run.id for run in runs],
-            index=next(
-                (
-                    index
-                    for index, run in enumerate(runs)
-                    if run.id == st.session_state.get("biocore_intelligence_selected_run")
-                ),
-                0,
-            ),
-            format_func=lambda run_id: next(
-                f"{run.created_at:%d/%m/%Y %H:%M} · base {run.baseline_year}"
-                for run in runs
-                if run.id == run_id
-            ),
-        )
-        selected_run = next(run for run in runs if run.id == selected_run_id)
+    st.markdown("### Historial del proyecto")
+    st.caption(
+        "Cada ejecución es inmutable. Una corrección crea un resultado nuevo "
+        "para no alterar la evidencia anterior."
+    )
+    selected_run = _select_run(runs, key="intelligence_history_run")
+    if selected_run is not None:
         _render_run(selected_run, selected_project.code)
+
+with guide_tab:
+    _render_guide()

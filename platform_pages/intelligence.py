@@ -573,8 +573,7 @@ with monitor_tab:
         )
         st.caption(
             "No necesitas activar una prueba de Google Cloud ni registrar una tarjeta. "
-            "Mientras un administrador completa la conexión, puedes consultar "
-            "resultados históricos. "
+            "Mientras un administrador completa la conexión, puedes consultar resultados históricos. "
             "No se enviarán datos ni se crearán resultados simulados."
         )
         st.info(

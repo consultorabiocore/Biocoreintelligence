@@ -13,8 +13,8 @@ se verifica la migración. No aparece como segundo módulo dentro de la platafor
 
 ## Regla de integración
 
-La aplicación actualizada no se incrusta mediante `iframe`, no redirige a otro
-Streamlit y no conserva su autenticación o tabla de usuarios independiente.
+La aplicación actualizada no se incrusta mediante `iframe`, no redirige a otro Streamlit
+y no conserva su autenticación o tabla de usuarios independiente.
 Cada capacidad se traslada a la arquitectura nativa:
 
 - sesión y autorización central de BioCore;

@@ -64,20 +64,38 @@ def _section(pdf: FPDF, title: str) -> None:
     pdf.ln(2)
     pdf.set_text_color(15, 74, 55)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.multi_cell(0, 6, _pdf_text(title))
+    pdf.multi_cell(
+        0,
+        6,
+        _pdf_text(title),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
     pdf.set_text_color(28, 48, 39)
 
 
 def _paragraph(pdf: FPDF, text: Any, *, bold: bool = False) -> None:
     pdf.set_font("Helvetica", "B" if bold else "", 8.6)
-    pdf.multi_cell(0, 4.8, _pdf_text(text))
+    pdf.multi_cell(
+        0,
+        4.8,
+        _pdf_text(text),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
 
 
 def _key_value(pdf: FPDF, key: str, value: Any) -> None:
     pdf.set_font("Helvetica", "B", 8.4)
     pdf.cell(45, 5, _pdf_text(key))
     pdf.set_font("Helvetica", size=8.4)
-    pdf.multi_cell(0, 5, _pdf_text(value))
+    pdf.multi_cell(
+        0,
+        5,
+        _pdf_text(value),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
 
 
 def _findings(pdf: FPDF, findings: Iterable[dict[str, Any]]) -> None:
@@ -92,6 +110,8 @@ def _findings(pdf: FPDF, findings: Iterable[dict[str, Any]]) -> None:
                 f"{finding.get('classification')}"
             ),
             fill=True,
+            new_x="LMARGIN",
+            new_y="NEXT",
         )
         _paragraph(pdf, f"Dato comparado: {finding.get('observed')}")
         _paragraph(pdf, f"Regla: {finding.get('rule')}")
@@ -120,7 +140,13 @@ def build_intelligence_pdf(
     pdf.set_text_color(22, 48, 38)
     pdf.set_font("Helvetica", "B", 17)
     report_name = "Informe tecnico" if technical else "Informe ejecutivo"
-    pdf.multi_cell(0, 8, _pdf_text(report_name))
+    pdf.multi_cell(
+        0,
+        8,
+        _pdf_text(report_name),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
     pdf.set_font("Helvetica", size=9)
     pdf.multi_cell(
         0,
@@ -129,6 +155,8 @@ def build_intelligence_pdf(
             "Vigilancia ecologica satelital explicable, vinculada al proyecto y "
             "conservada en su historial."
         ),
+        new_x="LMARGIN",
+        new_y="NEXT",
     )
 
     _section(pdf, "Identificacion")

@@ -83,7 +83,12 @@ class FakeHttp:
                 {
                     "ndvi": 0.48,
                     "evi": 0.31,
+                    "savi": 0.42,
+                    "ndwi": -0.18,
                     "ndmi": 0.22,
+                    "ndsi": -0.25,
+                    "swir1": 0.12,
+                    "swir_ratio": 1.15,
                     "vegetation_cover": 64.0,
                 }
             ),
@@ -91,7 +96,12 @@ class FakeHttp:
                 {
                     "ndvi": 0.55,
                     "evi": 0.35,
+                    "savi": 0.48,
+                    "ndwi": -0.12,
                     "ndmi": 0.28,
+                    "ndsi": -0.19,
+                    "swir1": 0.10,
+                    "swir_ratio": 1.05,
                     "vegetation_cover": 71.0,
                 }
             ),
@@ -118,7 +128,7 @@ def test_copernicus_provider_returns_real_source_and_auditable_metadata() -> Non
         today=date(2026, 8, 16),
     )
 
-    assert snapshot.provider_version == "copernicus-cdse-sentinel-2-l2a-v1"
+    assert snapshot.provider_version == "copernicus-cdse-sentinel-2-l2a-v2"
     assert snapshot.current_period == "2026-05-19 / 2026-08-16"
     assert snapshot.baseline_period == "2024-05-19 / 2024-08-16"
     assert snapshot.recent_image_count == 1
@@ -130,7 +140,12 @@ def test_copernicus_provider_returns_real_source_and_auditable_metadata() -> Non
     assert [metric.code for metric in snapshot.metrics] == [
         "ndvi",
         "evi",
+        "savi",
+        "ndwi",
         "ndmi",
+        "ndsi",
+        "swir1",
+        "swir_ratio",
         "vegetation_cover",
     ]
     assert snapshot.metrics[0].current == 0.48

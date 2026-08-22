@@ -11,6 +11,11 @@ def test_intelligence_page_runs_inside_biocore() -> None:
     assert "Sentinel-2" in source
     assert "Copernicus" in source
     assert "st.download_button(" in source
+    assert "Dibujar en el mapa" in source
+    assert "Informe ejecutivo" in source
+    assert "Informe técnico completo" in source
+    assert '["Vigilar", "Informes", "Historial", "Guía"]' in source
+    assert "build_intelligence_pdf" in source
     assert "render_module_integration" not in source
     assert "streamlit.app" not in source
     assert "cumplimiento" in source
@@ -38,3 +43,14 @@ def test_intelligence_migration_is_tenant_scoped_and_immutable() -> None:
     assert "create policy intelligence_runs_authorized_insert" in source
     assert "for update" not in source.casefold()
     assert "for delete" not in source.casefold()
+
+
+def test_intelligence_source_is_current_and_not_a_second_embedded_app() -> None:
+    documentation = Path("docs/intelligence_integration.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "consultorabiocore/Biocoreintelligenceaparte" in documentation
+    assert "153fe467a204d77207c8b1fa3ed0883374ae9525" in documentation
+    assert "no se incrusta mediante `iframe`" in documentation
+    assert "no redirige a otro Streamlit" in documentation

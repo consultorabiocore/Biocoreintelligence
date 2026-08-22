@@ -18,7 +18,7 @@ TOKEN_URL = (
 )
 STATISTICS_URL = "https://sh.dataspace.copernicus.eu/statistics/v1"
 CATALOG_URL = "https://sh.dataspace.copernicus.eu/catalog/v1/search"
-PROVIDER_VERSION = "copernicus-cdse-sentinel-2-l2a-v1"
+PROVIDER_VERSION = "copernicus-cdse-sentinel-2-l2a-v2"
 WINDOW_DAYS = 90
 MAX_CLOUD_COVER = 60
 
@@ -47,12 +47,15 @@ EVALSCRIPT = """//VERSION=3
 function setup() {
   return {
     input: [{
-      bands: ["B02", "B04", "B08", "B11", "SCL", "dataMask"]
+      bands: ["B02", "B03", "B04", "B08", "B11", "B12", "SCL", "dataMask"]
     }],
     output: [
       {
         id: "indices",
-        bands: ["ndvi", "evi", "ndmi", "vegetation_cover"],
+        bands: [
+          "ndvi", "evi", "savi", "ndwi", "ndmi", "ndsi",
+          "swir1", "swir_ratio", "vegetation_cover"
+        ],
         sampleType: "FLOAT32"
       },
       { id: "dataMask", bands: 1 }
@@ -64,18 +67,33 @@ function evaluatePixel(sample) {
   const excludedScl = [1, 3, 7, 8, 9, 10, 11];
   const clear = sample.dataMask === 1 && excludedScl.indexOf(sample.SCL) === -1;
   const ndviDenominator = sample.B08 + sample.B04;
+  const saviDenominator = sample.B08 + sample.B04 + 0.5;
+  const ndwiDenominator = sample.B03 + sample.B08;
   const ndmiDenominator = sample.B08 + sample.B11;
+  const ndsiDenominator = sample.B03 + sample.B11;
   const eviDenominator = sample.B08 + 6 * sample.B04 - 7.5 * sample.B02 + 1;
   const valid = clear && Math.abs(ndviDenominator) > 0.000001 &&
-    Math.abs(ndmiDenominator) > 0.000001 && Math.abs(eviDenominator) > 0.000001;
+    Math.abs(saviDenominator) > 0.000001 &&
+    Math.abs(ndwiDenominator) > 0.000001 &&
+    Math.abs(ndmiDenominator) > 0.000001 &&
+    Math.abs(ndsiDenominator) > 0.000001 &&
+    Math.abs(sample.B12) > 0.000001 &&
+    Math.abs(eviDenominator) > 0.000001;
   if (!valid) {
-    return { indices: [0, 0, 0, 0], dataMask: [0] };
+    return { indices: [0, 0, 0, 0, 0, 0, 0, 0, 0], dataMask: [0] };
   }
   const ndvi = (sample.B08 - sample.B04) / ndviDenominator;
   const evi = 2.5 * (sample.B08 - sample.B04) / eviDenominator;
+  const savi = 1.5 * (sample.B08 - sample.B04) / saviDenominator;
+  const ndwi = (sample.B03 - sample.B08) / ndwiDenominator;
   const ndmi = (sample.B08 - sample.B11) / ndmiDenominator;
+  const ndsi = (sample.B03 - sample.B11) / ndsiDenominator;
+  const swirRatio = sample.B11 / sample.B12;
   return {
-    indices: [ndvi, evi, ndmi, ndvi > 0.3 ? 100 : 0],
+    indices: [
+      ndvi, evi, savi, ndwi, ndmi, ndsi,
+      sample.B11, swirRatio, ndvi > 0.3 ? 100 : 0
+    ],
     dataMask: [1]
   };
 }
@@ -307,7 +325,12 @@ class CopernicusProvider:
         weighted_sums = {
             "ndvi": 0.0,
             "evi": 0.0,
+            "savi": 0.0,
+            "ndwi": 0.0,
             "ndmi": 0.0,
+            "ndsi": 0.0,
+            "swir1": 0.0,
+            "swir_ratio": 0.0,
             "vegetation_cover": 0.0,
         }
         weights = {code: 0 for code in weighted_sums}
@@ -397,12 +420,45 @@ class CopernicusProvider:
         metrics = (
             self._metric("ndvi", "NDVI", current["ndvi"], baseline["ndvi"], "índice", source),
             self._metric("evi", "EVI", current["evi"], baseline["evi"], "índice", source),
+            self._metric("savi", "SAVI", current["savi"], baseline["savi"], "índice", source),
+            self._metric(
+                "ndwi",
+                "Agua superficial (NDWI)",
+                current["ndwi"],
+                baseline["ndwi"],
+                "índice",
+                source,
+            ),
             self._metric(
                 "ndmi",
                 "Humedad de vegetación (NDMI)",
                 current["ndmi"],
                 baseline["ndmi"],
                 "índice",
+                source,
+            ),
+            self._metric(
+                "ndsi",
+                "Señal de nieve o hielo (NDSI)",
+                current["ndsi"],
+                baseline["ndsi"],
+                "índice",
+                source,
+            ),
+            self._metric(
+                "swir1",
+                "Reflectancia SWIR1",
+                current["swir1"],
+                baseline["swir1"],
+                "reflectancia",
+                source,
+            ),
+            self._metric(
+                "swir_ratio",
+                "Razón espectral SWIR1/SWIR2",
+                current["swir_ratio"],
+                baseline["swir_ratio"],
+                "razón",
                 source,
             ),
             self._metric(
@@ -432,5 +488,9 @@ class CopernicusProvider:
                 "baseline_valid_pixel_samples": baseline_valid_pixels,
                 "external_processing": True,
                 "data_nature": "observed_and_calculated",
+                "metric_scope": (
+                    "NDVI, EVI, SAVI, NDWI, NDMI, NDSI, SWIR1, "
+                    "SWIR1/SWIR2 y cobertura vegetal"
+                ),
             },
         )
